@@ -1,0 +1,6 @@
+@AlkemyBetaSquad_HostAddress = http://localhost:5289
+
+GET {{AlkemyBetaSquad_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
