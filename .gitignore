@@ -1,0 +1,28 @@
+﻿# Node / Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# .NET / Backend
+bin/
+obj/
+*.user
+*.suo
+
+# Secretos y Entorno
+.env
+.env.*
+appsettings.json
+!appsettings.Example.json
+!appsettings.Development.json
+
+# Base de datos (SQL Server)
+*.mdf
+*.ldf
+*.ndf
+
+# Logs y SO
+*.log
+.DS_Store
+Thumbs.db
