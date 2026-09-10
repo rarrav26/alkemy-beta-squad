@@ -1,13 +1,13 @@
-import ProductList from '../components/Home/ProductList'
+import Login from '../components/Home/Login'
 import { ElementosGlobales } from '../context/ElementosGlobales'
-import { useContext, useState } from 'react'
+import { useContext } from 'react'
 
 function Home() {
   const { products, error, loading } = useContext(ElementosGlobales)
 
   return (
     <section>
-      <ProductList />
+      <Login />
     </section>
   )
 }

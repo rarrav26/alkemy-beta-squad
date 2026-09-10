@@ -41,7 +41,7 @@ function Footer() {
             fontWeight: 700
           }}
         >
-          ReactCommerce
+          DigitalArs
         </Typography>
       </Box>
 
@@ -71,7 +71,7 @@ function Footer() {
         }}
       >
         <Link
-          href='https://www.facebook.com/share/1HQ1VhKSBA/?mibextid=wwXIfr'
+          href='#'
           target='_blank'
           rel='noopener noreferrer'
           underline='none'
@@ -83,7 +83,7 @@ function Footer() {
         </Link>
 
         <Link
-          href='https://www.instagram.com/lobos_martin/'
+          href='#'
           target='_blank'
           rel='noopener noreferrer'
           underline='none'
@@ -95,7 +95,7 @@ function Footer() {
         </Link>
 
         <Link
-          href='https://www.linkedin.com/in/mart%C3%ADn-lobos/'
+          href='#'
           target='_blank'
           rel='noopener noreferrer'
           underline='none'
@@ -110,7 +110,7 @@ function Footer() {
       {/* Copyright */}
 
       <Typography variant='body2' color='text.secondary'>
-        © 2026 ReactCommerce - Lobos Martín. All rights reserved.
+        © 2026 DigitalArs - Squad 2. All rights reserved.
       </Typography>
     </Box>
   )
