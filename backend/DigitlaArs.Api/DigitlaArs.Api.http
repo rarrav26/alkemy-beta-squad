@@ -1,0 +1,6 @@
+@DigitlaArs.Api_HostAddress = http://localhost:5261
+
+GET {{DigitlaArs.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

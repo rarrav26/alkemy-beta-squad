@@ -1,0 +1,31 @@
+# DigitalArs.Api - Setup EF Core Database First
+
+## Requisitos
+- .NET SDK 10
+- SQL Server con base `DigitalArs`
+- Herramienta EF Core CLI:
+
+```powershell
+dotnet tool install --global dotnet-ef
+```
+
+## Variable de entorno de conexión (Development)
+Configurar la cadena por variable de entorno (no versionar credenciales):
+
+```powershell
+$env:ConnectionStrings__DefaultConnection='Data Source=.\SQLEXPRESS01;Initial Catalog=DigitalArs;Integrated Security=True;Persist Security Info=False;Pooling=False;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Application Name=SQL Server Management Studio;Command Timeout=0'
+```
+
+## Scaffolding Database First
+Desde la carpeta `backend/DigitlaArs.Api`:
+
+```powershell
+dotnet ef dbcontext scaffold "$env:ConnectionStrings__DefaultConnection" Microsoft.EntityFrameworkCore.SqlServer --project "DigitalArs.Api.csproj" --startup-project "DigitalArs.Api.csproj" --context DigitalArsDbContext --context-dir Data/Context --output-dir Data/Entities --namespace DigitalArs.Api.Data.Entities --context-namespace DigitalArs.Api.Data.Context --no-onconfiguring --use-database-names --force
+```
+
+## Ejecución
+```powershell
+dotnet restore
+dotnet build
+dotnet run --project DigitalArs.Api.csproj
+```
