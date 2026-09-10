@@ -28,7 +28,7 @@ Abrir la solución de la API en Visual Studio, dentro de:
 backend/DigitlaArs.Api
 ```
 
-En `Properties/launchSettings.json`, buscar el perfil `https` y ajustar `ConnectionStrings__DefaultConnection` a su instancia de SQL Server.
+En `Properties/launchSettings.json`, buscar el perfil `DigitalArs.Api` y ajustar `ConnectionStrings__DefaultConnection` a su instancia de SQL Server.
 
 Ejemplo con autenticación de Windows:
 

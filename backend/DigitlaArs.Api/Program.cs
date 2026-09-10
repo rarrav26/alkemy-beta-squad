@@ -18,7 +18,12 @@ var builder = WebApplication.CreateBuilder(args.Where(a => !commandFlags.Contain
 DevelopmentSetup.ConfigureJwt(builder);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 if (string.IsNullOrWhiteSpace(connectionString))
-    throw new InvalidOperationException("Configurá ConnectionStrings:DefaultConnection.");
+{
+    throw new InvalidOperationException(
+        "Falta la cadena de conexión. Copiá Properties/launchSettings.Example.json a " +
+        "Properties/launchSettings.json y completá ConnectionStrings__DefaultConnection " +
+        "con tu instancia de SQL Server. Ver README.md del backend.");
+}
 
 builder.Services.AddScoped(_ => new SqlConnection(connectionString));
 builder.Services.AddDbContext<DigitalArsDbContext>((sp, options) =>

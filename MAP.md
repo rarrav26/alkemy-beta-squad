@@ -579,7 +579,7 @@ Aplicar Init(v.001).sql y después Create(v.002).sql. Seed(v.002).sql es opciona
 ### Backend
 
 1. Abrir la API en Visual Studio.
-2. Ajustar DefaultConnection en el perfil https de Properties/launchSettings.json.
+2. Ajustar DefaultConnection en el perfil DigitalArs.Api de Properties/launchSettings.json.
 3. Mantener ASPNETCORE_ENVIRONMENT=Development.
 4. Si falta administrador, agregar BootstrapAdmin mediante **Administrar secretos de usuario**:
 
