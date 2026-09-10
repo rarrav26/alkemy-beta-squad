@@ -1,9 +1,8 @@
 namespace DigitlaArs.Api.DTOs;
 
-public class RegisterDto
+public class RegisterDto : UserProfileDto
 {
-    public required string Nombre { get; set; }
-    public required string Apellido { get; set; }
-    public required string Email { get; set; }
+    [System.ComponentModel.DataAnnotations.Required]
+    [System.ComponentModel.DataAnnotations.StringLength(128, MinimumLength = 8)]
     public required string Password { get; set; }
 }

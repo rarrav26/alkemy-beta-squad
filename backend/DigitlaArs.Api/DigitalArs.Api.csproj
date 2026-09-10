@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>DigitalArs.Api-local-development</UserSecretsId>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Tests/**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -25,6 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Data/Sql/001_Identity.sql" />
     <Folder Include="Data\Entities\" />
     <Folder Include="Dtos\" />
   </ItemGroup>
