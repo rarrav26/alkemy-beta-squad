@@ -1,6 +1,6 @@
 /*============================================================================
  DigitalArs - Billetera Virtual
- Script 000: Inicialización de la base de datos
+ Script 001: Inicialización de la base de datos
  Autor: Beta Squad
  ============================================================================ */
 
