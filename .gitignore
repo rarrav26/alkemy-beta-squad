@@ -10,12 +10,16 @@ obj/
 *.user
 *.suo
 
+# Visual Studio (cache/estado local del IDE)
+.vs/
+
 # Secretos y Entorno
 .env
 .env.*
 appsettings.json
 !appsettings.Example.json
 !appsettings.Development.json
+**/Properties/launchSettings.json
 
 # Base de datos (SQL Server)
 *.mdf
