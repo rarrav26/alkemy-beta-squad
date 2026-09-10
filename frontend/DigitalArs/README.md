@@ -1,330 +1,164 @@
-# 🛒 ReactCommerce
+# DigitalArs — Login, registro y primer administrador
 
-ReactCommerce es una aplicación web de comercio electrónico desarrollada con **React**.  
-La aplicación permite consultar un catálogo de productos, buscar productos por nombre, acceder al detalle de cada uno y alternar entre modo claro y oscuro.
+Entrega para copiar y pegar. Los cambios están separados en `frontend/` y `api/`.
+Se prepararon sobre el frontend del repositorio y la API de `C:\Users\lobma\Desktop\DigitlaArs.Api`.
+Esta entrega no reemplazó los archivos de esas carpetas.
 
-Los productos son obtenidos dinámicamente desde la API pública de **DummyJSON**.
+## 1. Copiar los archivos
 
----
+Detené las aplicaciones antes de reemplazar archivos.
 
-## 🚀 Tecnologías utilizadas
+- Copiá el contenido de `frontend/` en `C:\Users\lobma\Documents\alkemy-beta-squad\frontend\DigitalArs`.
+- Copiá el contenido de `api/` en `C:\Users\lobma\Desktop\DigitlaArs.Api`.
+- Reemplazá los archivos coincidentes y creá los nuevos. No borres las demás carpetas.
 
-El proyecto fue desarrollado utilizando:
+El paquete contiene solo archivos nuevos o modificados. No contiene node_modules, bin, obj, conexiones ni claves.
+No necesitás cambiar los paquetes NuGet ni agregar dependencias de React.
+Los cambios de la API deben incorporarse también a la copia de backend que versionen en Git;
+la copia del Escritorio no se sube al repositorio por sí sola.
 
-- **React**
-- **Vite**
-- **JavaScript**
-- **Material UI (MUI)**
-- **React Router**
-- **Context API**
-- **Fetch API**
-- **DummyJSON API**
-- **Vercel** para el despliegue
+### Archivos de la API
 
----
+Reemplazar:
+- Program.cs
+- Controllers/AuthController.cs
+- Services/AccountService.cs
 
-## ⚛️ React
+Crear:
+- Controllers/SetupController.cs
+- DTOs/SetupAdminDto.cs
+- FRONTEND-AUTH.md (documentación)
 
-La interfaz fue construida mediante componentes de React.
+No reemplazar appsettings, la configuración JWT, la conexión ni los contextos de base existentes.
 
-La aplicación se dividió en diferentes componentes con responsabilidades específicas, permitiendo mantener el código organizado y reutilizable.
+## 2. Preparar la API
 
-Entre los principales componentes se encuentran:
+Si Identity ya funciona, no es necesario volver a crear sus tablas. Estos cambios no agregan tablas.
+Si es una instalación nueva, primero seguí la preparación de Identity del README anterior.
 
-- `Header`
-- `SearchBar`
-- `ChangeTheme`
-- `ProductList`
-- `ProductGrid`
-- `ProductCard`
-- `ProductDetailID`
-- `Footer`
-- `ScrollTopButton`
+Para habilitar el primer administrador desde React, ejecutá lo siguiente en la carpeta de la API:
 
----
-
-## 🎨 Material UI
-
-Para la construcción de la interfaz se utilizó **Material UI (MUI)**.
-
-Esta biblioteca proporciona componentes visuales reutilizables y permite trabajar fácilmente con diseños responsive.
-
-Entre los componentes utilizados se encuentran:
-
-- `AppBar`
-- `Toolbar`
-- `Grid`
-- `Card`
-- `CardMedia`
-- `CardContent`
-- `CardActions`
-- `Button`
-- `IconButton`
-- `TextField`
-- `Typography`
-- `Paper`
-- `Rating`
-- `Chip`
-- `LinearProgress`
-
-También se utilizaron diferentes íconos de **Material Icons**.
-
----
-
-## 📦 Cards de productos
-
-Cada producto del catálogo se representa mediante un componente `ProductCard`.
-
-Las cards muestran la información principal del producto:
-
-- Imagen
-- Nombre
-- Precio
-- Botón para acceder al detalle
-
-Cada card recibe el producto mediante **props**, permitiendo reutilizar el mismo componente para todos los elementos del catálogo.
-
-```jsx
-<ProductCard product={product} />
+```powershell
+$setupBytes = New-Object byte[] 32
+[Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($setupBytes)
+$setupKey = [Convert]::ToBase64String($setupBytes)
+dotnet user-secrets set "Setup:Key" $setupKey
+Write-Host "Clave para el formulario inicial: $setupKey"
+dotnet run --launch-profile https
 ```
 
-El botón **Show Detail** utiliza React Router para navegar hacia la página correspondiente al producto.
+Copiá esa clave en el campo **Clave de configuración inicial** del formulario.
+Es una clave distinta de Jwt:Key. No la guardes en React, Git, un archivo VITE_* ni la compartas públicamente.
+Después de crear al administrador, podés quitarla:
 
-```jsx
-<Button component={Link} to={`/product/${product.id}`}>
-  Show Detail
-</Button>
+```powershell
+dotnet user-secrets remove "Setup:Key"
 ```
 
----
+Si ya existe un administrador, la app muestra login directamente y no necesita Setup:Key.
+Si el usuario que creaste antes tiene rol Usuario, no se convierte automáticamente en administrador.
+Para crear la primera cuenta administradora, usá un correo y documento que todavía no estén registrados.
 
-## 🔲 Grilla de productos
+La API comprueba que no haya administrador y usa un bloqueo transaccional de SQL Server para coordinar
+solicitudes simultáneas. También se aplica al comando anterior --bootstrap-admin.
+Una segunda alta administrativa inicial devuelve 409 SETUP_COMPLETED, incluso desde otro navegador.
+Crear usuarios por el registro normal nunca asigna el rol Administrador.
 
-Los productos son organizados mediante el sistema de grillas de Material UI.
+## 3. Preparar React
 
-El componente `ProductGrid` recibe el listado de productos mediante props y utiliza `map()` para generar una card por cada producto.
+En la carpeta del frontend:
 
-```jsx
-{
-  products.map(product => <ProductCard key={product.id} product={product} />)
-}
+```powershell
+Copy-Item .env.example .env.local
+npm ci
+npm run dev
 ```
 
-Se utiliza `product.id` como **key estable** para identificar cada elemento renderizado.
+Abrí http://localhost:5173.
 
-La grilla también es responsive, adaptando la cantidad y tamaño de las cards según el ancho disponible en la pantalla.
-
----
-
-## 🔍 SearchBar
-
-La aplicación incluye un componente `SearchBar` que permite buscar productos por su título.
-
-El valor ingresado en el buscador se almacena en un estado global y posteriormente `ProductList` filtra los productos utilizando `filter()`.
-
-```jsx
-const filteredProducts = products.filter(product =>
-  product.title.toLowerCase().includes(search.toLowerCase())
-)
-```
-
-En dispositivos móviles, el buscador permanece reducido mostrando principalmente el ícono de búsqueda. Al tocarlo, el campo se expande y recibe automáticamente el foco.
-
-Para este comportamiento se utilizaron:
-
-- `useState`
-- `useRef`
-- eventos `onFocus` y `onBlur`
-- estilos responsive de Material UI
-
----
-
-## 🌙 Modo claro y oscuro
-
-La aplicación permite cambiar entre **Dark Mode** y **Light Mode**.
-
-Esta funcionalidad se encuentra encapsulada en el componente `ChangeTheme`.
-
-El estado del tema se administra mediante Context API:
-
-```jsx
-const [darkMode, setDarkMode] = useState(true)
-```
-
-A partir de este valor se genera dinámicamente el tema de Material UI:
-
-```jsx
-const theme = createTheme({
-  palette: {
-    mode: darkMode ? 'dark' : 'light'
-  }
-})
-```
-
-De esta manera, los componentes de Material UI pueden adaptar automáticamente sus colores al tema seleccionado.
-
----
-
-## 🌐 Context API
-
-Se utilizó **Context API** para compartir información entre diferentes componentes sin tener que pasarla manualmente por toda la jerarquía mediante props.
-
-El contexto `ElementosGlobales` administra información como:
-
-- Productos
-- Estado de carga
-- Errores
-- Texto ingresado en el buscador
-- Tema claro/oscuro
-
-Esto permite, por ejemplo, que `SearchBar` modifique el texto de búsqueda y que `ProductList` pueda utilizar inmediatamente ese valor para filtrar los productos.
-
----
-
-## 🔗 React Router
-
-La navegación de la aplicación se realiza utilizando **React Router**.
-
-Las principales rutas son:
-
-```jsx
-<Route path='/' element={<Home />} />
-
-<Route
-  path='/product/:id'
-  element={<ProductDetailID />}
-/>
-```
-
-La ruta `/` muestra el catálogo general.
-
-La ruta `/product/:id` utiliza un parámetro dinámico para identificar el producto seleccionado.
-
-Por ejemplo:
+El archivo .env.local contiene:
 
 ```text
-/product/1
+VITE_API_URL=https://localhost:7201
 ```
 
-permite acceder al detalle del producto con ID `1`.
+Es la dirección base, sin /api al final. Reiniciá Vite si la cambiás.
+El puerto 5173 está fijado: si está ocupado, cerrá la otra instancia o coordiná otro puerto con la configuración CORS.
 
----
+El certificado HTTPS de desarrollo debe estar aprobado en tu equipo.
+Si aún no lo está, ejecutá `dotnet dev-certs https --trust` desde tu terminal.
 
-## 📄 Detalle del producto
+### CORS
 
-Al seleccionar **Show Detail**, la aplicación navega al componente `ProductDetailID`.
+En Development, la API permite http://localhost:5173.
+Si usás otro origen, configurá en la API (y reiniciala):
 
-El ID se obtiene mediante `useParams()`:
+```powershell
+dotnet user-secrets set "Cors:AllowedOrigins:0" "http://localhost:5174"
+```
+
+En producción, configurá Cors__AllowedOrigins__0 con el origen HTTPS real del frontend.
+El frontend desplegado necesita VITE_API_URL con una API accesible por HTTPS; localhost solo sirve en tu máquina.
+Vercel no publica automáticamente esta API .NET. Esta entrega no realizó ningún despliegue.
+
+## 4. Flujo de la aplicación
+
+1. Al abrir la aplicación, consulta GET /api/setup/status.
+2. Si no hay administrador, muestra el formulario inicial. Sin Setup:Key configurada, informa que la instalación no está habilitada.
+3. Al crear el administrador, vuelve al login. No inicia sesión automáticamente.
+4. Login válido: guarda la sesión en sessionStorage y abre /dashboard.
+5. El administrador puede entrar a /usuarios/nuevo, registrar un usuario sin contraseña y obtener su invitación.
+6. El usuario entra a /primera-password con correo y código, elige contraseña y recibe acceso.
+7. También está disponible /register para el registro público de usuarios comunes.
+8. Cerrar sesión elimina el token. La sesión se conserva al recargar la pestaña y se verifica con GET /api/auth/me.
+9. Al vencer el JWT o recibir 401 en una llamada protegida, se cierra la sesión. Un usuario desactivado recibe el mensaje de la API.
+
+El código de invitación se muestra al administrador pero no se guarda en sessionStorage.
+No hay envío automático de correo. El administrador debe entregarlo por un medio privado.
+La pantalla de dashboard es el punto de entrada; no inventa saldos, movimientos ni datos financieros.
+
+## 5. Contextos globales
+
+- ElementosGlobales: tema visual.
+- AuthProvider / AuthContext: sesión, estado inicial, login, registro, primer administrador, primera contraseña y alta de usuarios.
+- context/api.js: cliente HTTP usado por AuthProvider.
+
+Los componentes no llaman fetch. Usan useAuth():
 
 ```jsx
-const { id } = useParams()
+const { login, register, createUser, logout, session } = useAuth()
 ```
 
-Luego se realiza una nueva petición a la API para obtener la información completa del producto:
+Las validaciones de rol del frontend sirven para la navegación; la API sigue validando permisos.
+sessionStorage guarda el token por pestaña, nunca contraseñas ni la clave de configuración inicial.
+Esta persistencia implica que el token es accesible a JavaScript; evitá introducir HTML sin sanitizar.
 
-```jsx
-fetch(`https://dummyjson.com/products/${id}`)
+## 6. Verificación
+
+Frontend:
+
+```powershell
+npm run build
+npm run lint
+npm test
 ```
 
-En esta pantalla se muestra información adicional como:
+API:
 
-- Imagen
-- Nombre
-- Precio
-- Categoría
-- Descripción
-- Rating
-- Stock
-- Disponibilidad
-- Opiniones de usuarios
-
-También se incluye un botón **Home** para regresar al catálogo.
-
----
-
-## 📡 Consumo de API
-
-Los datos utilizados por ReactCommerce provienen de la API de DummyJSON.
-
-El catálogo inicial se obtiene mediante:
-
-```text
-https://dummyjson.com/products
+```powershell
+dotnet build
+dotnet run --project Tests/AuthenticationChecks/AuthenticationChecks.csproj
 ```
 
-Las solicitudes se realizan utilizando `fetch()` junto con `async/await`.
+Verificado en esta entrega:
+- Compilación de frontend y API.
+- ESLint sin errores.
+- Ocho pruebas del cliente HTTP.
+- Diecinueve verificaciones existentes de Identity/JWT.
+- Navegador con servidor simulado: formulario inicial, contraseñas distintas, login incorrecto y correcto,
+  dashboard de administrador, restauración al recargar, alta con invitación, cierre de sesión y primera contraseña.
 
-También se implementó manejo de errores mediante:
-
-```jsx
-try {
-  // solicitud
-} catch (error) {
-  // manejo del error
-} finally {
-  // finalización de la carga
-}
-```
-
-Durante la carga de los productos se muestra un indicador visual utilizando `LinearProgress`.
-
----
-
-## 📱 Diseño responsive
-
-La interfaz fue diseñada para adaptarse a diferentes tamaños de pantalla.
-
-Se utilizaron los breakpoints de Material UI y media queries para modificar la distribución de los componentes en:
-
-- Computadoras
-- Tablets
-- Smartphones
-
-El `Header`, el buscador y la grilla de productos modifican su comportamiento según el espacio disponible.
-
-En pantallas pequeñas, por ejemplo, el menú principal se transforma en un menú hamburguesa y el buscador puede expandirse al seleccionarlo.
-
----
-
-## ⬆️ Scroll to Top
-
-La aplicación incorpora un botón flotante para regresar rápidamente al inicio de la página.
-
-El botón utiliza:
-
-```css
-position: fixed;
-```
-
-y ejecuta:
-
-```jsx
-window.scrollTo({
-  top: 0,
-  behavior: 'smooth'
-})
-```
-
-Esto permite realizar un desplazamiento suave hacia la parte superior del sitio.
-
----
-
-## ☁️ Deploy
-
-La aplicación se encuentra desplegada utilizando **Vercel**.
-
-Debido al uso de React Router, se configuró Vercel para redirigir las rutas de la SPA hacia `index.html`, permitiendo acceder directamente a rutas como:
-
-```text
-/product/1
-```
-
-sin obtener un error `404`.
-
----
-
-## 👨‍💻 Autor
-
-**Martín Lobos**
-
-Proyecto desarrollado como práctica de React, utilizando componentes, props, hooks, Context API, consumo de APIs, routing y Material UI.
+La prueba de navegador usa respuestas simuladas y datos ficticios: no valida la integración con tu SQL Server.
+Todavía debe probarse contra tu API real el alta inicial (incluidos dos intentos simultáneos),
+el bloqueo de un segundo administrador, CORS, registro, login y alta de usuarios.
+La sesión de herramientas no dispone de la autenticación Windows necesaria para comprobar tu base.
