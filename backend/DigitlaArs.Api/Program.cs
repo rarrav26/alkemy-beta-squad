@@ -6,19 +6,20 @@ using DigitalArs.Api.Repositories;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-
-var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
 if (string.IsNullOrWhiteSpace(connectionString))
 {
-    throw new InvalidOperationException("La cadena de conexión no está configurada. Definí la variable de entorno 'ConnectionStrings__DefaultConnection'.");
+    throw new InvalidOperationException("La cadena de conexión 'DefaultConnection' no está configurada en appsettings o variables de entorno.");
 }
 
 builder.Services.AddDbContext<DigitalArsDbContext>(options =>
     options.UseSqlServer(connectionString));
+
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 
 builder.Services.AddControllers();
+
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
