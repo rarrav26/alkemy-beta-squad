@@ -10,7 +10,10 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 if (string.IsNullOrWhiteSpace(connectionString))
 {
-    throw new InvalidOperationException("La cadena de conexión 'DefaultConnection' no está configurada en appsettings o variables de entorno.");
+    throw new InvalidOperationException(
+        "Falta la cadena de conexión. Copiá Properties/launchSettings.Example.json a " +
+        "Properties/launchSettings.json y completá ConnectionStrings__DefaultConnection " +
+        "con tu instancia de SQL Server. Ver README.md del backend.");
 }
 
 builder.Services.AddDbContext<DigitalArsDbContext>(options =>

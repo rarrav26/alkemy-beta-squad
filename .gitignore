@@ -14,11 +14,10 @@ obj/
 .vs/
 
 # Secretos y Entorno
+# La cadena de conexion vive SOLO en Properties/launchSettings.json (uno por dev, sin versionar).
+# Ningun appsettings*.json lleva credenciales, asi que todos se versionan.
 .env
 .env.*
-appsettings.json
-!appsettings.Example.json
-!appsettings.Development.json
 **/Properties/launchSettings.json
 
 # Base de datos (SQL Server)
