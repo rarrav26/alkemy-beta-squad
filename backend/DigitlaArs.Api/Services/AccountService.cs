@@ -19,19 +19,6 @@ public class AccountService(AuthDbContext auth, DigitalArsDbContext db, UserMana
         await db.Database.UseTransactionAsync(transaction.GetDbTransaction());
         try
         {
-            if (role == "Administrador")
-            {
-                // Transaction-owned lock coordinates setup across API instances and CLI.
-                await auth.Database.ExecuteSqlRawAsync("""
-                    DECLARE @result int;
-                    EXEC @result = sp_getapplock @Resource = 'DigitalArs.FirstAdmin',
-                        @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 10000;
-                    IF @result < 0 THROW 50002, 'No se pudo bloquear la configuración inicial.', 1;
-                    """);
-                if (await auth.UserRoles.AnyAsync(ur => auth.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Administrador")))
-                    return (null, null, ["SETUP_COMPLETED"]);
-            }
-
             var email = dto.Email.Trim();
             var tipoDoc = dto.TipoDocumento.Trim();
             var nroDoc = dto.NroDocumento.Trim();

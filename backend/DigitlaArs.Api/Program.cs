@@ -13,9 +13,8 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
-var commandFlags = new[] { "--identity-script", "--init-identity", "--bootstrap-admin", "--seed" };
+var commandFlags = new[] { "--identity-script", "--init-identity", "--bootstrap-admin" };
 var builder = WebApplication.CreateBuilder(args.Where(a => !commandFlags.Contains(a)).ToArray());
-DevelopmentSetup.ConfigureJwt(builder);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 if (string.IsNullOrWhiteSpace(connectionString))
 {
@@ -83,12 +82,16 @@ builder.Services.AddRateLimiter(options =>
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 builder.Services.AddControllers();
-builder.Services.AddCors(options => options.AddPolicy("Frontend", policy =>
+
+// El frontend de Vite corre en otro puerto, así que el navegador exige CORS explícito.
+// En producción los orígenes se declaran en Cors:AllowedOrigins; no hay valor por defecto.
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+if (allowedOrigins.Length == 0 && builder.Environment.IsDevelopment())
 {
-    var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-        ?? (builder.Environment.IsDevelopment() ? ["http://localhost:5173"] : Array.Empty<string>());
-    if (origins.Length > 0) policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod();
-}));
+    allowedOrigins = ["http://localhost:5173"];
+}
+builder.Services.AddCors(options => options.AddPolicy("Frontend", policy =>
+    policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod()));
 builder.Services.AddOpenApi(options => options.AddDocumentTransformer<BearerSecuritySchemeTransformer>());
 
 var app = builder.Build();
@@ -98,18 +101,20 @@ if (args.Contains("--identity-script"))
     Console.WriteLine(scope.ServiceProvider.GetRequiredService<AuthDbContext>().Database.GenerateCreateScript());
     return;
 }
-if (args.Contains("--bootstrap-admin") || args.Contains("--seed"))
+if (args.Contains("--bootstrap-admin"))
 {
     using var scope = app.Services.CreateScope();
-    await DevelopmentSetup.InitializeIdentityAsync(scope.ServiceProvider);
-    await DatabaseSeeder.SeedAsync(scope.ServiceProvider, builder.Configuration);
-    Console.WriteLine("Seed completo: roles, catálogo y administrador preparados.");
+    await IdentitySetup.CreateAdminAsync(scope.ServiceProvider, builder.Configuration);
     return;
 }
 if (args.Contains("--init-identity"))
 {
     using var scope = app.Services.CreateScope();
-    await DevelopmentSetup.InitializeIdentityAsync(scope.ServiceProvider);
+    var auth = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
+    using var stream = typeof(Program).Assembly.GetManifestResourceStream("DigitalArs.Api.Data.Sql.001_Identity.sql")!;
+    using var reader = new StreamReader(stream);
+    await auth.Database.ExecuteSqlRawAsync(await reader.ReadToEndAsync());
+    await IdentitySetup.EnsureRolesAsync(scope.ServiceProvider);
     Console.WriteLine("Tablas de Identity y roles preparados.");
     return;
 }
@@ -119,11 +124,7 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<DigitalArsDbContext>();
     if (!await db.Database.CanConnectAsync())
         throw new InvalidOperationException("No fue posible conectar con SQL Server. Revisá DefaultConnection y el servicio SQL Server.");
-    if (app.Environment.IsDevelopment())
-        await DevelopmentSetup.InitializeIdentityAsync(scope.ServiceProvider);
-    else
-        await IdentitySetup.EnsureRolesAsync(scope.ServiceProvider);
-    await DatabaseSeeder.SeedAsync(scope.ServiceProvider, builder.Configuration);
+    await IdentitySetup.EnsureRolesAsync(scope.ServiceProvider);
 }
 if (app.Environment.IsDevelopment())
 {

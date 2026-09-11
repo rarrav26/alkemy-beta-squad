@@ -71,15 +71,23 @@ Si el archivo ya tiene otras configuraciones, conservarlas y agregar `BootstrapA
 
 ## 5 Iniciar la API
 
-Seleccionar el perfil **https** en Visual Studio y ejecutar con **F5** o **Ctrl+F5**.
+La primera vez hay que preparar Identity y crear al administrador. Desde `backend/DigitlaArs.Api`:
 
-En desarrollo, la API prepara automáticamente:
+```powershell
+dotnet run --init-identity
+dotnet run --bootstrap-admin
+```
 
-- La clave JWT local, si no está configurada.
-- Las tablas de Identity.
-- Los roles `Usuario` y `Administrador`.
-- Los tipos de movimiento.
-- El primer administrador, usando la configuración anterior.
+- `--init-identity` crea las tablas de Identity y los roles `Usuario` y `Administrador`.
+- `--bootstrap-admin` crea al administrador con los secretos del paso anterior. Falla si ya existe uno.
+
+Ambos comandos terminan solos: no levantan la API.
+
+Después, seleccionar el perfil **https** en Visual Studio y ejecutar con **F5** o **Ctrl+F5**.
+En cada arranque la API verifica la conexión a SQL Server y asegura que existan los roles.
+
+> La clave JWT se configura en `Jwt:Key` (secretos de usuario o variables de entorno) y debe
+> tener al menos 32 bytes. La API no arranca si falta.
 
 Abrir:
 
@@ -140,7 +148,7 @@ Solo necesitan:
 2. Ejecutar la API desde Visual Studio.
 3. Ejecutar `npm run dev` en el frontend.
 
-No hay que repetir los scripts SQL, recrear al administrador ni configurar nuevamente los secretos. El seed conserva los datos existentes.
+No hay que repetir los scripts SQL, `--init-identity`, `--bootstrap-admin` ni configurar nuevamente los secretos: los datos existentes se conservan.
 
 ## Problemas frecuentes
 

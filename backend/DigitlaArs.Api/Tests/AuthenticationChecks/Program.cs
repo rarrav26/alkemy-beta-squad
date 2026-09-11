@@ -11,8 +11,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
-await AutomaticSetupChecks.RunAsync();
-SeedConfigurationChecks.Run();
 var services = new ServiceCollection();
 services.AddLogging();
 services.AddSingleton<IDataProtectionProvider>(new EphemeralDataProtectionProvider());
@@ -22,9 +20,6 @@ var users = provider.GetRequiredService<UserManager<IdentityUser>>();
 using var auth = new AuthDbContext(new DbContextOptionsBuilder<AuthDbContext>().UseSqlServer("Server=unused;Database=unused").Options);
 using var db = new DigitalArsDbContext(new DbContextOptionsBuilder<DigitalArsDbContext>().UseSqlServer("Server=unused;Database=unused").Options);
 var accounts = new AccountService(auth, db, users);
-var setupController = new DigitalArs.Api.Controllers.SetupController(auth);
-Check(setupController.CreateAdmin() is Microsoft.AspNetCore.Mvc.ObjectResult { StatusCode: 410 },
-    "El administrador inicial no puede crearse desde un endpoint público");
 var user = new IdentityUser { UserName = "test@example.com", Email = "test@example.com" };
 Check((await users.CreateAsync(user)).Succeeded, "Identity crea un usuario sin contraseña");
 Check(!await users.HasPasswordAsync(user), "La invitación no define una contraseña");

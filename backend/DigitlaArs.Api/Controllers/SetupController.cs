@@ -4,7 +4,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 namespace DigitalArs.Api.Controllers;
 
-// Compatibility for an older frontend. The administrator is now created only by the seed.
+// Compatibilidad con el frontend: le permite saber si ya existe un administrador.
+// El alta del administrador inicial se hace por CLI (dotnet run --bootstrap-admin), no por HTTP.
 [ApiController, Route("api/setup")]
 public class SetupController(AuthDbContext auth) : ControllerBase
 {
@@ -18,5 +19,5 @@ public class SetupController(AuthDbContext auth) : ControllerBase
 
     [AllowAnonymous, HttpPost("admin")]
     public IActionResult CreateAdmin() => StatusCode(410, new
-    { code = "ADMIN_MANAGED_BY_SEED", message = "El administrador inicial se crea mediante el seed del backend." });
+    { code = "ADMIN_MANAGED_BY_CLI", message = "El administrador inicial se crea desde el backend con: dotnet run --bootstrap-admin" });
 }
