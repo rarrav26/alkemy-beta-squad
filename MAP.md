@@ -279,20 +279,30 @@ La contraseña se guarda como **PasswordHash en AspNetUsers**, no en Usuarios ni
 **Método:** AuthController.Login.
 
 1. Busca la cuenta por email.
-2. Rechaza una cuenta inexistente, bloqueada o sin contraseña.
-3. Verifica la contraseña con CheckPasswordAsync.
-4. Si falla, registra un intento mediante AccessFailedAsync.
-5. Busca el perfil Usuarios vinculado.
-6. Comprueba is_active.
-7. Reinicia el contador de fallos tras un acceso correcto.
-8. Llama a JwtTokenService.CrearToken.
-9. Devuelve token, role, expiresAt y usuarioId.
+2. Rechaza una cuenta inexistente o bloqueada.
+3. Deriva a definir la primera contraseña si la cuenta todavía no tiene una.
+4. Verifica la contraseña con CheckPasswordAsync.
+5. Si falla, registra un intento mediante AccessFailedAsync.
+6. Busca el perfil Usuarios vinculado.
+7. Comprueba is_active.
+8. Reinicia el contador de fallos tras un acceso correcto.
+9. Llama a JwtTokenService.CrearToken.
+10. Devuelve token, role, expiresAt y usuarioId.
 
 Cinco fallos de contraseña bloquean el login durante 15 minutos, según Program.cs.
 
 - Credenciales incorrectas: 401 e INVALID_CREDENTIALS.
+- Cuenta sin contraseña definida: 409 y PASSWORD_SETUP_REQUIRED.
 - Usuario desactivado con contraseña correcta: 403 y USER_INACTIVE.
 - Contraseña incorrecta: no se revela el estado activo de la cuenta.
+
+El caso PASSWORD_SETUP_REQUIRED cubre al usuario que creó el administrador y
+todavía no eligió contraseña. Es la única desviación deliberada del error
+genérico: sin ella, esa persona recibiría el mismo 401 que un intento fallido y
+nunca sabría que debe definir su contraseña. Lo que se revela es acotado, porque
+la pantalla de primera contraseña sigue exigiendo el código de invitación que
+solo tiene el administrador. LoginPage lee el campo code y deriva a
+/primera-password con el correo ya cargado.
 
 Ejemplo de respuesta; el vencimiento real se calcula al emitir:
 
@@ -562,7 +572,7 @@ Al vencer el token, un temporizador borra la sesión. Un 401 en authenticatedReq
 
 La protección de rutas de React organiza la interfaz. La autorización real la hace la API.
 
-Home.jsx y ProductId.jsx quedaron como redirecciones. El antiguo components/Home/Login.jsx no es la pantalla conectada a las rutas actuales. Se retiraron del flujo las llamadas de ejemplo a DummyJSON.
+Home.jsx y ProductId.jsx quedaron como redirecciones. El antiguo components/Home/Login.jsx se eliminó: era una segunda pantalla de login que ninguna ruta importaba. La pantalla real es LoginPage, en routes/AuthPages.jsx. Se retiraron del flujo las llamadas de ejemplo a DummyJSON.
 
 ## 15. Cómo iniciar el proyecto
 
@@ -686,6 +696,7 @@ La entrega del seed dejó documentadas como pendientes sus pruebas de repetició
 | 401 en Swagger                  | Login y token en Authorize.                           |
 | 403 administrativo              | Rol de la cuenta.                                     |
 | USER_INACTIVE                   | Perfil desactivado con contraseña correcta.           |
+| PASSWORD_SETUP_REQUIRED         | La cuenta existe pero todavía no definió contraseña.  |
 | INVALID_INVITATION              | Código inválido, ajeno, vencido o usado.              |
 | 429                             | Esperar a la siguiente ventana del límite.            |
 | React no conecta                | API, certificado, URL y CORS.                         |
