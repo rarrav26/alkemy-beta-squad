@@ -20,6 +20,10 @@ export function LoginPage() {
   </AuthForm>
 }
 
+function mensajeDeCuentaCreada(cuenta) {
+  return `Cuenta creada con saldo $0. Tu alias es ${cuenta.alias} y tu CVU es ${cuenta.cvu}. Ya podés iniciar sesión.`
+}
+
 export function RegisterPage() {
   const { register, session } = useAuth()
   const navigate = useNavigate()
@@ -27,8 +31,8 @@ export function RegisterPage() {
   return <AuthForm title="Creá tu cuenta" description="Completá tus datos para registrarte."
     submitLabel="Registrarme"
     onSubmit={async data => {
-      await register(data)
-      navigate('/login', { replace: true, state: { message: 'Cuenta creada. Ya podés iniciar sesión.' } })
+      const cuenta = await register(data)
+      navigate('/login', { replace: true, state: { message: mensajeDeCuentaCreada(cuenta) } })
     }}
     footer={<Button component={Link} to="/login">Ya tengo una cuenta</Button>}>
     <ProfileFields /><PasswordFields />

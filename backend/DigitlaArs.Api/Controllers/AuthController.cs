@@ -30,7 +30,14 @@ public class AuthController(
             return BadRequest(new { message = firstError, errors = result.Errors });
         }
 
-        return StatusCode(201, new { message = "Usuario registrado exitosamente.", email = result.User.Email });
+        return StatusCode(201, new
+        {
+            message = "Usuario registrado exitosamente.",
+            email = result.User.Email,
+            alias = result.Cuenta!.alias,
+            cvu = result.Cuenta.cvu,
+            saldo = result.Cuenta.saldo
+        });
     }
 
     [AllowAnonymous, HttpPost("login")]

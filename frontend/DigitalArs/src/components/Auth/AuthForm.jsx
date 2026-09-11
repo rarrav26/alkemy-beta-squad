@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Alert, Box, Button, Paper, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material'
 
 export default function AuthForm({ title, description, submitLabel, onSubmit, children, footer, success }) {
   const [loading, setLoading] = useState(false)
@@ -49,8 +49,13 @@ export function ProfileFields() {
     <TextField name="nombre" label="Nombre" autoComplete="given-name" required fullWidth slotProps={{ htmlInput: { maxLength: 100 } }} />
     <TextField name="apellido" label="Apellido" autoComplete="family-name" required fullWidth slotProps={{ htmlInput: { maxLength: 100 } }} />
     <TextField name="email" label="Correo electrónico" type="email" autoComplete="email" required fullWidth slotProps={{ htmlInput: { maxLength: 256 } }} />
-    <TextField name="tipoDocumento" label="Tipo de documento" defaultValue="DNI" required fullWidth slotProps={{ htmlInput: { maxLength: 20 } }} />
-    <TextField name="nroDocumento" label="Número de documento" required fullWidth slotProps={{ htmlInput: { maxLength: 20 } }} />
+    <TextField select name="tipoDocumento" label="Tipo de documento" defaultValue="DNI" required fullWidth>
+      <MenuItem value="DNI">DNI</MenuItem>
+      <MenuItem value="PASAPORTE">Pasaporte</MenuItem>
+    </TextField>
+    <TextField name="nroDocumento" label="Número de documento" required fullWidth
+      helperText="DNI: 7 u 8 números. Pasaporte: 2 o 3 letras y 6 o 7 números (ej. AB123456)."
+      slotProps={{ htmlInput: { maxLength: 20 } }} />
   </>
 }
 
