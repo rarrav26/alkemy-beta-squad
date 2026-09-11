@@ -40,7 +40,7 @@ Este archivo **no se versiona** (está en `.gitignore`).
 dotnet run
 ```
 
-**4. Swagger:** https://localhost:58162/swagger
+**4. Swagger:** https://localhost:7201/swagger
 
 Si falta la cadena de conexión, la API **no arranca** y tira un error que te dice exactamente
 qué archivo copiar. Es a propósito: es mejor fallar al arrancar que descubrir el problema
@@ -193,8 +193,12 @@ Respuesta: { "token": "...", "role": "Usuario", "expiresAt": "...", "usuarioId":
 En Swagger, pegar solo el token en Authorize. En otras herramientas:
 Authorization: Bearer <token>.
 
-Usuario inexistente, password incorrecta, cuenta bloqueada o sin contraseña:
+Usuario inexistente, password incorrecta o cuenta bloqueada:
 401 con code INVALID_CREDENTIALS y el mismo mensaje genérico.
+Cuenta creada por el administrador que todavía no definió contraseña:
+409 con code PASSWORD_SETUP_REQUIRED, para que el frontend la derive a
+/primera-password en lugar de mostrarle un error. Esa pantalla sigue exigiendo
+el código de invitación, así que el 409 no alcanza para entrar.
 Usuario desactivado con contraseña correcta: 403 con code USER_INACTIVE y mensaje claro.
 La API no revela el estado de una cuenta antes de validar sus credenciales.
 Cinco fallos de contraseña bloquean temporalmente el login por 15 minutos.

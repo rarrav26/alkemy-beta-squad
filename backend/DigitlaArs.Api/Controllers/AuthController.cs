@@ -44,8 +44,13 @@ public class AuthController(
     public async Task<IActionResult> Login(LoginDto dto)
     {
         var user = await users.FindByEmailAsync(dto.Email.Trim());
-        if (user is null || await users.IsLockedOutAsync(user) || !await users.HasPasswordAsync(user))
+        if (user is null || await users.IsLockedOutAsync(user))
             return InvalidCredentials();
+
+        // El usuario que creó el administrador todavía no eligió contraseña: se lo
+        // deriva a la pantalla de primera contraseña en vez del error genérico.
+        if (!await users.HasPasswordAsync(user))
+            return PasswordSetupRequired();
 
         if (!await users.CheckPasswordAsync(user, dto.Password))
         {
@@ -105,4 +110,11 @@ public class AuthController(
 
     private UnauthorizedObjectResult InvalidCredentials() =>
         Unauthorized(new { code = "INVALID_CREDENTIALS", message = "Credenciales incorrectas." });
+
+    private ObjectResult PasswordSetupRequired() =>
+        StatusCode(409, new
+        {
+            code = "PASSWORD_SETUP_REQUIRED",
+            message = "Todavía no definiste tu contraseña. Usá el código de invitación que te dio el administrador."
+        });
 }

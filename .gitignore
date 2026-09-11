@@ -18,6 +18,8 @@ obj/
 # Ningun appsettings*.json lleva credenciales, asi que todos se versionan.
 .env
 .env.*
+# La plantilla no lleva secretos y el README manda copiarla, asi que si se versiona.
+!.env.example
 **/Properties/launchSettings.json
 
 # Base de datos (SQL Server)
