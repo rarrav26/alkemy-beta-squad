@@ -82,6 +82,16 @@ builder.Services.AddRateLimiter(options =>
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 builder.Services.AddControllers();
+
+// El frontend de Vite corre en otro puerto, así que el navegador exige CORS explícito.
+// En producción los orígenes se declaran en Cors:AllowedOrigins; no hay valor por defecto.
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+if (allowedOrigins.Length == 0 && builder.Environment.IsDevelopment())
+{
+    allowedOrigins = ["http://localhost:5173"];
+}
+builder.Services.AddCors(options => options.AddPolicy("Frontend", policy =>
+    policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod()));
 builder.Services.AddOpenApi(options => options.AddDocumentTransformer<BearerSecuritySchemeTransformer>());
 
 var app = builder.Build();
@@ -122,6 +132,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "DigitalArs.Api v1"));
 }
 app.UseHttpsRedirection();
+app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();

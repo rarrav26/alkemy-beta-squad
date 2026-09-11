@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using DigitalArs.Api.Data.Context;
 using DigitalArs.Api.Interfaces;
 using DigitalArs.Api.Services;
@@ -61,6 +62,24 @@ public class AuthController(UserManager<IdentityUser> users, DigitalArsDbContext
 
     [Authorize, HttpGet("test-protegido")]
     public IActionResult TestProtegido() => Ok(new { message = "Acceso autorizado con éxito a la API." });
+
+    [Authorize, HttpGet("me")]
+    public async Task<IActionResult> Me()
+    {
+        var identityUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (identityUserId is null) return Unauthorized();
+
+        var user = await users.FindByIdAsync(identityUserId);
+        if (user is null) return Unauthorized();
+
+        var profile = await db.Usuarios.AsNoTracking()
+            .SingleOrDefaultAsync(u => u.identity_user_id == identityUserId && u.is_active);
+        if (profile is null) return Unauthorized();
+
+        var roles = await users.GetRolesAsync(user);
+        var role = roles.Contains("Administrador") ? "Administrador" : "Usuario";
+        return Ok(new { usuarioId = profile.id, profile.nombre, profile.apellido, profile.email, role });
+    }
 
     private UnauthorizedObjectResult InvalidCredentials() =>
         Unauthorized(new { code = "INVALID_CREDENTIALS", message = "Credenciales incorrectas." });
