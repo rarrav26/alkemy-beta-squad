@@ -4,7 +4,7 @@ Este documento explica la autenticación, autorización, seed y conexión con Re
 
 **Versión documentada:** entrega final con administrador inicial creado mediante seed. El formulario de primer administrador de una versión anterior ya no es parte del flujo vigente.
 
-Las rutas del documento son relativas al repositorio. La carpeta del backend se llama **DigitlaArs.Api**, aunque el proyecto se llama **DigitalArs.Api.csproj**. Las variantes DigitalArs/DigitlaArs presentes en namespaces vienen de la estructura original; no renombrarlas sin actualizar sus referencias.
+Las rutas del documento son relativas al repositorio. La carpeta del backend, el proyecto y los namespaces usan todos el mismo nombre: **DigitalArs.Api**.
 
 ## Índice
 
@@ -73,7 +73,7 @@ Ejemplo: tener un JWT válido identifica a una persona; tener el rol Administrad
 
 ## 3. Mapa de archivos
 
-Dentro de **backend/DigitlaArs.Api/**:
+Dentro de **backend/DigitalArs.Api/**:
 
 | Archivo                                    | Responsabilidad                                                      |
 | ------------------------------------------ | -------------------------------------------------------------------- |

@@ -33,6 +33,7 @@ obj/
 Thumbs.db
 
 # Generado localmente por herramientas de IA, no es parte del proyecto
+.claude/
 .github/copilot-instructions.md
 docs/arquitectura.html
 docs/arquitectura.architecture.json

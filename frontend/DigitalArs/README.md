@@ -1,7 +1,7 @@
 # DigitalArs — Login, registro y primer administrador
 
 Entrega para copiar y pegar. Los cambios están separados en `frontend/` y `api/`.
-Se prepararon sobre el frontend del repositorio y la API de `C:\Users\lobma\Desktop\DigitlaArs.Api`.
+Se prepararon sobre el frontend del repositorio y la API de `C:\Users\lobma\Desktop\DigitalArs.Api`.
 Esta entrega no reemplazó los archivos de esas carpetas.
 
 ## 1. Copiar los archivos
@@ -9,7 +9,7 @@ Esta entrega no reemplazó los archivos de esas carpetas.
 Detené las aplicaciones antes de reemplazar archivos.
 
 - Copiá el contenido de `frontend/` en `C:\Users\lobma\Documents\alkemy-beta-squad\frontend\DigitalArs`.
-- Copiá el contenido de `api/` en `C:\Users\lobma\Desktop\DigitlaArs.Api`.
+- Copiá el contenido de `api/` en `C:\Users\lobma\Desktop\DigitalArs.Api`.
 - Reemplazá los archivos coincidentes y creá los nuevos. No borres las demás carpetas.
 
 El paquete contiene solo archivos nuevos o modificados. No contiene node_modules, bin, obj, conexiones ni claves.

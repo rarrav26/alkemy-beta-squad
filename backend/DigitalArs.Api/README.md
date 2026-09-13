@@ -79,7 +79,7 @@ $env:ConnectionStrings__DefaultConnection='Server=.\SQLEXPRESS01;Database=Digita
 ## Scaffolding Database First
 
 El modelo de datos se genera **desde la base** (Database First), no con migraciones. Desde la
-carpeta `backend/DigitlaArs.Api`, con la variable de entorno exportada como se muestra arriba:
+carpeta `backend/DigitalArs.Api`, con la variable de entorno exportada como se muestra arriba:
 
 ```powershell
 dotnet ef dbcontext scaffold "$env:ConnectionStrings__DefaultConnection" Microsoft.EntityFrameworkCore.SqlServer --project "DigitalArs.Api.csproj" --startup-project "DigitalArs.Api.csproj" --context DigitalArsDbContext --context-dir Data/Context --output-dir Data/Entities --namespace DigitalArs.Api.Data.Entities --context-namespace DigitalArs.Api.Data.Context --no-onconfiguring --use-database-names --force

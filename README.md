@@ -25,7 +25,7 @@ Opcionalmente, ejecutar `database/Seed(v.002).sql` una sola vez para cargar a Ju
 Abrir la solución de la API en Visual Studio, dentro de:
 
 ```text
-backend/DigitlaArs.Api
+backend/DigitalArs.Api
 ```
 
 En `Properties/launchSettings.json`, buscar el perfil `DigitalArs.Api` y ajustar `ConnectionStrings__DefaultConnection` a su instancia de SQL Server.
@@ -71,7 +71,7 @@ Si el archivo ya tiene otras configuraciones, conservarlas y agregar `BootstrapA
 
 ## 5 Iniciar la API
 
-La primera vez hay que preparar Identity y crear al administrador. Desde `backend/DigitlaArs.Api`:
+La primera vez hay que preparar Identity y crear al administrador. Desde `backend/DigitalArs.Api`:
 
 ```powershell
 dotnet run --init-identity
