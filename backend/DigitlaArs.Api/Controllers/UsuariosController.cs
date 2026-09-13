@@ -1,3 +1,4 @@
+using DigitalArs.Api.DTOs;
 using DigitalArs.Api.Interfaces;
 using DigitalArs.Api.Services;
 using DigitlaArs.Api.DTOs;
@@ -11,35 +12,50 @@ namespace DigitalArs.Api.Controllers;
 public class UsuariosController(AccountService accounts, IUsuarioRepository usuarios,
     UserManager<IdentityUser> users) : ControllerBase
 {
+    private const int InvitacionExpiraEnSegundos = 86400;
+
     [HttpPost]
+    [ProducesResponseType<UsuarioCreadoResponse>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create(UserProfileDto dto)
     {
         var result = await accounts.CreateAsync(dto, password: null);
-        if (result.User is null) return BadRequest(new { message = "No se pudo crear el usuario.", errors = result.Errors });
-        return StatusCode(201, new
-        {
-            usuarioId = result.Profile!.id, email = result.User.Email,
-            requiresPasswordSetup = true,
-            invitationToken = await accounts.CreateInvitationAsync(result.User),
-            expiresInSeconds = 86400
-        });
+        if (result.User is null)
+            return BadRequest(new ErrorResponse { Message = "No se pudo crear el usuario.", Errors = result.Errors });
+
+        return StatusCode(201, new UsuarioCreadoResponse(
+            UsuarioId: result.Profile!.id,
+            Email: result.User.Email,
+            RequiresPasswordSetup: true,
+            InvitationToken: await accounts.CreateInvitationAsync(result.User),
+            ExpiresInSeconds: InvitacionExpiraEnSegundos));
     }
 
     [HttpPost("{id:int}/invitation")]
+    [ProducesResponseType<InvitacionResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> ReissueInvitation(int id)
     {
         var profile = await usuarios.GetByIdAsync(id);
         var user = profile?.identity_user_id is null ? null : await users.FindByIdAsync(profile.identity_user_id);
         if (user is null) return NotFound();
         if (!profile!.is_active || await users.HasPasswordAsync(user))
-            return BadRequest(new { message = "El usuario debe estar activo y sin contraseña definida." });
+            return BadRequest(new ErrorResponse { Message = "El usuario debe estar activo y sin contraseña definida." });
         var updated = await users.UpdateSecurityStampAsync(user);
-        if (!updated.Succeeded) return Conflict(new { message = "No se pudo renovar la invitación." });
-        return Ok(new { email = user.Email, requiresPasswordSetup = true,
-            invitationToken = await accounts.CreateInvitationAsync(user), expiresInSeconds = 86400 });
+        if (!updated.Succeeded) return Conflict(new ErrorResponse { Message = "No se pudo renovar la invitación." });
+        return Ok(new InvitacionResponse(
+            Email: user.Email,
+            RequiresPasswordSetup: true,
+            InvitationToken: await accounts.CreateInvitationAsync(user),
+            ExpiresInSeconds: InvitacionExpiraEnSegundos));
     }
 
     [HttpPatch("{id:int}/active")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> SetActive(int id, ActiveStatusDto dto)
     {
         var profile = await usuarios.GetByIdAsync(id);
@@ -49,7 +65,7 @@ public class UsuariosController(AccountService accounts, IUsuarioRepository usua
         {
             var user = await users.FindByIdAsync(profile.identity_user_id);
             if (user is not null && !(await users.UpdateSecurityStampAsync(user)).Succeeded)
-                return Conflict(new { message = "No se pudo actualizar el usuario." });
+                return Conflict(new ErrorResponse { Message = "No se pudo actualizar el usuario." });
         }
         profile.is_active = dto.IsActive!.Value;
         await usuarios.SaveChangesAsync();

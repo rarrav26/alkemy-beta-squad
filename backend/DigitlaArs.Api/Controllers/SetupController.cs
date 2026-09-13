@@ -1,3 +1,4 @@
+using DigitalArs.Api.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -9,14 +10,19 @@ namespace DigitalArs.Api.Controllers;
 public class SetupController(UserManager<IdentityUser> users) : ControllerBase
 {
     [AllowAnonymous, HttpGet("status")]
+    [ProducesResponseType<SetupStatusResponse>(StatusCodes.Status200OK)]
     public async Task<IActionResult> Status()
     {
         Response.Headers.CacheControl = "no-store";
         var hasAdmin = (await users.GetUsersInRoleAsync("Administrador")).Count > 0;
-        return Ok(new { requiresSetup = !hasAdmin, setupEnabled = false, requiresSetupKey = false });
+        return Ok(new SetupStatusResponse(RequiresSetup: !hasAdmin, SetupEnabled: false, RequiresSetupKey: false));
     }
 
     [AllowAnonymous, HttpPost("admin")]
-    public IActionResult CreateAdmin() => StatusCode(410, new
-    { code = "ADMIN_MANAGED_BY_CLI", message = "El administrador inicial se crea desde el backend con: dotnet run --bootstrap-admin" });
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status410Gone)]
+    public IActionResult CreateAdmin() => StatusCode(410, new ErrorResponse
+    {
+        Code = "ADMIN_MANAGED_BY_CLI",
+        Message = "El administrador inicial se crea desde el backend con: dotnet run --bootstrap-admin"
+    });
 }
