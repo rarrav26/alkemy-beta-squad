@@ -1,4 +1,4 @@
-namespace DigitlaArs.Api.DTOs;
+namespace DigitalArs.Api.DTOs;
 
 public class LoginDto
 {

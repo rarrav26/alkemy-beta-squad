@@ -1,7 +1,6 @@
 using DigitalArs.Api.DTOs;
 using DigitalArs.Api.Interfaces;
 using DigitalArs.Api.Services;
-using DigitlaArs.Api.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;

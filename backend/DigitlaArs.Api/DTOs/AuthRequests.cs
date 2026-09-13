@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
-namespace DigitlaArs.Api.DTOs;
+namespace DigitalArs.Api.DTOs;
 public class UserProfileDto : IValidatableObject
 {
     [Required, StringLength(100)] public string Nombre { get; set; } = "";

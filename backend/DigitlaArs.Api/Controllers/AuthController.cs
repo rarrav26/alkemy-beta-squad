@@ -2,13 +2,12 @@ using System.Security.Claims;
 using DigitalArs.Api.DTOs;
 using DigitalArs.Api.Interfaces;
 using DigitalArs.Api.Services;
-using DigitlaArs.Api.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
-namespace DigitlaArs.Api.Controllers;
+namespace DigitalArs.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]

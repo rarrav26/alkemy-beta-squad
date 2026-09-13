@@ -1,4 +1,4 @@
-using DigitlaArs.Api.DTOs;
+using DigitalArs.Api.DTOs;
 using Microsoft.AspNetCore.Identity;
 namespace DigitalArs.Api.Services;
 

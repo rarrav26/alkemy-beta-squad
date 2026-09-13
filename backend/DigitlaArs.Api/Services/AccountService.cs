@@ -1,6 +1,6 @@
 using DigitalArs.Api.Data.Context;
 using DigitalArs.Api.Data.Entities;
-using DigitlaArs.Api.DTOs;
+using DigitalArs.Api.DTOs;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
