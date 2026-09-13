@@ -8,12 +8,21 @@ namespace DigitalArs.Api.Repositories;
 public class UsuarioRepository(DigitalArsDbContext context) : IUsuarioRepository
 {
     public Task<Usuario?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
-        context.Usuarios.FindAsync([id], cancellationToken).AsTask();
+        context.Usuarios.AsNoTracking()
+            .SingleOrDefaultAsync(usuario => usuario.id == id, cancellationToken);
 
     public Task<Usuario?> GetByIdentityUserIdAsync(string identityUserId, CancellationToken cancellationToken = default) =>
         context.Usuarios.AsNoTracking()
             .SingleOrDefaultAsync(usuario => usuario.identity_user_id == identityUserId, cancellationToken);
 
-    public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
-        context.SaveChangesAsync(cancellationToken);
+    public async Task<bool> ActualizarEstadoActivoAsync(int id, bool activo, CancellationToken cancellationToken = default)
+    {
+        // Se vuelve a buscar con seguimiento porque esta es la única operación que escribe.
+        var perfil = await context.Usuarios.SingleOrDefaultAsync(usuario => usuario.id == id, cancellationToken);
+        if (perfil is null) return false;
+
+        perfil.is_active = activo;
+        await context.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 }

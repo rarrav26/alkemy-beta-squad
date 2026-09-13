@@ -23,7 +23,7 @@ public class JwtTokenService(IOptions<JwtOptions> options, UserManager<IdentityU
             signingCredentials: FirmaCon(settings.Key));
 
         return new SesionResponse(
-            new JwtSecurityTokenHandler().WriteToken(token), roles.FirstOrDefault() ?? "Usuario", expires, usuarioId);
+            new JwtSecurityTokenHandler().WriteToken(token), RolPrincipal.DeLosRoles(roles), expires, usuarioId);
     }
 
     private async Task<List<Claim>> ArmarClaims(IdentityUser user, int usuarioId, IList<string> roles)

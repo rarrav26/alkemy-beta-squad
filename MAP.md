@@ -106,15 +106,24 @@ Dentro de **backend/DigitalArs.Api/**:
 | DTOs/TipoMovimientoResponse.cs             | Respuesta del catálogo de tipos de movimiento.                       |
 | DTOs/ErrorResponse.cs                      | Forma única de los errores HTTP: code, message y errors.             |
 | Interfaces/ITokenService.cs                | Contrato de generación del JWT.                                      |
+| Interfaces/IAuthService.cs                 | Contrato de login, primera contraseña y perfil de la sesión.         |
+| Interfaces/IAccountService.cs              | Contrato del alta, la invitación y el estado de un usuario.          |
 | Interfaces/IUsuarioRepository.cs           | Contrato de acceso a los perfiles de usuario.                        |
 | Interfaces/ITipoMovimientoRepository.cs    | Contrato de acceso al catálogo de tipos de movimiento.               |
 | Repositories/UsuarioRepository.cs          | Consultas de perfiles sobre DigitalArsDbContext.                     |
 | Repositories/TipoMovimientoRepository.cs   | Consultas del catálogo sobre DigitalArsDbContext.                    |
-| Services/AccountService.cs                 | Creación de cuentas/perfiles e invitaciones.                         |
-| Services/ResultadoDeAlta.cs                | Resultado del alta: los registros creados o los errores.             |
+| Services/AuthService.cs                    | Reglas de login, primera contraseña y consulta del perfil.           |
+| Services/AccountService.cs                 | Creación de cuentas/perfiles, invitaciones y estado activo.          |
+| Services/Resultado.cs                      | Lo que devuelve un servicio: la respuesta lista o el motivo.         |
+| Services/MotivoDeRechazo.cs                | Los motivos de negocio por los que un servicio rechaza.              |
+| Services/Invitacion.cs                     | Propósito y duración de la invitación, compartidos.                  |
+| Services/RolPrincipal.cs                   | Regla única del rol que se informa al frontend.                      |
+| Services/MensajesDeIdentity.cs             | Traduce los errores de Identity a mensajes mostrables.               |
+| Services/ResultadoDeAlta.cs                | Resultado interno del alta: los registros creados o los errores.     |
 | Services/DatosDeCuenta.cs                  | Sorteo del alias y armado del CVU, sin base de datos.                |
 | Services/JwtTokenService.cs                | Generación y firma de JWT.                                           |
 | Services/JwtOptions.cs                     | Opciones y valores predeterminados del JWT.                          |
+| Middleware/GlobalExceptionHandler.cs       | Convierte una excepción no controlada en un 500 con ErrorResponse.   |
 | OpenApi/BearerSecuritySchemeTransformer.cs | Documentación de autenticación en Swagger.                           |
 | Properties/launchSettings.json             | Perfiles, puertos y entorno de desarrollo.                           |
 | Tests/AuthenticationChecks/                | Ejecutable de verificaciones del backend.                            |
@@ -139,7 +148,8 @@ Program.cs es el punto de entrada. Primero registra servicios; después construy
 | AddIdentityCore                             | Configura Identity, contraseña mínima y bloqueo por intentos.  |
 | AddRoles / AddEntityFrameworkStores         | Agrega roles y almacenamiento en SQL mediante EF.              |
 | AddDefaultTokenProviders                    | Habilita los proveedores usados para invitaciones.             |
-| AddScoped de AccountService e ITokenService | Registra servicios propios.                                    |
+| AddScoped de IAccountService, IAuthService e ITokenService | Registra servicios propios por su interfaz. |
+| AddExceptionHandler / AddProblemDetails     | Registra el manejo global de errores.                          |
 | AddOptions de JwtOptions                    | Lee y valida las opciones JWT.                                 |
 | AddAuthentication / AddJwtBearer            | Configura autenticación mediante JWT.                          |
 | AddAuthorization                            | Exige autenticación por defecto.                               |
@@ -154,7 +164,8 @@ Program.cs es el punto de entrada. Primero registra servicios; después construy
 
 ```mermaid
 flowchart LR
-    A[React o Swagger] --> B[HTTPS y CORS]
+    A[React o Swagger] --> M[Manejo global de errores]
+    M --> B[HTTPS y CORS]
     B --> C[Authentication: validar identidad]
     C --> D[Authorization: comprobar permisos]
     D --> E[Rate limiter donde corresponde]
@@ -164,6 +175,10 @@ flowchart LR
 ```
 
 UseAuthentication está antes que UseAuthorization porque primero hay que identificar a la persona y después revisar sus permisos.
+
+UseExceptionHandler va primero de todo para que cualquier excepción que ocurra más adentro lo atraviese de vuelta. **GlobalExceptionHandler** la registra en el log y responde 500 con un ErrorResponse de código `INTERNAL_ERROR`, sin filtrar el detalle de la excepción al cliente.
+
+`AddExceptionHandler<GlobalExceptionHandler>()` necesita que además esté registrado `AddProblemDetails()`: sin ese respaldo, `UseExceptionHandler()` sin argumentos corta el arranque de la aplicación. El respaldo no llega a usarse nunca, porque el handler escribe la respuesta y devuelve `true`.
 
 CORS es una política del navegador para acceder entre orígenes distintos. **No reemplaza la autenticación ni bloquea por sí solo herramientas como clientes HTTP.**
 
@@ -220,15 +235,19 @@ Al repetir scaffolding, seleccionar las tablas del negocio para no generar model
 Cada recurso tiene su propia interfaz en **Interfaces/** y su implementación en **Repositories/**, con métodos de nombre explícito en vez de consultas LINQ armadas por quien llama:
 
 | Interfaz | Métodos | Quién la usa |
-| ---------------------------- | ------------------------------------------------------------- | ------------------------------------ |
-| IUsuarioRepository           | GetByIdAsync, GetByIdentityUserIdAsync, SaveChangesAsync       | AuthController y UsuariosController. |
-| ITipoMovimientoRepository    | GetAllAsync, GetByIdAsync                                      | TiposDeMovimientosController.        |
+| ---------------------------- | ------------------------------------------------------------------- | ------------------------------ |
+| IUsuarioRepository           | GetByIdAsync, GetByIdentityUserIdAsync, ActualizarEstadoActivoAsync  | AuthService y AccountService.  |
+| ITipoMovimientoRepository    | GetAllAsync, GetByIdAsync                                            | TiposDeMovimientosController.  |
 
-En IUsuarioRepository, `GetByIdAsync` devuelve la entidad con seguimiento de cambios porque quien la llama puede modificarla y guardarla con `SaveChangesAsync`. `GetByIdentityUserIdAsync` usa AsNoTracking: solo se lee el perfil, nunca se modifica. ITipoMovimientoRepository es de solo lectura, así que sus dos métodos usan AsNoTracking.
+En IUsuarioRepository las dos consultas usan AsNoTracking, porque solo leen. La única escritura sobre un perfil es el estado activo, y la hace `ActualizarEstadoActivoAsync`, que busca con seguimiento y guarda adentro. El repositorio no expone `SaveChangesAsync`: quien lo llama pide una operación con nombre, no maneja la unidad de trabajo.
 
-Ningún controlador inyecta un DbContext: todos pasan por un repositorio o por UserManager.
+ITipoMovimientoRepository devuelve `TipoMovimientoResponse` y no la entidad. Es un catálogo de solo lectura sin reglas propias, así que proyecta dentro de la consulta: trae solo las dos columnas que se publican y el controlador no necesita conocer `Tipo_Movimiento`. Mismo criterio que ITokenService, que devuelve `SesionResponse`.
 
-AccountService es la excepción deliberada. Usa los dos contextos directamente porque abre una transacción que abarca a ambos (Identity y negocio), y eso necesita `db.Database`, que un repositorio no expone. Tampoco hay que implementar hashing ni altas de Identity mediante un repositorio: de eso se encarga UserManager.
+**Ningún controlador toca la base ni Identity.** No inyectan DbContext, ni UserManager, ni manejan entidades: dependen solo de sus interfaces de servicio o de repositorio. La regla es que un controlador reciba el request, delegue y traduzca el resultado a HTTP.
+
+El reparto queda así: el **servicio** aplica las reglas y devuelve un `Resultado<T>` con la respuesta lista o con un `MotivoDeRechazo`; el **controlador** traduce ese motivo al status y al mensaje del endpoint. Así las reglas de negocio se pueden probar sin levantar SQL Server, y el contrato HTTP vive en un solo lugar.
+
+AccountService es la excepción deliberada. Usa los dos contextos directamente porque abre una transacción que abarca a ambos (Identity y negocio), y eso necesita `db.Database`, que un repositorio no expone. Para lo que no es transaccional usa IUsuarioRepository. Tampoco hay que implementar hashing ni altas de Identity mediante un repositorio: de eso se encarga UserManager.
 
 ## 6. DTOs y validaciones
 
@@ -255,12 +274,12 @@ Hay tres niveles:
 
 El frontend no es una barrera de seguridad: se puede llamar directamente a la API.
 
-SQL permite DNI o PASAPORTE. El registro normal todavía puede terminar con un error genérico de base si se envía otro tipo; se puede mejorar agregando esa validación explícita al DTO.
+SQL permite DNI o PASAPORTE, y el DTO lo valida antes de tocar la base. PerfilUsuarioDto implementa `IValidatableObject` porque el formato del número depende del tipo elegido, y eso no se puede expresar con un atributo sobre una sola propiedad: DNI son 7 u 8 dígitos, PASAPORTE son 2 o 3 letras seguidas de 6 o 7 números, y cualquier otro tipo se rechaza con un mensaje propio en vez de un error genérico de base.
 
 ## 7. Registro
 
 **Entrada:** POST /api/auth/register.  
-**Archivos:** AuthController.Register y AccountService.CreateAsync.
+**Archivos:** AuthController.Register delega en AccountService.RegistrarAsync, que envuelve al alta transaccional.
 
 1. Recibe RegistroDto.
 2. Inicia una transacción en AuthDbContext.
@@ -295,7 +314,7 @@ La contraseña se guarda como **PasswordHash en AspNetUsers**, no en Usuarios ni
 
 ## 8. Login
 
-**Método:** AuthController.Login.
+**Método:** AuthService.LoginAsync. AuthController.Login solo traduce el resultado a HTTP.
 
 1. Busca la cuenta por email.
 2. Rechaza una cuenta inexistente o bloqueada.
@@ -409,7 +428,7 @@ La invitación usa proveedores de Identity y Data Protection con el propósito D
 
 POST /api/auth/initial-password verifica cuenta, ausencia de contraseña, invitación, vencimiento, perfil activo y reglas de contraseña.
 
-AccountService.SetInitialPasswordAsync llama a AddPasswordAsync. Identity guarda el hash y cambia el stamp.
+AuthService.DefinirPrimeraPasswordAsync hace esas comprobaciones y llama a AddPasswordAsync. Identity guarda el hash y cambia el stamp.
 
 La invitación no permite reemplazar una contraseña ya definida y no se puede reutilizar para ese fin.
 
@@ -421,7 +440,7 @@ Las claves Data Protection son distintas de Jwt:Key. En varias instancias de pro
 
 ### Desactivación
 
-**Método:** UsuariosController.SetActive.
+**Método:** AccountService.CambiarEstadoAsync, que expone UsuariosController.SetActive.
 
 Cambia el security stamp antes de guardar is_active. Esto invalida tokens anteriores, incluso si luego se reactiva al usuario.
 
@@ -565,11 +584,12 @@ Dentro de **frontend/DigitalArs/**:
 | src/context/ElementosGlobales.jsx          | Tema claro/oscuro y tema MUI.                          |
 | src/context/authContext.js                 | AuthContext y hook useAuth.                            |
 | src/context/AuthProvider.jsx               | Sesión y operaciones de autenticación/alta.            |
-| src/context/api.js                         | Fetch, headers, JSON y errores.                        |
+| src/context/api.js                         | Cliente Axios: headers, JSON y traducción de errores.  |
 | src/components/Auth/AuthForm.jsx           | Formulario común, carga, errores y campos compartidos. |
 | src/routes/AuthPages.jsx                   | LoginPage, RegisterPage e InitialPasswordPage.         |
 | src/routes/Dashboard.jsx                   | Dashboard y NewUserPage con invitación.                |
 | src/components/Main/Main.jsx               | Rutas y protección de navegación.                      |
+| src/components/Header/Header.jsx           | Envuelve a ResponsiveAppBar.                           |
 | src/components/Header/ResponsiveAppBar.jsx | Navegación y cierre de sesión.                         |
 | src/components/Header/ChangeTheme.jsx      | Cambia el tema.                                        |
 | src/components/Footer/Footer.jsx           | Pie de página.                                         |
@@ -588,7 +608,7 @@ Al vencer el token, un temporizador borra la sesión. Un 401 en authenticatedReq
 
 La protección de rutas de React organiza la interfaz. La autorización real la hace la API.
 
-Home.jsx y ProductId.jsx quedaron como redirecciones. El antiguo components/Home/Login.jsx se eliminó: era una segunda pantalla de login que ninguna ruta importaba. La pantalla real es LoginPage, en routes/AuthPages.jsx. Se retiraron del flujo las llamadas de ejemplo a DummyJSON.
+routes/Home.jsx y routes/ProductId.jsx quedaron del template original y ninguna ruta los importa: son archivos muertos. El antiguo components/Home/Login.jsx se eliminó: era una segunda pantalla de login que tampoco se usaba. La pantalla real es LoginPage, en routes/AuthPages.jsx. Se retiraron del flujo las llamadas de ejemplo a DummyJSON.
 
 ## 15. Cómo iniciar el proyecto
 
@@ -621,7 +641,7 @@ El seed deja creado al administrador: `admin@digitalars.com` / `Admin123!`.
 
 Completar con al menos 32 caracteres y conservar otras configuraciones existentes.
 
-Iniciar con el perfil https. Swagger:
+Iniciar con el perfil DigitalArs.Api, que es el único definido en launchSettings.json. Swagger:
 [https://localhost:7201/swagger](https://localhost:7201/swagger).
 
 Si falta confiar en el certificado de desarrollo, puede requerirse una preparación inicial:
@@ -656,6 +676,8 @@ Git no replica automáticamente la base local de cada compañero.
 | ----------------------------------------------- | -------------------------------------------------------------------- |
 | Tests/AuthenticationChecks/Program.cs           | Hashing, contraseñas, invitaciones y emisión/validación de JWT.      |
 | frontend/DigitalArs/tests/api.test.mjs          | Headers, JSON y manejo de errores HTTP.                              |
+
+Las invitaciones se ejercitan contra el AuthService real, con Identity y los perfiles en memoria: no hace falta SQL Server porque el servicio depende de interfaces, no de un DbContext.
 
 ```powershell
 # Carpeta de la API:
@@ -726,7 +748,7 @@ No compartir contraseñas en capturas ni habilitar indiscriminadamente logs de d
 | Emisor/audiencia         | JwtOptions y configuración Jwt.                                                    |
 | Reglas de contraseña     | AddIdentityCore en Program.cs; coordinar DTO y ayuda del formulario.               |
 | Intentos fallidos        | Opciones Lockout en Program.cs.                                                    |
-| Duración de invitación   | DataProtectionTokenProviderOptions; actualizar expiresInSeconds y textos de React. |
+| Duración de invitación   | DataProtectionTokenProviderOptions; actualizar Invitacion.ExpiraEnSegundos y textos de React. |
 | Permisos                 | Authorize/AllowAnonymous del controlador.                                          |
 | Límite de solicitudes    | AddRateLimiter en Program.cs.                                                      |
 | Orígenes del frontend    | Cors:AllowedOrigins.                                                               |
@@ -735,7 +757,9 @@ No compartir contraseñas en capturas ni habilitar indiscriminadamente logs de d
 | Catálogo de tipos        | Create(v.002).sql, respetando los IDs del esquema.                                 |
 | Consultas a la base      | El repositorio del recurso en Repositories/, no el controlador.                    |
 | Forma de un error HTTP   | ErrorResponse y el DTO de respuesta del endpoint.                                  |
-| Errores de registro      | AuthController.Register y AccountService.                                          |
+| Errores de registro      | AccountService.RegistrarAsync; el texto del 400, en AuthController.Register.       |
+| Reglas de login          | AuthService.LoginAsync, no el controlador.                                          |
+| Status de un rechazo     | El switch del controlador que traduce MotivoDeRechazo.                             |
 | Claims                   | JwtTokenService.CrearToken.                                                        |
 | Revocación por cuenta    | OnTokenValidated y security stamp.                                                 |
 | Endpoint nuevo           | Controllers, DTOs y servicios.                                                     |
@@ -763,6 +787,6 @@ CuentasController y MovimientosController son estructuras vacías en esta versi�
 Tener tablas y entidades no implica tener sus operaciones HTTP implementadas.
 TiposDeMovimientosController sí está implementado y sirve de plantilla para los otros dos.
 
-**Orden sugerido para estudiar:** AuthPages → AuthProvider → AuthController → IUsuarioRepository/UsuarioRepository → AccountService → contextos → JwtTokenService → Program.cs. Así se sigue una acción desde la pantalla hasta la base y los controles de acceso.
+**Orden sugerido para estudiar:** AuthPages → AuthProvider → AuthController → AuthService → IUsuarioRepository/UsuarioRepository → AccountService → contextos → JwtTokenService → Program.cs. Así se sigue una acción desde la pantalla hasta la base y los controles de acceso, y se ve el corte entre el controlador que traduce HTTP y el servicio que aplica las reglas.
 
 Para ver el patrón Controller → Interface → Repository → DbContext en su forma más simple, sin la complejidad de la autenticación, mirar TiposDeMovimientosController junto a ITipoMovimientoRepository y TipoMovimientoRepository.

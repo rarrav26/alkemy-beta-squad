@@ -1,56 +1,19 @@
-# DigitalArs — Login, registro y primer administrador
+# DigitalArs — Frontend
 
-Entrega para copiar y pegar. Los cambios están separados en `frontend/` y `api/`.
-Se prepararon sobre el frontend del repositorio y la API de `C:\Users\lobma\Desktop\DigitalArs.Api`.
-Esta entrega no reemplazó los archivos de esas carpetas.
+Cliente React de la API DigitalArs: login, registro, primera contraseña con invitación,
+dashboard y alta de usuarios. Hecho con Vite, React 19 y Material UI.
 
-## 1. Copiar los archivos
+El backend está en `backend/DigitalArs.Api` y tiene su propio README. Este frontend **no
+funciona solo**: necesita la API levantada.
 
-Detené las aplicaciones antes de reemplazar archivos.
+## Requisitos
 
-- Copiá el contenido de `frontend/` en `C:\Users\lobma\Documents\alkemy-beta-squad\frontend\DigitalArs`.
-- Copiá el contenido de `api/` en `C:\Users\lobma\Desktop\DigitalArs.Api`.
-- Reemplazá los archivos coincidentes y creá los nuevos. No borres las demás carpetas.
+- Node.js 24 (incluye npm).
+- La API corriendo en `https://localhost:7201`, con SQL Server preparado según el README de la raíz.
 
-El paquete contiene solo archivos nuevos o modificados. No contiene node_modules, bin, obj, conexiones ni claves.
-No necesitás cambiar los paquetes NuGet ni agregar dependencias de React.
-Los cambios de la API deben incorporarse también a la copia de backend que versionen en Git;
-la copia del Escritorio no se sube al repositorio por sí sola.
+## Puesta en marcha
 
-### Archivos de la API
-
-Reemplazar:
-- Program.cs
-- Controllers/AuthController.cs
-- Services/AccountService.cs
-
-Crear:
-- Controllers/SetupController.cs
-- DTOs/SetupAdminDto.cs
-- FRONTEND-AUTH.md (documentación)
-
-No reemplazar appsettings, la configuración JWT, la conexión ni los contextos de base existentes.
-
-## 2. Preparar la API
-
-Si Identity ya funciona, no es necesario volver a crear sus tablas. Estos cambios no agregan tablas.
-Si es una instalación nueva, primero corré los scripts de database/ como indica el README de la raíz.
-
-El administrador ya viene creado por database/Seed(v.003).sql:
-
-| Correo | Contraseña |
-|---|---|
-| `admin@digitalars.com` | `Admin123!` |
-
-React no tiene formulario de primer administrador: al arrancar consulta GET /api/setup/status y,
-si la instalación está completa, muestra el login directamente.
-
-Crear usuarios por el registro normal nunca asigna el rol Administrador.
-Si el usuario que creaste antes tiene rol Usuario, no se convierte automáticamente en administrador.
-
-## 3. Preparar React
-
-En la carpeta del frontend:
+Desde esta carpeta:
 
 ```powershell
 Copy-Item .env.example .env.local
@@ -58,67 +21,152 @@ npm ci
 npm run dev
 ```
 
-Abrí http://localhost:5173.
+Abrir http://localhost:5173.
 
-El archivo .env.local contiene:
+`.env.local` define la dirección base de la API, **sin `/api` al final**:
 
 ```text
 VITE_API_URL=https://localhost:7201
 ```
 
-Es la dirección base, sin /api al final. Reiniciá Vite si la cambiás.
-El puerto 5173 está fijado: si está ocupado, cerrá la otra instancia o coordiná otro puerto con la configuración CORS.
+Vite no recarga ese archivo en caliente: si lo cambiás, reiniciá `npm run dev`.
 
-El certificado HTTPS de desarrollo debe estar aprobado en tu equipo.
-Si aún no lo está, ejecutá `dotnet dev-certs https --trust` desde tu terminal.
+El puerto 5173 está fijado con `strictPort`, así que si está ocupado el arranque falla en vez
+de saltar a otro puerto. Es a propósito: la política CORS de la API permite ese origen.
 
-### CORS
+El certificado HTTPS de desarrollo tiene que estar aprobado en tu equipo, o las llamadas a la
+API fallan desde el navegador. Si falta:
 
-En Development, la API permite http://localhost:5173.
-Si usás otro origen, configurá en la API (y reiniciala):
+```powershell
+dotnet dev-certs https --trust
+```
+
+### Si usás otro origen
+
+Hay que habilitarlo también en la API, y reiniciarla:
 
 ```powershell
 dotnet user-secrets set "Cors:AllowedOrigins:0" "http://localhost:5174"
 ```
 
-En producción, configurá Cors__AllowedOrigins__0 con el origen HTTPS real del frontend.
-El frontend desplegado necesita VITE_API_URL con una API accesible por HTTPS; localhost solo sirve en tu máquina.
-Vercel no publica automáticamente esta API .NET. Esta entrega no realizó ningún despliegue.
+En producción se configura `Cors__AllowedOrigins__0` con el origen HTTPS real.
 
-## 4. Flujo de la aplicación
+## Scripts
 
-1. Al abrir la aplicación, consulta GET /api/setup/status.
-2. Si no hay administrador, informa que la instalación no está completa: falta correr database/Seed(v.003).sql.
-3. Login válido: guarda la sesión en sessionStorage y abre /dashboard.
-4. El administrador puede entrar a /usuarios/nuevo, registrar un usuario sin contraseña y obtener su invitación.
-5. El usuario entra a /primera-password con correo y código, elige contraseña y recibe acceso.
-6. También está disponible /register para el registro público de usuarios comunes.
-7. Cerrar sesión elimina el token. La sesión se conserva al recargar la pestaña y se verifica con GET /api/auth/me.
-8. Al vencer el JWT o recibir 401 en una llamada protegida, se cierra la sesión. Un usuario desactivado recibe el mensaje de la API.
+| Comando | Qué hace |
+|---|---|
+| `npm run dev` | Servidor de desarrollo en el puerto 5173. |
+| `npm run build` | Compila a `dist/`. |
+| `npm run preview` | Sirve lo compilado, para revisar el build. |
+| `npm run lint` | ESLint sobre todo el proyecto. |
+| `npm test` | Ocho pruebas del cliente HTTP (`node --test`). |
 
-El código de invitación se muestra al administrador pero no se guarda en sessionStorage.
-No hay envío automático de correo. El administrador debe entregarlo por un medio privado.
-La pantalla de dashboard es el punto de entrada; no inventa saldos, movimientos ni datos financieros.
+## Estructura
 
-## 5. Contextos globales
-
-- ElementosGlobales: tema visual.
-- AuthProvider / AuthContext: sesión, estado inicial, login, registro, primer administrador, primera contraseña y alta de usuarios.
-- context/api.js: cliente HTTP usado por AuthProvider.
-
-Los componentes no llaman fetch. Usan useAuth():
-
-```jsx
-const { login, register, createUser, logout, session } = useAuth()
+```
+src/
+├─ main.jsx                        monta BrowserRouter y los dos providers
+├─ App.jsx                         tema MUI, Header, Main, Footer
+├─ components/
+│  ├─ Main/Main.jsx                las rutas y la protección de navegación
+│  ├─ Auth/AuthForm.jsx            formulario común: campos, carga y errores
+│  ├─ Header/Header.jsx            envuelve a ResponsiveAppBar
+│  ├─ Header/ResponsiveAppBar.jsx  navegación y cierre de sesión
+│  ├─ Header/ChangeTheme.jsx       alterna claro/oscuro
+│  ├─ Footer/Footer.jsx            pie de página
+│  └─ Home/ScrollTopButton.jsx     botón de volver arriba
+├─ context/
+│  ├─ ElementosGlobales.jsx        tema claro/oscuro y tema MUI
+│  ├─ AuthProvider.jsx             sesión y operaciones de autenticación
+│  ├─ authContext.js               AuthContext y el hook useAuth
+│  └─ api.js                       cliente HTTP (Axios) y traducción de errores
+└─ routes/
+   ├─ AuthPages.jsx                LoginPage, RegisterPage, InitialPasswordPage
+   └─ Dashboard.jsx                Dashboard y NewUserPage
 ```
 
-Las validaciones de rol del frontend sirven para la navegación; la API sigue validando permisos.
-sessionStorage guarda el token por pestaña, nunca contraseñas ni la clave de configuración inicial.
-Esta persistencia implica que el token es accesible a JavaScript; evitá introducir HTML sin sanitizar.
+## Rutas
 
-## 6. Verificación
+| Ruta | Acceso | Pantalla |
+|---|---|---|
+| `/` | — | Redirige a `/dashboard` con sesión, o a `/login` sin ella. |
+| `/login` | Público | Inicio de sesión. |
+| `/register` | Público | Registro de un usuario común. |
+| `/primera-password` | Con invitación | Definir la primera contraseña. |
+| `/dashboard` | Autenticado | Punto de entrada tras iniciar sesión. |
+| `/usuarios/nuevo` | Administrador | Alta de usuario, devuelve la invitación. |
+| `/setup` | — | Redirige a `/login`; quedó por compatibilidad. |
+| cualquier otra | — | Redirige a `/`. |
 
-Frontend:
+La protección de rutas organiza la navegación. **La autorización real la hace la API**: un
+usuario sin rol Administrador que llegue a `/usuarios/nuevo` igual recibe 403 del backend.
+
+## Cómo funciona la sesión
+
+`AuthProvider` es el único que habla con la API. Al arrancar:
+
+1. Consulta `GET /api/setup/status`. Si responde `requiresSetup: true`, muestra que la
+   instalación no está completa: falta correr `database/Seed(v.003).sql`.
+2. Si hay una sesión guardada, la verifica con `GET /api/auth/me`. Si da 401, la descarta.
+3. Ante un fallo de conexión muestra el error con un botón de reintentar.
+
+La sesión vive en `sessionStorage`, bajo la clave `digitalars.session`, con el token, su
+vencimiento y el perfil. Es por pestaña y no guarda contraseñas ni invitaciones. Un temporizador
+cierra la sesión cuando el token vence, y un 401 en cualquier llamada protegida también.
+
+Cerrar sesión borra la copia local. **No hay revocación del JWT en el servidor por parte del
+frontend**: una copia del token seguiría sirviendo hasta que venza o cambie el security stamp,
+cosa que la API hace al desactivar un usuario.
+
+Como el token es accesible desde JavaScript, no introducir HTML sin sanitizar.
+
+### useAuth()
+
+Los componentes no llaman a la API directamente: usan el hook.
+
+```jsx
+const { session, ready, connectionError, login, register, initialPassword, createUser, logout, retry } = useAuth()
+```
+
+| Qué | Para qué |
+|---|---|
+| `session` | `{ token, expiresAt, user }`, o `null`. `user.role` decide la navegación por rol. |
+| `ready` | La verificación inicial terminó. |
+| `connectionError` | Mensaje a mostrar cuando la API no responde o la instalación está incompleta. |
+| `login` / `register` / `initialPassword` | Las tres operaciones públicas. |
+| `createUser` | Alta administrativa; devuelve la invitación. |
+| `logout` / `retry` | Cerrar sesión y reintentar la carga inicial. |
+
+## Endpoints que consume
+
+`POST /api/auth/login`, `POST /api/auth/register`, `POST /api/auth/initial-password`,
+`GET /api/auth/me`, `GET /api/setup/status` y `POST /api/usuarios`.
+
+El catálogo `GET /api/tiposdemovimientos` existe en la API pero todavía no se usa acá.
+
+## El cliente HTTP
+
+`context/api.js` expone `apiRequest(path, { method, body, token, signal })` sobre una instancia
+de Axios. Se encarga de tres cosas que conviene no repetir en cada pantalla:
+
+- Arma el header `Authorization: Bearer <token>` cuando se le pasa un token.
+- Normaliza un 204 sin cuerpo a `null`.
+- Traduce el error HTTP a un `Error` con `message`, `status` y `code`, usando el `message` que
+  manda la API cuando existe. El 429 tiene su propio texto porque llega sin cuerpo JSON, y una
+  cancelación conserva el nombre `AbortError` para poder distinguirla.
+
+## Flujo para probar de punta a punta
+
+1. Entrar con `admin@digitalars.com` / `Admin123!` (lo siembra `database/Seed(v.003).sql`).
+2. Ir a **Registrar usuario**, completar un perfil y copiar la invitación.
+3. Cerrar sesión o abrir una ventana privada.
+4. Entrar a **Tengo una invitación**, poner el correo y el código, y elegir una contraseña.
+5. Comprobar que el usuario nuevo entra al dashboard con rol `Usuario`.
+
+El código de invitación se le muestra al administrador pero no se guarda en `sessionStorage`.
+No hay envío de correo: hay que entregarlo por un medio privado.
+
+## Verificación
 
 ```powershell
 npm run build
@@ -126,22 +174,19 @@ npm run lint
 npm test
 ```
 
-API:
+Las ocho pruebas de `tests/api.test.mjs` cubren el cliente HTTP: headers, JSON, 204 sin cuerpo,
+429, fallo de red, cancelación y los mensajes de error. **Usan respuestas simuladas**, así que
+no validan la integración con la API real ni con SQL Server: para eso está el flujo manual de
+arriba.
 
-```powershell
-dotnet build
-dotnet run --project Tests/AuthenticationChecks/AuthenticationChecks.csproj
-```
+## Pendientes conocidos
 
-Verificado en esta entrega:
-- Compilación de frontend y API.
-- ESLint sin errores.
-- Ocho pruebas del cliente HTTP.
-- Diecinueve verificaciones existentes de Identity/JWT.
-- Navegador con servidor simulado: formulario inicial, contraseñas distintas, login incorrecto y correcto,
-  dashboard de administrador, restauración al recargar, alta con invitación, cierre de sesión y primera contraseña.
-
-La prueba de navegador usa respuestas simuladas y datos ficticios: no valida la integración con tu SQL Server.
-Todavía debe probarse contra tu API real el alta inicial (incluidos dos intentos simultáneos),
-el bloqueo de un segundo administrador, CORS, registro, login y alta de usuarios.
-La sesión de herramientas no dispone de la autenticación Windows necesaria para comprobar tu base.
+- El dashboard es solo el punto de entrada: no muestra saldos ni movimientos, porque la API
+  todavía no expone esos endpoints.
+- No hay listado de usuarios ni interfaz para renovar invitaciones o desactivar cuentas, aunque
+  la API sí tiene esos endpoints.
+- `src/routes/Home.jsx` y `src/routes/ProductId.jsx` quedaron del template original: ninguna
+  ruta los importa.
+- `package.json` todavía se llama `reactcommerce`, también del template.
+- `vercel.json` configura solo este frontend. **No despliega la API .NET**, que necesita su
+  propio hosting.

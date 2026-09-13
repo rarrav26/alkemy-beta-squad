@@ -91,14 +91,23 @@ hardcodeada dentro del `DbContext`.
 ## Estructura
 
 ```
-Controllers/      endpoints HTTP
-Interfaces/       contratos de repositorios
+Controllers/      endpoints HTTP: reciben el request y traducen el resultado a un status
+DTOs/             lo que cada operación acepta y devuelve; nunca se expone una entidad
+Interfaces/       contratos, tanto de repositorios como de servicios
+Services/         las reglas de negocio (login, alta, invitaciones, JWT)
 Repositories/     acceso a datos vía DbContext
-Data/Context/     DigitalArsDbContext (generado por scaffolding)
+Middleware/       GlobalExceptionHandler: convierte una excepción no controlada en un 500 con ErrorResponse
+OpenApi/          documentación del esquema Bearer en Swagger
+Data/Context/     DigitalArsDbContext (generado por scaffolding) y AuthDbContext (Identity)
 Data/Entities/    entidades (generadas por scaffolding)
 ```
 
-Flujo: `Controller` → `Interface` → `Repository` → `DbContext`.
+Flujo de una lectura simple: `Controller` → `Interface` → `Repository` → `DbContext`.
+Flujo cuando hay reglas de por medio: `Controller` → `Interface` → `Service` → `Repository` / `UserManager`.
+
+El corte importante es que **un controlador no conoce entidades, ni `DbContext`, ni `UserManager`**.
+El servicio aplica las reglas y devuelve un `Resultado<T>` con la respuesta lista o con un
+`MotivoDeRechazo`; el controlador traduce ese motivo al status y al mensaje del endpoint.
 
 ## Autenticación con Identity y JWT
 
@@ -125,7 +134,7 @@ $keyBytes = New-Object byte[] 32
 [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($keyBytes)
 dotnet user-secrets set "Jwt:Key" ([Convert]::ToBase64String($keyBytes))
 dotnet build
-dotnet run --no-build --launch-profile https
+dotnet run --no-build --launch-profile DigitalArs.Api
 ```
 
 database/Identity(v.001).sql agrega las siete tablas Identity si no existen.
@@ -133,7 +142,9 @@ Si encuentra parte de las tablas Identity, se detiene para evitar completar un e
 Si ya están las siete, las conserva; se espera el modelo estándar de Identity de .NET 10.
 El script no borra ni altera las tablas de negocio.
 
-Swagger: https://localhost:7201/swagger (perfil https).
+Swagger: https://localhost:7201/swagger (perfil DigitalArs.Api, el único que define launchSettings.json).
+Si pasás un nombre de perfil que no existe, `dotnet run` avisa pero arranca igual sin las variables
+de entorno del perfil, y la API falla diciendo que falta la cadena de conexión aunque esté configurada.
 Configurá el certificado de desarrollo con dotnet dev-certs https --trust si tu equipo todavía no confía en él.
 En producción, suministrá Jwt__Key desde un gestor de secretos y conservá las claves de Data Protection
 de forma persistente y compartida entre instancias: las invitaciones dependen de ellas.
@@ -159,10 +170,16 @@ La contraseña debe tener al menos ocho caracteres, mayúscula, minúscula, núm
 | POST /api/auth/register | Público | 201: crea Identity y perfil en una transacción; no emite JWT |
 | POST /api/auth/login | Público | 200: token, role, expiresAt (UTC), usuarioId |
 | POST /api/auth/initial-password | Invitación válida | Define primera contraseña y devuelve JWT |
+| GET /api/auth/me | JWT | 200: perfil y rol consultados en la base, no en el token |
 | GET /api/auth/test-protegido | JWT | 200 autorizado, 401 sin token válido |
 | POST /api/usuarios | Administrador | Crea sin contraseña; devuelve invitationToken y requiresPasswordSetup |
 | POST /api/usuarios/{id}/invitation | Administrador | Renueva invitación e invalida la anterior |
 | PATCH /api/usuarios/{id}/active | Administrador | Activa/desactiva con { "isActive": false } |
+| GET /api/tiposdemovimientos | JWT | 200: catálogo completo de tipos de movimiento |
+| GET /api/tiposdemovimientos/{id} | JWT | 200: un tipo, o 404 si no existe |
+| GET /api/setup/status | Público | Informa si la instalación ya tiene administrador |
+
+No existe GET /api/usuarios para listar usuarios en esta entrega.
 
 Todos los endpoints nuevos quedan protegidos por defecto salvo los marcados AllowAnonymous.
 Las invitaciones duran 24 horas y se consumen al definir la contraseña.

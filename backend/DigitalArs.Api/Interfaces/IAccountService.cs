@@ -1,0 +1,23 @@
+using DigitalArs.Api.DTOs;
+using DigitalArs.Api.Services;
+
+namespace DigitalArs.Api.Interfaces;
+
+// El ciclo de vida de la cuenta de un usuario: alta, invitación y estado. Devuelve las
+// respuestas ya armadas para que ningún controller tenga que conocer las entidades.
+public interface IAccountService
+{
+    Task<Resultado<RegistroResponse>> RegistrarAsync(RegistroDto dto);
+
+    Task<Resultado<UsuarioCreadoResponse>> CrearConInvitacionAsync(PerfilUsuarioDto dto);
+
+    Task<Resultado<InvitacionResponse>> ReemitirInvitacionAsync(
+        int usuarioId, CancellationToken cancellationToken = default);
+
+    // Null cuando el cambio se guardó: el endpoint responde sin cuerpo, así que no hay nada
+    // que devolver más que el motivo del rechazo cuando lo hay.
+    Task<MotivoDeRechazo?> CambiarEstadoAsync(
+        int usuarioId, bool activo, CancellationToken cancellationToken = default);
+
+    Task<bool> ExisteAdministradorAsync();
+}

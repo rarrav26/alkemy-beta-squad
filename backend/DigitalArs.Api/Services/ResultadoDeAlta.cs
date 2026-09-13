@@ -3,9 +3,13 @@ using Microsoft.AspNetCore.Identity;
 
 namespace DigitalArs.Api.Services;
 
-// El alta devuelve los registros creados o los errores, nunca las dos cosas. Cuenta queda en
-// null cuando el rol no lleva cuenta en pesos, que es el caso del administrador.
-public record ResultadoDeAlta(IdentityUser? UsuarioIdentity, Usuario? Perfil, Cuenta? Cuenta, string[] Errores)
+// Lo que devuelve el alta por dentro de AccountService: los registros creados o los errores,
+// nunca las dos cosas. Cuenta queda en null cuando el rol no lleva cuenta en pesos, que es el
+// caso del administrador.
+//
+// Es interno a propósito: lleva entidades, así que no sale de la capa de servicios. Lo que
+// llega al controller son RegistroResponse y UsuarioCreadoResponse, ya armados.
+internal record ResultadoDeAlta(IdentityUser? UsuarioIdentity, Usuario? Perfil, Cuenta? Cuenta, string[] Errores)
 {
     public bool Exitoso => UsuarioIdentity is not null;
 

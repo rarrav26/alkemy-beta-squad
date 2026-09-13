@@ -1,3 +1,26 @@
+// =============================================================================
+// Program.cs — punto de entrada de la API.
+//
+// El archivo tiene dos mitades y la línea que las separa es builder.Build():
+//
+//   ANTES   (builder.Services.Add...)  se REGISTRA qué servicios existen y cómo
+//           se construyen. Todavía no se atiende ninguna petición.
+//   DESPUÉS (app.Use...)               se ARMA EL PIPELINE: los pasos por los que
+//           pasa cada petición, y en qué orden.
+//
+// Son dos cosas distintas: registrar un servicio no lo pone en el pipeline. Por
+// eso varias funciones vienen de a pares (AddCors/UseCors,
+// AddAuthentication/UseAuthentication): una registra, la otra activa.
+//
+// Índice de secciones:
+//   1. Arranque y cadena de conexión          7. Autenticación con JWT
+//   2. Acceso a datos                          8. Autorización
+//   3. Identity                                9. Límite de solicitudes
+//   4. Servicios propios                      10. Controllers, CORS y Swagger
+//   5. Manejo global de errores               11. Verificaciones de arranque
+//   6. Opciones del JWT                       12. El pipeline
+// =============================================================================
+
 using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
@@ -14,8 +37,20 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
+// -----------------------------------------------------------------------------
+// 1. Arranque y cadena de conexión
+// -----------------------------------------------------------------------------
+// CreateBuilder prepara el host y carga la configuración de varias fuentes a la
+// vez: appsettings.json, los user-secrets y las variables de entorno, en ese
+// orden de prioridad creciente. La conexión no está en ningún appsettings: llega
+// como variable de entorno ConnectionStrings__DefaultConnection, que en local
+// define Properties/launchSettings.json y en un servidor define el entorno.
+
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+// Cortar acá y no en la primera consulta: un error de arranque con instrucciones
+// es mucho más fácil de resolver que un 500 a mitad de camino.
 if (string.IsNullOrWhiteSpace(connectionString))
 {
     throw new InvalidOperationException(
@@ -24,28 +59,92 @@ if (string.IsNullOrWhiteSpace(connectionString))
         "con tu instancia de SQL Server. Ver README.md del backend.");
 }
 
+// -----------------------------------------------------------------------------
+// 2. Acceso a datos: conexión, contextos y repositorios
+// -----------------------------------------------------------------------------
+// "Scoped" quiere decir una instancia por petición HTTP, compartida por todo lo
+// que se construya durante esa petición.
+//
+// Los dos DbContext reciben deliberadamente la MISMA SqlConnection scoped. Eso es
+// lo que le permite a AccountService abrir una transacción que abarque a la vez
+// las tablas de Identity y las de negocio: si el alta del perfil falla, tampoco
+// queda creada la cuenta de acceso.
+
 builder.Services.AddScoped(_ => new SqlConnection(connectionString));
 builder.Services.AddDbContext<DigitalArsDbContext>((sp, options) =>
     options.UseSqlServer(sp.GetRequiredService<SqlConnection>()));
 builder.Services.AddDbContext<AuthDbContext>((sp, options) =>
     options.UseSqlServer(sp.GetRequiredService<SqlConnection>()));
+
+// Un repositorio por recurso. Los controllers y servicios dependen de la interfaz.
 builder.Services.AddScoped<ITipoMovimientoRepository, TipoMovimientoRepository>();
 builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+
+// -----------------------------------------------------------------------------
+// 3. Identity: cuentas, contraseñas, roles e invitaciones
+// -----------------------------------------------------------------------------
+// Identity administra las siete tablas AspNet*: guarda el hash de la contraseña
+// (nunca el texto), los roles y el security stamp. AddIdentityCore es la variante
+// sin cookies ni pantallas propias, que es la que corresponde en una API que se
+// autentica con JWT.
+
 builder.Services.AddIdentityCore<IdentityUser>(options =>
 {
     options.User.RequireUniqueEmail = true;
     options.Password.RequiredLength = 8;
+    // A los 5 intentos fallidos la cuenta queda bloqueada 15 minutos.
     options.Lockout.MaxFailedAccessAttempts = 5;
     options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
 }).AddRoles<IdentityRole>().AddEntityFrameworkStores<AuthDbContext>().AddDefaultTokenProviders();
+
+// AddDefaultTokenProviders habilita los tokens con los que se arma la invitación
+// de primera contraseña; esta línea les fija cuánto duran. El plazo tiene que
+// coincidir con Invitacion.ExpiraEnSegundos, que es el que se le informa al
+// frontend: un día.
 builder.Services.Configure<DataProtectionTokenProviderOptions>(options => options.TokenLifespan = TimeSpan.FromDays(1));
-builder.Services.AddScoped<AccountService>();
+
+// -----------------------------------------------------------------------------
+// 4. Servicios propios
+// -----------------------------------------------------------------------------
+// Se registran por su interfaz, así quien los recibe depende del contrato y no de
+// la clase concreta. Eso es lo que permite probar las reglas de negocio sin tener
+// SQL Server levantado, como hace Tests/AuthenticationChecks.
+
+builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
+
+// -----------------------------------------------------------------------------
+// 5. Manejo global de errores
+// -----------------------------------------------------------------------------
+// Cualquier excepción que no atrape un controller termina acá: se registra en el
+// log y sale como un 500 con la misma forma de ErrorResponse que el resto, sin
+// filtrarle al cliente el detalle de la excepción.
+
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+// UseExceptionHandler() sin argumentos no arranca si no hay un servicio de respaldo registrado.
+// GlobalExceptionHandler escribe la respuesta y devuelve true, así que este respaldo no llega a
+// usarse nunca: está para cumplir el requisito del middleware.
+builder.Services.AddProblemDetails();
+
+// -----------------------------------------------------------------------------
+// 6. Opciones del JWT, validadas al arrancar
+// -----------------------------------------------------------------------------
+// BindConfiguration lee la sección "Jwt" y la vuelca en JwtOptions. ValidateOnStart
+// hace que una clave ausente o de menos de 32 bytes corte el arranque, en vez de
+// fallar recién cuando alguien intenta iniciar sesión.
+
 builder.Services.AddOptions<JwtOptions>().BindConfiguration("Jwt").ValidateDataAnnotations()
     .Validate(o => Encoding.UTF8.GetByteCount(o.Key) >= 32, "Jwt:Key debe tener al menos 32 bytes.")
     .ValidateOnStart();
+
+// Copia suelta de las mismas opciones, porque la configuración de abajo se arma
+// ahora y no puede esperar a que el contenedor construya IOptions<JwtOptions>.
 var jwt = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
+
+// -----------------------------------------------------------------------------
+// 7. Autenticación con JWT
+// -----------------------------------------------------------------------------
 
 // El token se firma una sola vez, pero el usuario puede desactivarse o perder la sesión
 // después. Por eso cada request vuelve a contrastar el token contra el estado real en la base.
@@ -70,6 +169,10 @@ async Task<bool> ElTokenSigueSiendoValido(TokenValidatedContext context)
     return await db.Usuarios.AnyAsync(u => u.identity_user_id == identityUserId && u.is_active);
 }
 
+// TokenValidationParameters es lo que se comprueba del token en sí: que lo haya
+// emitido esta API, que sea para este frontend, que la firma cierre con la clave
+// y que no esté vencido. ClockSkew en cero saca la tolerancia de 5 minutos que
+// .NET aplica por defecto al vencimiento.
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
 {
     options.TokenValidationParameters = new TokenValidationParameters
@@ -78,11 +181,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
         ValidateAudience = true, ValidAudience = jwt.Audience,
         ValidateLifetime = true, RequireExpirationTime = true,
         ValidateIssuerSigningKey = true,
+        // El texto de relleno nunca se usa: si la clave falta, el arranque ya cortó
+        // en la sección 6. Está solo para que esta línea compile y no explote antes.
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
             string.IsNullOrEmpty(jwt.Key) ? "missing-key-validation-will-fail-on-start" : jwt.Key)),
         ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
         ClockSkew = TimeSpan.Zero
     };
+    // Con el token ya validado criptográficamente, recién acá se lo contrasta
+    // contra la base. context.Fail() convierte la petición en un 401.
     options.Events = new JwtBearerEvents
     {
         OnTokenValidated = async context =>
@@ -92,8 +199,25 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
         }
     };
 });
+
+// -----------------------------------------------------------------------------
+// 8. Autorización: todo protegido salvo que se diga lo contrario
+// -----------------------------------------------------------------------------
+// La FallbackPolicy se aplica a cualquier endpoint que no declare su propia regla.
+// Es una decisión de seguridad: olvidarse un [Authorize] deja el endpoint
+// protegido, no abierto. Lo que va a ser público tiene que pedirlo explícitamente
+// con [AllowAnonymous].
+
 builder.Services.AddAuthorization(options =>
     options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+
+// -----------------------------------------------------------------------------
+// 9. Límite de solicitudes
+// -----------------------------------------------------------------------------
+// La política "auth" NO es global: solo corre donde un controller la pide con
+// [EnableRateLimiting("auth")], hoy AuthController. Cuenta por dirección IP en
+// ventanas de un minuto, y al excederlas responde 429 sin encolar nada.
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -101,6 +225,11 @@ builder.Services.AddRateLimiter(options =>
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
+
+// -----------------------------------------------------------------------------
+// 10. Controllers, CORS y Swagger
+// -----------------------------------------------------------------------------
+
 builder.Services.AddControllers();
 
 // El frontend de Vite corre en otro puerto, así que el navegador exige CORS explícito.
@@ -112,26 +241,65 @@ if (allowedOrigins.Length == 0 && builder.Environment.IsDevelopment())
 }
 builder.Services.AddCors(options => options.AddPolicy("Frontend", policy =>
     policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod()));
+
+// CORS es una política del navegador: evita que otro sitio llame a esta API desde
+// la pestaña de un usuario. No reemplaza a la autenticación ni frena a un cliente
+// HTTP como curl o Postman.
+
+// El transformer le agrega a Swagger el candado para pegar el Bearer. Solo documenta
+// cómo mandar el token: no valida nada.
 builder.Services.AddOpenApi(options => options.AddDocumentTransformer<BearerSecuritySchemeTransformer>());
 
+// =============================================================================
+// A partir de acá la aplicación ya está construida: se termina de verificar el
+// entorno y se arma el recorrido de las peticiones.
+// =============================================================================
+
 var app = builder.Build();
+
+// -----------------------------------------------------------------------------
+// 11. Verificaciones de arranque
+// -----------------------------------------------------------------------------
+// Las dos comprobaciones siguientes existen para fallar temprano y con un motivo
+// claro, en vez de dejar la API en pie y que el primer usuario se coma el error.
+
+// Pedir el valor fuerza la validación de JwtOptions declarada en la sección 6.
 _ = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<JwtOptions>>().Value;
+
+// Un DbContext es scoped y acá todavía no hay ninguna petición, así que hay que
+// abrir un scope a mano para poder pedirlo.
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<DigitalArsDbContext>();
     if (!await db.Database.CanConnectAsync())
         throw new InvalidOperationException("No fue posible conectar con SQL Server. Revisá DefaultConnection y el servicio SQL Server.");
 }
+
+// Swagger solo en Development: en producción no se publica la documentación.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi().AllowAnonymous();
     app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "DigitalArs.Api v1"));
 }
-app.UseExceptionHandler();
-app.UseHttpsRedirection();
-app.UseCors("Frontend");
-app.UseAuthentication();
-app.UseAuthorization();
-app.UseRateLimiter();
-app.MapControllers();
+
+// -----------------------------------------------------------------------------
+// 12. El pipeline: por dónde pasa cada petición
+// -----------------------------------------------------------------------------
+// Acá el orden es lo único que importa. Cada middleware recibe la petición, puede
+// cortarla o dejarla seguir hacia el siguiente, y después ve pasar la respuesta de
+// vuelta. Se recorren de arriba hacia abajo, y la respuesta vuelve en sentido
+// inverso. Mover una línea de lugar cambia el comportamiento.
+
+app.UseExceptionHandler();   // primero de todo: así envuelve lo que falle más adentro
+app.UseHttpsRedirection();   // manda a HTTPS antes de procesar nada
+app.UseCors("Frontend");     // antes de autenticar: el preflight OPTIONS viaja sin token
+app.UseAuthentication();     // ¿quién sos? lee el Bearer y arma la identidad
+app.UseAuthorization();      // ¿podés? aplica [Authorize] y la FallbackPolicy
+app.UseRateLimiter();        // aplica la política "auth" donde el controller la pide
+app.MapControllers();        // último: recién acá se ejecuta el endpoint
+
+// Nota sobre el orden: el rate limiter quedó después de la autorización, así que un
+// 401 o un 403 se responde sin consumir cuota. Para el login, que es [AllowAnonymous]
+// y es lo que realmente interesa limitar, da igual.
+
 app.Run();

@@ -1,12 +1,15 @@
-using DigitalArs.Api.Data.Entities;
 using DigitalArs.Api.DTOs;
 using DigitalArs.Api.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DigitalArs.Api.Controllers;
 
+// El catálogo ya lo exigía la política global de autorización; el atributo lo deja a la vista
+// de quien lee el archivo.
 [Route("api/[controller]")]
 [ApiController]
+[Authorize]
 public class TiposDeMovimientosController(ITipoMovimientoRepository tiposDeMovimientos) : ControllerBase
 {
     [HttpGet]
@@ -14,8 +17,7 @@ public class TiposDeMovimientosController(ITipoMovimientoRepository tiposDeMovim
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
         var tipos = await tiposDeMovimientos.GetAllAsync(cancellationToken);
-        var response = tipos.Select(ToResponse).ToList();
-        return Ok(response);
+        return Ok(tipos);
     }
 
     [HttpGet("{id:int}")]
@@ -25,9 +27,7 @@ public class TiposDeMovimientosController(ITipoMovimientoRepository tiposDeMovim
     {
         var tipo = await tiposDeMovimientos.GetByIdAsync(id, cancellationToken);
         if (tipo is null) return NotFound();
-        return Ok(ToResponse(tipo));
-    }
 
-    private static TipoMovimientoResponse ToResponse(Tipo_Movimiento tipo) =>
-        new(tipo.id, tipo.descripcion);
+        return Ok(tipo);
+    }
 }

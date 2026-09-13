@@ -1,21 +1,108 @@
 using DigitalArs.Api.Data.Context;
 using DigitalArs.Api.Data.Entities;
 using DigitalArs.Api.DTOs;
+using DigitalArs.Api.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace DigitalArs.Api.Services;
 
-public class AccountService(AuthDbContext auth, DigitalArsDbContext db, UserManager<IdentityUser> users)
+public class AccountService(
+    AuthDbContext auth,
+    DigitalArsDbContext db,
+    UserManager<IdentityUser> users,
+    IUsuarioRepository usuarios) : IAccountService
 {
-    public const string InitialPasswordPurpose = "DigitalArs.InitialPassword.v1";
-
-    private const string RolUsuario = "Usuario";
-
     private const int IntentosParaGenerarAlias = 10;
 
-    public async Task<ResultadoDeAlta> CreateAsync(PerfilUsuarioDto dto, string? password)
+    public async Task<Resultado<RegistroResponse>> RegistrarAsync(RegistroDto dto)
+    {
+        var alta = await CrearEnTransaccionAsync(dto, dto.Password);
+        if (!alta.Exitoso) return Resultado<RegistroResponse>.Fallo(MotivoDeRechazo.DatosInvalidos, alta.Errores);
+
+        // El autorregistro siempre crea con el rol Usuario, y ese rol siempre lleva cuenta en pesos.
+        var cuenta = alta.Cuenta!;
+        return Resultado<RegistroResponse>.Exito(new RegistroResponse(
+            Message: "Usuario registrado exitosamente.",
+            Email: alta.UsuarioIdentity!.Email,
+            Alias: cuenta.alias,
+            Cvu: cuenta.cvu,
+            Saldo: cuenta.saldo));
+    }
+
+    public async Task<Resultado<UsuarioCreadoResponse>> CrearConInvitacionAsync(PerfilUsuarioDto dto)
+    {
+        var alta = await CrearEnTransaccionAsync(dto, password: null);
+        if (!alta.Exitoso) return Resultado<UsuarioCreadoResponse>.Fallo(MotivoDeRechazo.DatosInvalidos, alta.Errores);
+
+        var usuarioIdentity = alta.UsuarioIdentity!;
+        return Resultado<UsuarioCreadoResponse>.Exito(new UsuarioCreadoResponse(
+            UsuarioId: alta.Perfil!.id,
+            Email: usuarioIdentity.Email,
+            RequiresPasswordSetup: true,
+            InvitationToken: await GenerarInvitacionAsync(usuarioIdentity),
+            ExpiresInSeconds: Invitacion.ExpiraEnSegundos));
+    }
+
+    public async Task<Resultado<InvitacionResponse>> ReemitirInvitacionAsync(
+        int usuarioId, CancellationToken cancellationToken = default)
+    {
+        var perfil = await usuarios.GetByIdAsync(usuarioId, cancellationToken);
+        if (perfil?.identity_user_id is null) return Resultado<InvitacionResponse>.Fallo(MotivoDeRechazo.NoEncontrado);
+
+        var usuarioIdentity = await users.FindByIdAsync(perfil.identity_user_id);
+        if (usuarioIdentity is null) return Resultado<InvitacionResponse>.Fallo(MotivoDeRechazo.NoEncontrado);
+
+        var puedeRecibirInvitacion = perfil.is_active && !await users.HasPasswordAsync(usuarioIdentity);
+        if (!puedeRecibirInvitacion)
+            return Resultado<InvitacionResponse>.Fallo(MotivoDeRechazo.NoPuedeRecibirInvitacion);
+
+        // Renovar el stamp invalida la invitación anterior, así queda una sola vigente.
+        var rotado = await users.UpdateSecurityStampAsync(usuarioIdentity);
+        if (!rotado.Succeeded) return Resultado<InvitacionResponse>.Fallo(MotivoDeRechazo.NoSePudoActualizar);
+
+        return Resultado<InvitacionResponse>.Exito(new InvitacionResponse(
+            Email: usuarioIdentity.Email,
+            RequiresPasswordSetup: true,
+            InvitationToken: await GenerarInvitacionAsync(usuarioIdentity),
+            ExpiresInSeconds: Invitacion.ExpiraEnSegundos));
+    }
+
+    public async Task<MotivoDeRechazo?> CambiarEstadoAsync(
+        int usuarioId, bool activo, CancellationToken cancellationToken = default)
+    {
+        var perfil = await usuarios.GetByIdAsync(usuarioId, cancellationToken);
+        if (perfil is null) return MotivoDeRechazo.NoEncontrado;
+
+        if (!await RevocarSesionesAsync(perfil)) return MotivoDeRechazo.NoSePudoActualizar;
+
+        if (!await usuarios.ActualizarEstadoActivoAsync(usuarioId, activo, cancellationToken))
+            return MotivoDeRechazo.NoEncontrado;
+
+        return null;
+    }
+
+    public async Task<bool> ExisteAdministradorAsync() =>
+        (await users.GetUsersInRoleAsync(RolPrincipal.Administrador)).Count > 0;
+
+    // Se revoca primero y se guarda después: si el guardado del perfil falla, los tokens viejos
+    // ya dejaron de valer y no vuelven a servir cuando se reactive al usuario.
+    private async Task<bool> RevocarSesionesAsync(Usuario perfil)
+    {
+        if (perfil.identity_user_id is null) return true;
+
+        var usuarioIdentity = await users.FindByIdAsync(perfil.identity_user_id);
+        if (usuarioIdentity is null) return true;
+
+        var rotado = await users.UpdateSecurityStampAsync(usuarioIdentity);
+        return rotado.Succeeded;
+    }
+
+    private Task<string> GenerarInvitacionAsync(IdentityUser usuarioIdentity) =>
+        users.GenerateUserTokenAsync(usuarioIdentity, TokenOptions.DefaultProvider, Invitacion.Proposito);
+
+    private async Task<ResultadoDeAlta> CrearEnTransaccionAsync(PerfilUsuarioDto dto, string? password)
     {
         // Los dos contextos comparten la conexión scoped, así que entran en la misma transacción.
         // Si falla el perfil de negocio, tampoco queda creado el usuario de Identity.
@@ -48,7 +135,7 @@ public class AccountService(AuthDbContext auth, DigitalArsDbContext db, UserMana
 
         var usuarioIdentity = new IdentityUser { UserName = dto.Email, Email = dto.Email };
         var alta = await CrearEnIdentityAsync(usuarioIdentity, password);
-        if (!alta.Succeeded) return ResultadoDeAlta.Fallo(Errors(alta));
+        if (!alta.Succeeded) return ResultadoDeAlta.Fallo(MensajesDeIdentity.Traducir(alta));
 
         var perfil = await GuardarPerfilAsync(dto, usuarioIdentity.Id);
 
@@ -95,7 +182,7 @@ public class AccountService(AuthDbContext auth, DigitalArsDbContext db, UserMana
 
         if (!creado.Succeeded) return creado;
 
-        return await users.AddToRoleAsync(usuarioIdentity, RolUsuario);
+        return await users.AddToRoleAsync(usuarioIdentity, RolPrincipal.Usuario);
     }
 
     private async Task<Usuario> GuardarPerfilAsync(PerfilUsuarioDto dto, string identityUserId)
@@ -142,37 +229,5 @@ public class AccountService(AuthDbContext auth, DigitalArsDbContext db, UserMana
             if (!await db.Cuentas.AnyAsync(c => c.alias == alias)) return alias;
         }
         return null;
-    }
-
-    public Task<string> CreateInvitationAsync(IdentityUser user) =>
-        users.GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, InitialPasswordPurpose);
-
-    public async Task<IdentityResult> SetInitialPasswordAsync(IdentityUser user, string token, string password)
-    {
-        if (await users.HasPasswordAsync(user))
-            return InvitacionRechazada();
-
-        if (!await users.VerifyUserTokenAsync(user, TokenOptions.DefaultProvider, InitialPasswordPurpose, token))
-            return InvitacionRechazada();
-
-        return await users.AddPasswordAsync(user, password);
-    }
-
-    public static string[] Errors(IdentityResult result) =>
-        result.Errors.Select(MensajeSeguro).ToArray();
-
-    private static IdentityResult InvitacionRechazada() =>
-        IdentityResult.Failed(new IdentityError
-        {
-            Code = "InvalidInvitation",
-            Description = "Invitación inválida o vencida."
-        });
-
-    // Los errores de contraseña se muestran tal cual porque ayudan a corregirla. El resto se
-    // generaliza para no revelar si un email o un documento ya estaban registrados.
-    private static string MensajeSeguro(IdentityError error)
-    {
-        if (error.Code.StartsWith("Password")) return error.Description;
-        return "No se pudo completar la operación con los datos proporcionados.";
     }
 }

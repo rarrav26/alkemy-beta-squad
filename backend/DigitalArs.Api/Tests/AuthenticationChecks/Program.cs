@@ -1,11 +1,12 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using DigitalArs.Api.Data.Context;
+using DigitalArs.Api.Data.Entities;
+using DigitalArs.Api.DTOs;
+using DigitalArs.Api.Interfaces;
 using DigitalArs.Api.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -17,36 +18,45 @@ services.AddSingleton<IDataProtectionProvider>(new EphemeralDataProtectionProvid
 services.AddIdentityCore<IdentityUser>().AddUserStore<MemoryStore>().AddDefaultTokenProviders();
 using var provider = services.BuildServiceProvider();
 var users = provider.GetRequiredService<UserManager<IdentityUser>>();
-using var auth = new AuthDbContext(new DbContextOptionsBuilder<AuthDbContext>().UseSqlServer("Server=unused;Database=unused").Options);
-using var db = new DigitalArsDbContext(new DbContextOptionsBuilder<DigitalArsDbContext>().UseSqlServer("Server=unused;Database=unused").Options);
-var accounts = new AccountService(auth, db, users);
-var user = new IdentityUser { UserName = "test@example.com", Email = "test@example.com" };
-Check((await users.CreateAsync(user)).Succeeded, "Identity crea un usuario sin contraseña");
-Check(!await users.HasPasswordAsync(user), "La invitación no define una contraseña");
-var invitation = await accounts.CreateInvitationAsync(user);
-Check(!(await accounts.SetInitialPasswordAsync(user, invitation + "invalid", "Secure123!")).Succeeded, "Rechaza invitación adulterada");
-var other = new IdentityUser { UserName = "other@example.com", Email = "other@example.com" };
-await users.CreateAsync(other);
-Check(!(await accounts.SetInitialPasswordAsync(other, invitation, "Secure123!")).Succeeded, "Invitación vinculada al usuario");
-Check(!(await accounts.SetInitialPasswordAsync(user, invitation, "abc")).Succeeded, "Rechaza contraseña débil");
-Check((await accounts.SetInitialPasswordAsync(user, invitation, "Secure123!")).Succeeded, "Establece primera contraseña");
-Check(user.PasswordHash != "Secure123!" && !string.IsNullOrEmpty(user.PasswordHash), "Guarda hash, nunca texto plano");
-Check(await users.CheckPasswordAsync(user, "Secure123!"), "Identity valida contraseña correcta");
-Check(!await users.CheckPasswordAsync(user, "Incorrect123!"), "Identity rechaza contraseña incorrecta");
-Check(!(await accounts.SetInitialPasswordAsync(user, invitation, "NewSecure123!")).Succeeded, "Invitación de un solo uso");
-var oldInvitation = await accounts.CreateInvitationAsync(other);
-await users.UpdateSecurityStampAsync(other);
-Check(!(await accounts.SetInitialPasswordAsync(other, oldInvitation, "Secure123!")).Succeeded, "Renovar stamp revoca invitaciones anteriores");
-var expiredProvider = new DataProtectorTokenProvider<IdentityUser>(
-    provider.GetRequiredService<IDataProtectionProvider>(),
-    Options.Create(new DataProtectionTokenProviderOptions { TokenLifespan = TimeSpan.FromSeconds(-1) }),
-    provider.GetRequiredService<ILogger<DataProtectorTokenProvider<IdentityUser>>>());
-var fresh = await accounts.CreateInvitationAsync(other);
-Check(!await expiredProvider.ValidateAsync(AccountService.InitialPasswordPurpose, fresh, users, other), "Invitación vencida rechazada");
 
 var settings = new JwtOptions { Key = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)),
     Issuer = "DigitalArs.Api", Audience = "DigitalArs.Frontend", ExpirationMinutes = 60 };
 var service = new JwtTokenService(Options.Create(settings), users);
+
+// AuthService solo depende de Identity, del repositorio de perfiles y del emisor de tokens, así
+// que se lo puede ejercitar entero en memoria: no hace falta SQL Server para estas pruebas.
+var perfiles = new PerfilesEnMemoria();
+var authService = new AuthService(users, perfiles, service);
+
+var user = new IdentityUser { UserName = "test@example.com", Email = "test@example.com" };
+Check((await users.CreateAsync(user)).Succeeded, "Identity crea un usuario sin contraseña");
+Check(!await users.HasPasswordAsync(user), "La invitación no define una contraseña");
+perfiles.Agregar(user.Id, "test@example.com");
+
+// Se emite igual que AccountService, con el mismo propósito compartido: si ese propósito
+// cambiara de un lado solo, esta prueba lo detecta.
+var invitation = await CrearInvitacion(user);
+Check(!(await DefinirPassword("test@example.com", invitation + "invalid", "Secure123!")).Exitoso, "Rechaza invitación adulterada");
+var other = new IdentityUser { UserName = "other@example.com", Email = "other@example.com" };
+await users.CreateAsync(other);
+perfiles.Agregar(other.Id, "other@example.com");
+Check(!(await DefinirPassword("other@example.com", invitation, "Secure123!")).Exitoso, "Invitación vinculada al usuario");
+Check(!(await DefinirPassword("test@example.com", invitation, "abc")).Exitoso, "Rechaza contraseña débil");
+Check((await DefinirPassword("test@example.com", invitation, "Secure123!")).Exitoso, "Establece primera contraseña");
+Check(user.PasswordHash != "Secure123!" && !string.IsNullOrEmpty(user.PasswordHash), "Guarda hash, nunca texto plano");
+Check(await users.CheckPasswordAsync(user, "Secure123!"), "Identity valida contraseña correcta");
+Check(!await users.CheckPasswordAsync(user, "Incorrect123!"), "Identity rechaza contraseña incorrecta");
+Check(!(await DefinirPassword("test@example.com", invitation, "NewSecure123!")).Exitoso, "Invitación de un solo uso");
+var oldInvitation = await CrearInvitacion(other);
+await users.UpdateSecurityStampAsync(other);
+Check(!(await DefinirPassword("other@example.com", oldInvitation, "Secure123!")).Exitoso, "Renovar stamp revoca invitaciones anteriores");
+var expiredProvider = new DataProtectorTokenProvider<IdentityUser>(
+    provider.GetRequiredService<IDataProtectionProvider>(),
+    Options.Create(new DataProtectionTokenProviderOptions { TokenLifespan = TimeSpan.FromSeconds(-1) }),
+    provider.GetRequiredService<ILogger<DataProtectorTokenProvider<IdentityUser>>>());
+var fresh = await CrearInvitacion(other);
+Check(!await expiredProvider.ValidateAsync(Invitacion.Proposito, fresh, users, other), "Invitación vencida rechazada");
+
 var response = await service.CrearToken(user, 42);
 var parameters = new TokenValidationParameters
 {
@@ -71,6 +81,16 @@ var expired = new JwtSecurityToken(settings.Issuer, settings.Audience, expires: 
 Reject(handler.WriteToken(expired), parameters, "Rechaza JWT vencido");
 Reject(invitation, parameters, "Invitación no puede usarse como JWT");
 Console.WriteLine("Todas las verificaciones pasaron.");
+
+Task<string> CrearInvitacion(IdentityUser usuario) =>
+    users.GenerateUserTokenAsync(usuario, TokenOptions.DefaultProvider, Invitacion.Proposito);
+
+Task<Resultado<SesionResponse>> DefinirPassword(string email, string token, string password) =>
+    authService.DefinirPrimeraPasswordAsync(new PrimeraPasswordDto
+    {
+        Email = email, InvitationToken = token, Password = password, ConfirmPassword = password
+    });
+
 void Check(bool condition, string name) { if (!condition) throw new Exception(name); Console.WriteLine("PASS: " + name); }
 void Reject(string token, TokenValidationParameters validation, string name)
 {
@@ -80,7 +100,39 @@ void Reject(string token, TokenValidationParameters validation, string name)
     throw new Exception(name);
 }
 
-sealed class MemoryStore : IUserPasswordStore<IdentityUser>, IUserSecurityStampStore<IdentityUser>, IUserRoleStore<IdentityUser>
+// Perfiles de negocio en memoria, para no necesitar SQL Server.
+sealed class PerfilesEnMemoria : IUsuarioRepository
+{
+    private readonly List<Usuario> items = [];
+
+    public void Agregar(string identityUserId, string email) =>
+        items.Add(new Usuario
+        {
+            id = items.Count + 1,
+            identity_user_id = identityUserId,
+            nombre = "Prueba", apellido = "Prueba", email = email,
+            tipo_documento = "DNI", nro_documento = "90000001",
+            is_active = true
+        });
+
+    public Task<Usuario?> GetByIdAsync(int id, CancellationToken c = default) =>
+        Task.FromResult(items.FirstOrDefault(u => u.id == id));
+
+    public Task<Usuario?> GetByIdentityUserIdAsync(string identityUserId, CancellationToken c = default) =>
+        Task.FromResult(items.FirstOrDefault(u => u.identity_user_id == identityUserId));
+
+    public Task<bool> ActualizarEstadoActivoAsync(int id, bool activo, CancellationToken c = default)
+    {
+        var perfil = items.FirstOrDefault(u => u.id == id);
+        if (perfil is null) return Task.FromResult(false);
+
+        perfil.is_active = activo;
+        return Task.FromResult(true);
+    }
+}
+
+sealed class MemoryStore : IUserPasswordStore<IdentityUser>, IUserSecurityStampStore<IdentityUser>,
+    IUserRoleStore<IdentityUser>, IUserEmailStore<IdentityUser>
 {
     private readonly Dictionary<string, IdentityUser> items = new();
     public void Dispose() { }
@@ -104,4 +156,11 @@ sealed class MemoryStore : IUserPasswordStore<IdentityUser>, IUserSecurityStampS
     public Task RemoveFromRoleAsync(IdentityUser u, string s, CancellationToken c) => throw new NotSupportedException();
     public Task<bool> IsInRoleAsync(IdentityUser u, string s, CancellationToken c) => Task.FromResult(s == "Usuario");
     public Task<IList<IdentityUser>> GetUsersInRoleAsync(string s, CancellationToken c) => Task.FromResult<IList<IdentityUser>>(items.Values.ToList());
+    public Task SetEmailAsync(IdentityUser u, string? s, CancellationToken c) { u.Email=s; return Task.CompletedTask; }
+    public Task<string?> GetEmailAsync(IdentityUser u, CancellationToken c) => Task.FromResult(u.Email);
+    public Task<bool> GetEmailConfirmedAsync(IdentityUser u, CancellationToken c) => Task.FromResult(u.EmailConfirmed);
+    public Task SetEmailConfirmedAsync(IdentityUser u, bool b, CancellationToken c) { u.EmailConfirmed=b; return Task.CompletedTask; }
+    public Task<IdentityUser?> FindByEmailAsync(string normalizedEmail, CancellationToken c) => Task.FromResult(items.Values.FirstOrDefault(u => u.NormalizedEmail == normalizedEmail));
+    public Task<string?> GetNormalizedEmailAsync(IdentityUser u, CancellationToken c) => Task.FromResult(u.NormalizedEmail);
+    public Task SetNormalizedEmailAsync(IdentityUser u, string? s, CancellationToken c) { u.NormalizedEmail=s; return Task.CompletedTask; }
 }

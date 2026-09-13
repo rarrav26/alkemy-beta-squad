@@ -30,7 +30,9 @@ El seed deja creado al administrador con el que se entra por primera vez:
 
 > Son credenciales de proyecto de estudio, versionadas a propósito para que cualquiera pueda levantar el entorno. No usarlas fuera de la máquina local.
 
-El seed también carga a Juan, María y Carlos con sus cuentas de ejemplo. Esos usuarios sirven para probar consultas: no tienen acceso al login.
+El seed también carga a Juan, María y Carlos con sus cuentas de ejemplo. Esos usuarios sirven para probar consultas: no tienen acceso al login, porque no están vinculados a una cuenta de Identity.
+
+## 3. Configurar la conexión a SQL Server
 
 Abrir la solución de la API en Visual Studio, dentro de:
 
@@ -74,11 +76,12 @@ Si el archivo ya tiene otras configuraciones, conservarlas y agregar `Jwt` dentr
 
 **Estos secretos no se suben a Git.** Cada compañero usa la suya.
 
-## 5 Iniciar la API
+## 5. Iniciar la API
 
 No hace falta ningún paso previo: la base ya quedó lista en el punto 2.
 
-Seleccionar el perfil **https** en Visual Studio y ejecutar con **F5** o **Ctrl+F5**.
+Seleccionar el perfil **DigitalArs.Api** en Visual Studio y ejecutar con **F5** o **Ctrl+F5**.
+Es el único perfil del proyecto: es el que define el puerto 7201 y la cadena de conexión.
 En cada arranque la API solo verifica que pueda conectarse a SQL Server.
 
 Abrir:
