@@ -49,7 +49,13 @@ public class AccountService(AuthDbContext auth, DigitalArsDbContext db, UserMana
             }
 
             var user = new IdentityUser { UserName = email, Email = email };
-            var result = password is null ? await users.CreateAsync(user) : await users.CreateAsync(user, password);
+            // Sin contraseña, el usuario queda a la espera de consumir su invitación.
+            IdentityResult result;
+            if (password is null)
+                result = await users.CreateAsync(user);
+            else
+                result = await users.CreateAsync(user, password);
+
             if (!result.Succeeded) return (null, null, null, Errors(result));
 
             result = await users.AddToRoleAsync(user, role);

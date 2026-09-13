@@ -45,6 +45,30 @@ builder.Services.AddOptions<JwtOptions>().BindConfiguration("Jwt").ValidateDataA
     .Validate(o => Encoding.UTF8.GetByteCount(o.Key) >= 32, "Jwt:Key debe tener al menos 32 bytes.")
     .ValidateOnStart();
 var jwt = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
+
+// El token se firma una sola vez, pero el usuario puede desactivarse o perder la sesión
+// después. Por eso cada request vuelve a contrastar el token contra el estado real en la base.
+async Task<bool> ElTokenSigueSiendoValido(TokenValidatedContext context)
+{
+    var users = context.HttpContext.RequestServices.GetRequiredService<UserManager<IdentityUser>>();
+    var db = context.HttpContext.RequestServices.GetRequiredService<DigitalArsDbContext>();
+
+    var identityUserId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (identityUserId is null) return false;
+
+    var user = await users.FindByIdAsync(identityUserId);
+    if (user is null) return false;
+
+    // Sin contraseña definida, el usuario todavía no consumió su invitación.
+    if (!await users.HasPasswordAsync(user)) return false;
+
+    // El stamp se renueva cuando se revoca la sesión: ahí un token viejo deja de coincidir.
+    var stampDelToken = context.Principal?.FindFirstValue("security_stamp");
+    if (stampDelToken != await users.GetSecurityStampAsync(user)) return false;
+
+    return await db.Usuarios.AnyAsync(u => u.identity_user_id == identityUserId && u.is_active);
+}
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
 {
     options.TokenValidationParameters = new TokenValidationParameters
@@ -62,13 +86,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     {
         OnTokenValidated = async context =>
         {
-            var users = context.HttpContext.RequestServices.GetRequiredService<UserManager<IdentityUser>>();
-            var db = context.HttpContext.RequestServices.GetRequiredService<DigitalArsDbContext>();
-            var id = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
-            var user = id is null ? null : await users.FindByIdAsync(id);
-            if (user is null || !await users.HasPasswordAsync(user) ||
-                context.Principal?.FindFirstValue("security_stamp") != await users.GetSecurityStampAsync(user) ||
-                !await db.Usuarios.AnyAsync(u => u.identity_user_id == id && u.is_active))
+            if (!await ElTokenSigueSiendoValido(context))
                 context.Fail("Token inválido o usuario desactivado.");
         }
     };

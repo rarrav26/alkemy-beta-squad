@@ -39,9 +39,12 @@ public class UsuariosController(AccountService accounts, IUsuarioRepository usua
     public async Task<IActionResult> ReissueInvitation(int id)
     {
         var profile = await usuarios.GetByIdAsync(id);
-        var user = profile?.identity_user_id is null ? null : await users.FindByIdAsync(profile.identity_user_id);
+        if (profile?.identity_user_id is null) return NotFound();
+
+        var user = await users.FindByIdAsync(profile.identity_user_id);
         if (user is null) return NotFound();
-        if (!profile!.is_active || await users.HasPasswordAsync(user))
+
+        if (!profile.is_active || await users.HasPasswordAsync(user))
             return BadRequest(new ErrorResponse { Message = "El usuario debe estar activo y sin contraseña definida." });
         var updated = await users.UpdateSecurityStampAsync(user);
         if (!updated.Succeeded) return Conflict(new ErrorResponse { Message = "No se pudo renovar la invitación." });
