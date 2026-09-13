@@ -28,8 +28,6 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Data/Sql/001_Identity.sql" />
-    <Folder Include="Data\Entities\" />
-    <Folder Include="Dtos\" />
   </ItemGroup>
 
 </Project>
