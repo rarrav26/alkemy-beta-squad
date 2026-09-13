@@ -1,3 +1,22 @@
+/* ============================================================================
+   DigitalArs - Billetera Virtual
+   Script Identity (v.001): las siete tablas de ASP.NET Core Identity
+   Requiere: Init(v.001).sql
+
+   Se puede repetir: si las siete tablas ya existen, no hace nada.
+   Correr despues de Create(v.002).sql y antes de Seed(v.003).sql.
+   ============================================================================ */
+
+USE DigitalArs;
+GO
+
+/* RoleNameIndex y UserNameIndex son indices filtrados (llevan WHERE), y SQL Server
+   los rechaza si estas dos opciones no estan activas. SSMS las activa por su cuenta,
+   sqlcmd no: se declaran aca para que el script corra igual en cualquier cliente. */
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
 SET XACT_ABORT ON;
 BEGIN TRY
     BEGIN TRANSACTION;

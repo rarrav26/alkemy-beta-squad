@@ -13,8 +13,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
-var commandFlags = new[] { "--identity-script", "--init-identity", "--bootstrap-admin" };
-var builder = WebApplication.CreateBuilder(args.Where(a => !commandFlags.Contains(a)).ToArray());
+var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 if (string.IsNullOrWhiteSpace(connectionString))
 {
@@ -114,36 +113,12 @@ builder.Services.AddCors(options => options.AddPolicy("Frontend", policy =>
 builder.Services.AddOpenApi(options => options.AddDocumentTransformer<BearerSecuritySchemeTransformer>());
 
 var app = builder.Build();
-if (args.Contains("--identity-script"))
-{
-    using var scope = app.Services.CreateScope();
-    Console.WriteLine(scope.ServiceProvider.GetRequiredService<AuthDbContext>().Database.GenerateCreateScript());
-    return;
-}
-if (args.Contains("--bootstrap-admin"))
-{
-    using var scope = app.Services.CreateScope();
-    await IdentitySetup.CreateAdminAsync(scope.ServiceProvider, builder.Configuration);
-    return;
-}
-if (args.Contains("--init-identity"))
-{
-    using var scope = app.Services.CreateScope();
-    var auth = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
-    using var stream = typeof(Program).Assembly.GetManifestResourceStream("DigitalArs.Api.Data.Sql.001_Identity.sql")!;
-    using var reader = new StreamReader(stream);
-    await auth.Database.ExecuteSqlRawAsync(await reader.ReadToEndAsync());
-    await IdentitySetup.EnsureRolesAsync(scope.ServiceProvider);
-    Console.WriteLine("Tablas de Identity y roles preparados.");
-    return;
-}
 _ = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<JwtOptions>>().Value;
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<DigitalArsDbContext>();
     if (!await db.Database.CanConnectAsync())
         throw new InvalidOperationException("No fue posible conectar con SQL Server. Revisá DefaultConnection y el servicio SQL Server.");
-    await IdentitySetup.EnsureRolesAsync(scope.ServiceProvider);
 }
 if (app.Environment.IsDevelopment())
 {

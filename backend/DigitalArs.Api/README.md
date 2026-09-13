@@ -115,6 +115,9 @@ SQL Server debe estar iniciado y tu cuenta Windows debe tener acceso a esa base.
 Si usás otra conexión, ajustá el perfil de Properties/launchSettings.json o ejecutá sin perfil
 y configurá ConnectionStrings__DefaultConnection y ASPNETCORE_ENVIRONMENT=Development.
 
+Las tablas de Identity, los roles y el administrador inicial se preparan con los scripts de
+la carpeta database/ antes de levantar la API. Ver el README de la raíz del repositorio.
+
 1. Configurá una clave aleatoria local (una sola vez; no subirla al repositorio):
 
 ```powershell
@@ -122,15 +125,13 @@ $keyBytes = New-Object byte[] 32
 [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($keyBytes)
 dotnet user-secrets set "Jwt:Key" ([Convert]::ToBase64String($keyBytes))
 dotnet build
-dotnet run --no-build -- --init-identity
 dotnet run --no-build --launch-profile https
 ```
 
-El comando init-identity agrega las tablas Identity si no existen y crea los roles Usuario/Administrador.
+database/Identity(v.001).sql agrega las siete tablas Identity si no existen.
 Si encuentra parte de las tablas Identity, se detiene para evitar completar un esquema incompatible.
 Si ya están las siete, las conserva; se espera el modelo estándar de Identity de .NET 10.
-Alternativamente, un administrador de SQL puede ejecutar Data/Sql/001_Identity.sql en DigitalArs.
-La API crea los roles al arrancar. El script no borra ni altera las tablas de negocio.
+El script no borra ni altera las tablas de negocio.
 
 Swagger: https://localhost:7201/swagger (perfil https).
 Configurá el certificado de desarrollo con dotnet dev-certs https --trust si tu equipo todavía no confía en él.
@@ -140,22 +141,15 @@ de forma persistente y compartida entre instancias: las invitaciones dependen de
 ### Primer administrador
 
 El registro público siempre asigna Usuario. Nunca acepta un rol proporcionado por el cliente.
-Para el primer Administrador, configurá estas variables con datos reales en tu consola local:
+La API no tiene ningún camino para crear un Administrador: el único es database/Seed(v.003).sql,
+que siembra admin@digitalars.com con la contraseña Admin123!.
 
-```powershell
-$env:BootstrapAdmin__Nombre = 'Nombre'
-$env:BootstrapAdmin__Apellido = 'Apellido'
-$env:BootstrapAdmin__Email = 'administrador@ejemplo.com'
-$env:BootstrapAdmin__TipoDocumento = 'DNI'
-$env:BootstrapAdmin__NroDocumento = 'DOCUMENTO_REAL'
-$credential = Get-Credential -UserName $env:BootstrapAdmin__Email -Message 'Contraseña inicial del administrador'
-$env:BootstrapAdmin__Password = $credential.GetNetworkCredential().Password
-dotnet run --no-build -- --bootstrap-admin
-Remove-Item Env:BootstrapAdmin__Password
-$credential = $null
-```
+Identity guarda la contraseña con PBKDF2 y salt aleatorio, que no se puede calcular en T-SQL,
+así que el seed lleva el hash ya generado. Para cambiar esa contraseña hay que regenerarlo con
+PasswordHasher y reemplazar el literal @AdminHash del script.
 
-El comando se niega a crear otro administrador si ya existe uno. No hay contraseñas ni usuarios de prueba predefinidos.
+Son credenciales de proyecto de estudio. En un despliegue real el administrador se siembra con
+una contraseña propia y se rota apenas se entra por primera vez.
 La contraseña debe tener al menos ocho caracteres, mayúscula, minúscula, número y símbolo (máximo 128).
 
 ### Contrato de endpoints

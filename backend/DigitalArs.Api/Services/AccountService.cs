@@ -15,7 +15,7 @@ public class AccountService(AuthDbContext auth, DigitalArsDbContext db, UserMana
 
     private const int IntentosParaGenerarAlias = 10;
 
-    public async Task<ResultadoDeAlta> CreateAsync(PerfilUsuarioDto dto, string? password, string role = RolUsuario)
+    public async Task<ResultadoDeAlta> CreateAsync(PerfilUsuarioDto dto, string? password)
     {
         // Los dos contextos comparten la conexión scoped, así que entran en la misma transacción.
         // Si falla el perfil de negocio, tampoco queda creado el usuario de Identity.
@@ -23,7 +23,7 @@ public class AccountService(AuthDbContext auth, DigitalArsDbContext db, UserMana
         await db.Database.UseTransactionAsync(transaccion.GetDbTransaction());
         try
         {
-            var resultado = await CrearUsuarioYCuentaAsync(dto, password, role);
+            var resultado = await CrearUsuarioYCuentaAsync(dto, password);
             if (!resultado.Exitoso) return resultado;
 
             await transaccion.CommitAsync();
@@ -39,7 +39,7 @@ public class AccountService(AuthDbContext auth, DigitalArsDbContext db, UserMana
         }
     }
 
-    private async Task<ResultadoDeAlta> CrearUsuarioYCuentaAsync(PerfilUsuarioDto dto, string? password, string role)
+    private async Task<ResultadoDeAlta> CrearUsuarioYCuentaAsync(PerfilUsuarioDto dto, string? password)
     {
         QuitarEspaciosSobrantes(dto);
 
@@ -47,13 +47,10 @@ public class AccountService(AuthDbContext auth, DigitalArsDbContext db, UserMana
         if (errorDeDuplicado is not null) return ResultadoDeAlta.Fallo(errorDeDuplicado);
 
         var usuarioIdentity = new IdentityUser { UserName = dto.Email, Email = dto.Email };
-        var alta = await CrearEnIdentityAsync(usuarioIdentity, password, role);
+        var alta = await CrearEnIdentityAsync(usuarioIdentity, password);
         if (!alta.Succeeded) return ResultadoDeAlta.Fallo(Errors(alta));
 
         var perfil = await GuardarPerfilAsync(dto, usuarioIdentity.Id);
-
-        // La cuenta en pesos es para quien opera en la billetera; el administrador no la necesita.
-        if (role != RolUsuario) return ResultadoDeAlta.Exito(usuarioIdentity, perfil, cuenta: null);
 
         var cuenta = await CrearCuentaEnPesosAsync(perfil.id);
         if (cuenta is null) return ResultadoDeAlta.Fallo("No se pudo generar el alias de la cuenta. Intentá nuevamente.");
@@ -87,7 +84,7 @@ public class AccountService(AuthDbContext auth, DigitalArsDbContext db, UserMana
         return null;
     }
 
-    private async Task<IdentityResult> CrearEnIdentityAsync(IdentityUser usuarioIdentity, string? password, string role)
+    private async Task<IdentityResult> CrearEnIdentityAsync(IdentityUser usuarioIdentity, string? password)
     {
         IdentityResult creado;
         // Sin contraseña, el usuario queda a la espera de consumir su invitación.
@@ -98,7 +95,7 @@ public class AccountService(AuthDbContext auth, DigitalArsDbContext db, UserMana
 
         if (!creado.Succeeded) return creado;
 
-        return await users.AddToRoleAsync(usuarioIdentity, role);
+        return await users.AddToRoleAsync(usuarioIdentity, RolUsuario);
     }
 
     private async Task<Usuario> GuardarPerfilAsync(PerfilUsuarioDto dto, string identityUserId)

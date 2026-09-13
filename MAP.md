@@ -2,7 +2,7 @@
 
 Este documento explica la autenticación, autorización, seed y conexión con React implementados en DigitalArs. El foco está en entender **qué hace cada parte y en qué archivo encontrarla**.
 
-**Versión documentada:** entrega final con administrador inicial creado mediante el comando `--bootstrap-admin`. El formulario de primer administrador de una versión anterior ya no es parte del flujo vigente.
+**Versión documentada:** entrega final con administrador inicial creado por `database/Seed(v.003).sql`. El formulario de primer administrador y el comando `--bootstrap-admin` de versiones anteriores ya no son parte del flujo vigente.
 
 Las rutas del documento son relativas al repositorio. La carpeta del backend, el proyecto y los namespaces usan todos el mismo nombre: **DigitalArs.Api**.
 
@@ -42,8 +42,8 @@ En DigitalArs se incorporaron:
 - Rechazo de usuarios desactivados.
 - Alta administrativa sin contraseña e invitación para establecerla.
 - Renovación de invitaciones y cambio de estado desde la API.
-- Roles asegurados al arrancar y primer administrador creado con `--bootstrap-admin`.
-- Estructura de Identity preparada con `--init-identity`; la clave JWT se configura a mano.
+- Roles y primer administrador sembrados por `database/Seed(v.003).sql`.
+- Estructura de Identity preparada con `database/Identity(v.001).sql`; la clave JWT se configura a mano.
 - Swagger con soporte Bearer y CORS para React.
 - Login, registro, dashboard y alta de usuarios desde el frontend.
 - Llamadas a la API centralizadas en AuthProvider.
@@ -81,7 +81,7 @@ Dentro de **backend/DigitalArs.Api/**:
 | DigitalArs.Api.csproj                      | Versión de .NET, paquetes y recursos SQL incluidos en el ensamblado. |
 | Controllers/AuthController.cs              | Registro, login, primera contraseña, sesión y prueba protegida.      |
 | Controllers/UsuariosController.cs          | Crear usuarios con invitación, renovarla y cambiar estado.           |
-| Controllers/SetupController.cs             | Estado del alta inicial y compatibilidad con el formulario retirado. |
+| Controllers/SetupController.cs             | Estado del alta inicial: informa si ya existe un administrador.      |
 | Controllers/TiposDeMovimientosController.cs | Catálogo de tipos de movimiento: listado y detalle por id.          |
 | Controllers/CuentasController.cs           | Estructura vacía, todavía sin endpoints.                             |
 | Controllers/MovimientosController.cs       | Estructura vacía, todavía sin endpoints.                             |
@@ -91,7 +91,6 @@ Dentro de **backend/DigitalArs.Api/**:
 | Data/Entities/Cuenta.cs                    | Datos de una cuenta.                                                 |
 | Data/Entities/Movimiento.cs                | Datos de un movimiento.                                              |
 | Data/Entities/Tipo_Movimiento.cs           | Catálogo de tipos.                                                   |
-| Data/Sql/001_Identity.sql                  | Creación de tablas Identity.                                         |
 | DTOs/InicioSesionDto.cs                    | Datos para ingresar.                                                 |
 | DTOs/RegistroDto.cs                        | Datos para registrarse con contraseña.                               |
 | DTOs/PerfilUsuarioDto.cs                   | Nombre, apellido, email y documento, con su validación por tipo.     |
@@ -116,12 +115,11 @@ Dentro de **backend/DigitalArs.Api/**:
 | Services/DatosDeCuenta.cs                  | Sorteo del alias y armado del CVU, sin base de datos.                |
 | Services/JwtTokenService.cs                | Generación y firma de JWT.                                           |
 | Services/JwtOptions.cs                     | Opciones y valores predeterminados del JWT.                          |
-| Services/IdentitySetup.cs                  | Creación de roles y del administrador inicial.                       |
 | OpenApi/BearerSecuritySchemeTransformer.cs | Documentación de autenticación en Swagger.                           |
 | Properties/launchSettings.json             | Perfiles, puertos y entorno de desarrollo.                           |
 | Tests/AuthenticationChecks/                | Ejecutable de verificaciones del backend.                            |
 
-En **database/** están los scripts de creación y seed (Create, Init y Seed en sus distintas versiones) junto al diagrama entidad-relación. El frontend está en **frontend/DigitalArs/** y se detalla en la sección 14.
+En **database/** están todos los scripts SQL (Init, Create, Identity y Seed en sus distintas versiones) junto al diagrama entidad-relación. El frontend está en **frontend/DigitalArs/** y se detalla en la sección 14.
 
 No editar **bin, obj ni .vs** para cambiar la aplicación. Son archivos generados por la compilación o las herramientas.
 
@@ -149,7 +147,6 @@ Program.cs es el punto de entrada. Primero registra servicios; después construy
 | AddCors                                     | Permite los orígenes configurados del frontend.                |
 | AddControllers / AddOpenApi                 | Habilita controladores y documentación.                        |
 | CanConnectAsync                             | Verifica que SQL esté disponible.                              |
-| IdentitySetup.EnsureRolesAsync              | Asegura que existan los roles Usuario y Administrador.         |
 
 **Scoped** significa que se reutiliza una instancia dentro del scope actual, normalmente una petición HTTP. En el arranque se crean scopes explícitos para inicializar la base.
 
@@ -170,17 +167,11 @@ UseAuthentication está antes que UseAuthorization porque primero hay que identi
 
 CORS es una política del navegador para acceder entre orígenes distintos. **No reemplaza la autenticación ni bloquea por sí solo herramientas como clientes HTTP.**
 
-### Argumentos especiales
+### Arranque
 
-| Argumento         | Acción                                                        |
-| ----------------- | ------------------------------------------------------------- |
-| --identity-script | Imprime el SQL del modelo Identity; no lo ejecuta.            |
-| --init-identity   | Prepara tablas Identity y roles; no crea el administrador.    |
-| --bootstrap-admin | Crea el administrador inicial leyendo BootstrapAdmin.         |
+La API no acepta argumentos especiales ni ejecuta ningún seed: al arrancar solo comprueba que se pueda conectar a SQL Server y que exista la clave JWT.
 
-Los tres terminan el proceso en vez de levantar la API.
-
-El arranque normal no ejecuta ningún seed: solo comprueba que se pueda conectar a SQL Server y asegura que existan los roles. Las tablas Identity se preparan una vez con `--init-identity` y el administrador una vez con `--bootstrap-admin`.
+Toda la preparación de datos vive en los scripts de `database/`, que se ejecutan a mano en SSMS antes del primer arranque. Ver la sección 11.
 
 ## 5. Database First e Identity
 
@@ -438,14 +429,14 @@ Estas dos escrituras no están en una única transacción en la versión actual:
 
 ## 11. Seed y administrador inicial
 
-| Archivo                        | Qué prepara                                                   |
-| ------------------------------ | ------------------------------------------------------------- |
-| database/Init(v.001).sql        | Preparación inicial de la base.                                |
-| database/Create(v.002).sql      | Tablas de negocio, restricciones y el catálogo de tipos.       |
-| database/Seed(v.002).sql        | Datos de ejemplo opcionales, sin login.                        |
-| Data/Sql/001_Identity.sql       | Las siete tablas Identity cuando faltan.                       |
-| IdentitySetup.EnsureRolesAsync  | Roles Usuario y Administrador.                                 |
-| IdentitySetup.CreateAdminAsync  | Administrador inicial, solo por línea de comandos.             |
+Toda la preparación de datos vive en `database/` y se ejecuta a mano en SSMS, en este orden:
+
+| Archivo                     | Qué prepara                                              |
+| --------------------------- | -------------------------------------------------------- |
+| database/Init(v.001).sql     | Preparación inicial de la base.                           |
+| database/Create(v.002).sql   | Tablas de negocio, restricciones y el catálogo de tipos.  |
+| database/Identity(v.001).sql | Las siete tablas Identity cuando faltan.                  |
+| database/Seed(v.003).sql     | Roles, administrador inicial y datos de ejemplo.          |
 
 El catálogo de tipos de movimiento se inserta dentro de **Create(v.002).sql**, no en un script aparte.
 
@@ -457,31 +448,28 @@ El catálogo de tipos de movimiento se inserta dentro de **Create(v.002).sql**, 
 
 ### Creación del administrador
 
-Se hace por línea de comandos, nunca por HTTP: `dotnet run --bootstrap-admin`.
+La API no tiene ningún camino para crear un Administrador: ni por HTTP ni por línea de comandos. El único es **database/Seed(v.003).sql**, que inserta:
 
-IdentitySetup.CreateAdminAsync:
+1. Los roles Administrador y Usuario en AspNetRoles.
+2. El administrador en AspNetUsers, con `admin@digitalars.com` / `Admin123!`.
+3. El vínculo entre ambos en AspNetUserRoles.
+4. Su perfil de negocio en Usuarios, con identity_user_id apuntando a AspNetUsers.Id.
 
-1. Asegura que existan los roles Usuario y Administrador.
-2. Si ya hay algún miembro del rol Administrador, corta con un error y no crea nada.
-3. Lee la sección de configuración BootstrapAdmin como un RegistroDto.
-4. Valida ese DTO con DataAnnotations antes de tocar la base.
-5. Llama a AccountService.CreateAsync con el rol Administrador.
+Identity guarda la contraseña con PBKDF2 y salt aleatorio, que no se puede calcular en T-SQL. El script lleva el hash ya generado como literal; para cambiar la contraseña hay que regenerarlo con PasswordHasher y reemplazar `@AdminHash`. Son credenciales de proyecto de estudio, versionadas a propósito.
 
-La cuenta se crea con UserManager para aplicar las reglas y el hashing. No se inserta una contraseña manualmente en AspNetUsers.
+Cuatro campos del INSERT no pueden quedar en NULL o el login falla en tiempo de ejecución: SecurityStamp (lo lee JwtTokenService), ConcurrencyStamp (control de concurrencia al actualizar), y NormalizedEmail/NormalizedUserName en mayúsculas (es como Identity busca al usuario).
 
-Como el rol Administrador no recibe cuenta en pesos, AccountService crea el perfil pero no la Cuenta.
+Como el administrador no opera la billetera, el seed no le crea Cuenta en pesos.
 
 ### Repetición
 
-Volver a ejecutar `--bootstrap-admin` con un administrador ya creado falla con un mensaje explícito, en vez de duplicarlo o restablecer su contraseña. Cambiar BootstrapAdmin:Password después no cambia la contraseña del administrador existente.
+Identity(v.001).sql y Seed(v.003).sql se pueden repetir: cada bloque solo inserta lo que falta. Volver a correr el seed no duplica filas ni restablece la contraseña del administrador existente.
 
-`--init-identity` y EnsureRolesAsync sí se pueden repetir: solo crean lo que falta.
-
-El seed original v.002 no es idempotente. Los usuarios Juan, María y Carlos son ejemplos opcionales y no se vuelven a insertar automáticamente.
+Create(v.002).sql sí es destructivo: elimina y recrea las tablas de negocio.
 
 ### Flujo anterior retirado
 
-SetupController conserva GET /api/setup/status por compatibilidad. POST /api/setup/admin devuelve **410** y no crea usuarios.
+SetupController conserva GET /api/setup/status, que el frontend consulta al arrancar para saber si la instalación está completa. Con el administrador sembrado, siempre responde `requiresSetup: false`.
 
 React redirige /setup al login. Setup:Key ya no es necesaria.
 
@@ -492,7 +480,6 @@ Los archivos sin uso de aquel flujo (LocalSetupAccess.cs y SetupAdminDto.cs) ya 
 | Dato                   | Consumidor                  | Ubicación                                           |
 | ---------------------- | --------------------------- | --------------------------------------------------- |
 | DefaultConnection      | API/EF                      | Configuración del backend o perfil de desarrollo.   |
-| BootstrapAdmin         | Alta con --bootstrap-admin  | Secretos locales o del servidor.                    |
 | Jwt:Key                | Firma y validación de JWT   | Configuración privada.                              |
 | Claves Data Protection | Invitaciones                | Almacén de Data Protection.                         |
 | VITE_API_URL           | React                       | .env.local o configuración de build; no es secreto. |
@@ -519,9 +506,9 @@ Los user-secrets no son un gestor cifrado de secretos de producción, pero sí q
 ### Producción
 
 Se suministra Jwt:Key desde la infraestructura. No se genera automáticamente.
-La estructura Identity se prepara antes de arrancar el servicio, con `--init-identity`, y el administrador con `--bootstrap-admin`.
+La estructura Identity, los roles y el administrador se preparan con los scripts de `database/` antes de arrancar el servicio.
 
-El arranque normal no crea el administrador: solo verifica la conexión a SQL Server y asegura que existan los roles.
+El arranque normal no crea nada: solo verifica la conexión a SQL Server y que exista la clave JWT.
 
 Las instancias que emiten y validan tokens necesitan una configuración de firma compatible. Cambiar la clave sin transición invalida los tokens anteriores.
 
@@ -540,7 +527,6 @@ Las instancias que emiten y validan tokens necesitan una configuración de firma
 | GET /api/tiposdemovimientos        | Autenticado             | 200: catálogo completo de tipos.         |
 | GET /api/tiposdemovimientos/{id}   | Autenticado             | 200: un tipo, o 404 si no existe.        |
 | GET /api/setup/status              | Público                 | Estado de existencia del administrador.  |
-| POST /api/setup/admin              | Compatibilidad          | 410: operación retirada.                 |
 
 No existe GET /api/usuarios para listar usuarios en esta entrega.
 
@@ -612,31 +598,28 @@ Home.jsx y ProductId.jsx quedaron como redirecciones. El antiguo components/Home
 
 ### Base nueva
 
-Aplicar Init(v.001).sql y después Create(v.002).sql. Seed(v.002).sql es opcional para datos ficticios.
+Aplicar, en orden: Init(v.001).sql, Create(v.002).sql, Identity(v.001).sql y Seed(v.003).sql.
 
-**Create(v.002).sql elimina tablas: no repetirlo sobre datos que quieran conservar.**
+**Create(v.002).sql elimina tablas: no repetirlo sobre datos que quieran conservar.** Los otros tres solo agregan lo que falta.
+
+El seed deja creado al administrador: `admin@digitalars.com` / `Admin123!`.
 
 ### Backend
 
 1. Abrir la API en Visual Studio.
 2. Ajustar DefaultConnection en el perfil DigitalArs.Api de Properties/launchSettings.json.
 3. Mantener ASPNETCORE_ENVIRONMENT=Development.
-4. Si falta administrador, agregar BootstrapAdmin mediante **Administrar secretos de usuario**:
+4. Agregar la clave JWT mediante **Administrar secretos de usuario**:
 
 ```json
 {
-  "BootstrapAdmin": {
-    "Nombre": "Administrador",
-    "Apellido": "Inicial",
-    "Email": "",
-    "TipoDocumento": "DNI",
-    "NroDocumento": "",
-    "Password": ""
+  "Jwt": {
+    "Key": ""
   }
 }
 ```
 
-Completar campos vacíos y conservar otras configuraciones existentes.
+Completar con al menos 32 caracteres y conservar otras configuraciones existentes.
 
 Iniciar con el perfil https. Swagger:
 [https://localhost:7201/swagger](https://localhost:7201/swagger).
@@ -690,25 +673,23 @@ Varias usan almacenamiento en memoria o respuestas simuladas; no equivalen a int
 
 ### Prueba manual
 
-1. Base de prueba con estructura y sin administrador.
-2. Configurar BootstrapAdmin y correr `dotnet run --bootstrap-admin`.
-3. Verificar roles, catálogo y perfil administrador.
-4. Repetir `--bootstrap-admin`: conservar conteos, ID y hash del administrador.
-5. Swagger: test-protegido sin token debe dar 401.
-6. Hacer login, copiar el token y pegarlo solo en Authorize.
-7. Repetir test-protegido: 200.
-8. Comprobar que un Usuario no accede a rutas de Administrador.
-9. Crear invitación, definir contraseña y rechazar reutilización.
-10. Desactivar una cuenta y comprobar rechazo del JWT anterior.
-11. Probar dos `--bootstrap-admin` simultáneos en la base de prueba: un solo primer administrador.
+1. Base de prueba: correr los cuatro scripts de `database/` en orden.
+2. Verificar roles, catálogo y perfil administrador.
+3. Repetir Seed(v.003).sql: conservar conteos, ID y hash del administrador.
+4. Swagger: test-protegido sin token debe dar 401.
+5. Iniciar sesión con `admin@digitalars.com` / `Admin123!`, copiar el token y pegarlo solo en Authorize.
+6. Repetir test-protegido: 200.
+7. Comprobar que un Usuario no accede a rutas de Administrador.
+8. Crear invitación, definir contraseña y rechazar reutilización.
+9. Desactivar una cuenta y comprobar rechazo del JWT anterior.
 
 | Criterio de la historia               | Implementación                                           |
 | ------------------------------------- | -------------------------------------------------------- |
 | Identity integrado con Database First | Dos contextos y vínculo identity_user_id.                |
-| Roles Usuario/Administrador           | IdentitySetup.EnsureRolesAsync.                          |
+| Roles Usuario/Administrador           | database/Seed(v.003).sql.                                |
 | JWT emite y valida                    | JwtTokenService y AddJwtBearer.                          |
 | 401 sin token / 200 con token         | AuthController.TestProtegido.                            |
-| Administrador inicial y catálogo      | IdentitySetup.CreateAdminAsync y Create(v.002).sql.      |
+| Administrador inicial y catálogo      | Seed(v.003).sql y Create(v.002).sql.                     |
 
 Login y test-protegido fueron comprobados durante la integración del equipo.
 La entrega del seed dejó documentadas como pendientes sus pruebas de repetición y concurrencia contra SQL Server.
@@ -717,8 +698,8 @@ La entrega del seed dejó documentadas como pendientes sus pruebas de repetició
 
 | Síntoma                         | Revisar                                               |
 | ------------------------------- | ----------------------------------------------------- |
-| Invalid object name AspNetRoles | Esquema Identity no preparado o conexión a otra base. |
-| Falta BootstrapAdmin            | Datos privados del primer administrador.              |
+| Invalid object name AspNetRoles | Falta correr database/Identity(v.001).sql, o la conexión apunta a otra base. |
+| No entra el administrador       | Falta correr database/Seed(v.003).sql después de Identity(v.001).sql. |
 | No conecta con SQL              | Instancia, servicio, permisos y DefaultConnection.    |
 | Registro 400                    | DTO, duplicados, contraseña o restricciones SQL.      |
 | 401 en Swagger                  | Login y token en Authorize.                           |
@@ -728,8 +709,7 @@ La entrega del seed dejó documentadas como pendientes sus pruebas de repetició
 | INVALID_INVITATION              | Código inválido, ajeno, vencido o usado.              |
 | 429                             | Esperar a la siguiente ventana del límite.            |
 | React no conecta                | API, certificado, URL y CORS.                         |
-| /setup no crea administrador    | Comportamiento actual: lo crea --bootstrap-admin.     |
-| Falta recurso SQL               | EmbeddedResource en el archivo .csproj.               |
+| /setup no crea administrador    | Comportamiento actual: lo crea Seed(v.003).sql.       |
 
 Un log **info** con SELECT CASE WHEN EXISTS no es una excepción.
 Comprueba duplicados; el log no necesariamente muestra el resultado.
@@ -751,7 +731,7 @@ No compartir contraseñas en capturas ni habilitar indiscriminadamente logs de d
 | Límite de solicitudes    | AddRateLimiter en Program.cs.                                                      |
 | Orígenes del frontend    | Cors:AllowedOrigins.                                                               |
 | Conexión SQL             | DefaultConnection y perfil de lanzamiento.                                         |
-| Administrador inicial    | BootstrapAdmin, antes de crearlo.                                                  |
+| Administrador inicial    | database/Seed(v.003).sql, antes de correrlo.                                       |
 | Catálogo de tipos        | Create(v.002).sql, respetando los IDs del esquema.                                 |
 | Consultas a la base      | El repositorio del recurso en Repositories/, no el controlador.                    |
 | Forma de un error HTTP   | ErrorResponse y el DTO de respuesta del endpoint.                                  |
@@ -763,7 +743,7 @@ No compartir contraseñas en capturas ni habilitar indiscriminadamente logs de d
 | Campos de formularios    | AuthForm/ProfileFields y DTO correspondiente.                                      |
 | Pantallas                | AuthPages, Dashboard y Main.                                                       |
 
-Cambiar BootstrapAdmin:Password después de crear al administrador no cambia su contraseña. `--bootstrap-admin` conserva la cuenta existente.
+Cambiar `@AdminHash` en Seed(v.003).sql después de crear al administrador no cambia su contraseña: el bloque no vuelve a insertarlo si ya existe.
 
 ## 19. Alcance y pendientes
 

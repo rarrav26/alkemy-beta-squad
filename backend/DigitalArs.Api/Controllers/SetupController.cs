@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace DigitalArs.Api.Controllers;
 
 // Compatibilidad con el frontend: le permite saber si ya existe un administrador.
-// El alta del administrador inicial se hace por CLI (dotnet run --bootstrap-admin), no por HTTP.
+// El administrador inicial lo crea database/Seed(v.003).sql, no la API.
 [ApiController, Route("api/setup")]
 public class SetupController(UserManager<IdentityUser> users) : ControllerBase
 {
@@ -17,12 +17,4 @@ public class SetupController(UserManager<IdentityUser> users) : ControllerBase
         var hayAdministrador = (await users.GetUsersInRoleAsync("Administrador")).Count > 0;
         return Ok(new EstadoSetupResponse(RequiresSetup: !hayAdministrador, SetupEnabled: false, RequiresSetupKey: false));
     }
-
-    [AllowAnonymous, HttpPost("admin")]
-    [ProducesResponseType<ErrorResponse>(StatusCodes.Status410Gone)]
-    public IActionResult CreateAdmin() => StatusCode(410, new ErrorResponse
-    {
-        Code = "ADMIN_MANAGED_BY_CLI",
-        Message = "El administrador inicial se crea desde el backend con: dotnet run --bootstrap-admin"
-    });
 }

@@ -34,35 +34,19 @@ No reemplazar appsettings, la configuración JWT, la conexión ni los contextos 
 ## 2. Preparar la API
 
 Si Identity ya funciona, no es necesario volver a crear sus tablas. Estos cambios no agregan tablas.
-Si es una instalación nueva, primero seguí la preparación de Identity del README anterior.
+Si es una instalación nueva, primero corré los scripts de database/ como indica el README de la raíz.
 
-Para habilitar el primer administrador desde React, ejecutá lo siguiente en la carpeta de la API:
+El administrador ya viene creado por database/Seed(v.003).sql:
 
-```powershell
-$setupBytes = New-Object byte[] 32
-[Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($setupBytes)
-$setupKey = [Convert]::ToBase64String($setupBytes)
-dotnet user-secrets set "Setup:Key" $setupKey
-Write-Host "Clave para el formulario inicial: $setupKey"
-dotnet run --launch-profile https
-```
+| Correo | Contraseña |
+|---|---|
+| `admin@digitalars.com` | `Admin123!` |
 
-Copiá esa clave en el campo **Clave de configuración inicial** del formulario.
-Es una clave distinta de Jwt:Key. No la guardes en React, Git, un archivo VITE_* ni la compartas públicamente.
-Después de crear al administrador, podés quitarla:
+React no tiene formulario de primer administrador: al arrancar consulta GET /api/setup/status y,
+si la instalación está completa, muestra el login directamente.
 
-```powershell
-dotnet user-secrets remove "Setup:Key"
-```
-
-Si ya existe un administrador, la app muestra login directamente y no necesita Setup:Key.
-Si el usuario que creaste antes tiene rol Usuario, no se convierte automáticamente en administrador.
-Para crear la primera cuenta administradora, usá un correo y documento que todavía no estén registrados.
-
-La API comprueba que no haya administrador y usa un bloqueo transaccional de SQL Server para coordinar
-solicitudes simultáneas. También se aplica al comando anterior --bootstrap-admin.
-Una segunda alta administrativa inicial devuelve 409 SETUP_COMPLETED, incluso desde otro navegador.
 Crear usuarios por el registro normal nunca asigna el rol Administrador.
+Si el usuario que creaste antes tiene rol Usuario, no se convierte automáticamente en administrador.
 
 ## 3. Preparar React
 
@@ -104,14 +88,13 @@ Vercel no publica automáticamente esta API .NET. Esta entrega no realizó ning�
 ## 4. Flujo de la aplicación
 
 1. Al abrir la aplicación, consulta GET /api/setup/status.
-2. Si no hay administrador, muestra el formulario inicial. Sin Setup:Key configurada, informa que la instalación no está habilitada.
-3. Al crear el administrador, vuelve al login. No inicia sesión automáticamente.
-4. Login válido: guarda la sesión en sessionStorage y abre /dashboard.
-5. El administrador puede entrar a /usuarios/nuevo, registrar un usuario sin contraseña y obtener su invitación.
-6. El usuario entra a /primera-password con correo y código, elige contraseña y recibe acceso.
-7. También está disponible /register para el registro público de usuarios comunes.
-8. Cerrar sesión elimina el token. La sesión se conserva al recargar la pestaña y se verifica con GET /api/auth/me.
-9. Al vencer el JWT o recibir 401 en una llamada protegida, se cierra la sesión. Un usuario desactivado recibe el mensaje de la API.
+2. Si no hay administrador, informa que la instalación no está completa: falta correr database/Seed(v.003).sql.
+3. Login válido: guarda la sesión en sessionStorage y abre /dashboard.
+4. El administrador puede entrar a /usuarios/nuevo, registrar un usuario sin contraseña y obtener su invitación.
+5. El usuario entra a /primera-password con correo y código, elige contraseña y recibe acceso.
+6. También está disponible /register para el registro público de usuarios comunes.
+7. Cerrar sesión elimina el token. La sesión se conserva al recargar la pestaña y se verifica con GET /api/auth/me.
+8. Al vencer el JWT o recibir 401 en una llamada protegida, se cierra la sesión. Un usuario desactivado recibe el mensaje de la API.
 
 El código de invitación se muestra al administrador pero no se guarda en sessionStorage.
 No hay envío automático de correo. El administrador debe entregarlo por un medio privado.

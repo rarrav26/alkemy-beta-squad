@@ -15,12 +15,22 @@ Traigan los últimos cambios con `git pull`. Trabajen sobre la rama que indique 
 
 En SQL Server Management Studio, conectarse a su instancia y ejecutar, en este orden:
 
-1. `database/Init(v.001).sql`
-2. `database/Create(v.002).sql`
+1. `database/Init(v.001).sql` — crea la base.
+2. `database/Create(v.002).sql` — tablas de negocio y catálogo de tipos de movimiento.
+3. `database/Identity(v.001).sql` — las siete tablas de ASP.NET Core Identity.
+4. `database/Seed(v.003).sql` — roles, administrador inicial y datos de ejemplo.
 
-**Esto es para una base nueva.** El script `Create` elimina y recrea tablas; no ejecutarlo sobre una base con datos que quieran conservar.
+**Esto es para una base nueva.** El script `Create` elimina y recrea tablas; no ejecutarlo sobre una base con datos que quieran conservar. Los otros tres se pueden repetir sin romper nada: solo agregan lo que falta.
 
-Opcionalmente, ejecutar `database/Seed(v.002).sql` una sola vez para cargar a Juan, María y Carlos con sus cuentas de ejemplo. Esos usuarios no tienen acceso al login.
+El seed deja creado al administrador con el que se entra por primera vez:
+
+| Correo | Contraseña |
+|---|---|
+| `admin@digitalars.com` | `Admin123!` |
+
+> Son credenciales de proyecto de estudio, versionadas a propósito para que cualquiera pueda levantar el entorno. No usarlas fuera de la máquina local.
+
+El seed también carga a Juan, María y Carlos con sus cuentas de ejemplo. Esos usuarios sirven para probar consultas: no tienen acceso al login.
 
 Abrir la solución de la API en Visual Studio, dentro de:
 
@@ -42,52 +52,34 @@ Cambiar `.\\SQLEXPRESS` por el nombre de su servidor. Mantener:
 "ASPNETCORE_ENVIRONMENT": "Development"
 ```
 
-## 4. Configurar el primer administrador
+## 4. Configurar la clave JWT
 
-En Visual Studio:
+La API firma los tokens con `Jwt:Key` y no arranca si falta. En Visual Studio:
 
 1. Clic derecho sobre el proyecto de la API.
 2. Seleccionar **Administrar secretos de usuario**.
-3. Agregar esta configuración, completando los campos vacíos:
+3. Agregar esta configuración, con una clave propia:
 
 ```json
 {
-  "BootstrapAdmin": {
-    "Nombre": "Administrador",
-    "Apellido": "Inicial",
-    "Email": "",
-    "TipoDocumento": "DNI",
-    "NroDocumento": "",
-    "Password": ""
+  "Jwt": {
+    "Key": ""
   }
 }
 ```
 
-La contraseña debe tener entre 8 y 128 caracteres, con mayúscula, minúscula, número y símbolo. Usar un correo y documento que no estén registrados.
+La clave debe tener **al menos 32 caracteres**. Sirve cualquier texto largo al azar.
 
-Si el archivo ya tiene otras configuraciones, conservarlas y agregar `BootstrapAdmin` dentro del mismo objeto JSON.
+Si el archivo ya tiene otras configuraciones, conservarlas y agregar `Jwt` dentro del mismo objeto JSON.
 
-**Estos secretos no se suben a Git.** Cada compañero puede elegir sus credenciales si usa su propia base. Si comparten una base que ya tiene administrador, este paso no es necesario.
+**Estos secretos no se suben a Git.** Cada compañero usa la suya.
 
 ## 5 Iniciar la API
 
-La primera vez hay que preparar Identity y crear al administrador. Desde `backend/DigitalArs.Api`:
+No hace falta ningún paso previo: la base ya quedó lista en el punto 2.
 
-```powershell
-dotnet run --init-identity
-dotnet run --bootstrap-admin
-```
-
-- `--init-identity` crea las tablas de Identity y los roles `Usuario` y `Administrador`.
-- `--bootstrap-admin` crea al administrador con los secretos del paso anterior. Falla si ya existe uno.
-
-Ambos comandos terminan solos: no levantan la API.
-
-Después, seleccionar el perfil **https** en Visual Studio y ejecutar con **F5** o **Ctrl+F5**.
-En cada arranque la API verifica la conexión a SQL Server y asegura que existan los roles.
-
-> La clave JWT se configura en `Jwt:Key` (secretos de usuario o variables de entorno) y debe
-> tener al menos 32 bytes. La API no arranca si falta.
+Seleccionar el perfil **https** en Visual Studio y ejecutar con **F5** o **Ctrl+F5**.
+En cada arranque la API solo verifica que pueda conectarse a SQL Server.
 
 Abrir:
 
@@ -127,7 +119,7 @@ Mantener la API y el frontend ejecutándose al mismo tiempo.
 
 ## 7. Probar el flujo
 
-1. Iniciar sesión con el administrador configurado.
+1. Iniciar sesión con `admin@digitalars.com` / `Admin123!`.
 2. Comprobar que abre el dashboard.
 3. Elegir **Registrar usuario**.
 4. Completar datos distintos a los del administrador.
@@ -148,12 +140,13 @@ Solo necesitan:
 2. Ejecutar la API desde Visual Studio.
 3. Ejecutar `npm run dev` en el frontend.
 
-No hay que repetir los scripts SQL, `--init-identity`, `--bootstrap-admin` ni configurar nuevamente los secretos: los datos existentes se conservan.
+No hay que repetir los scripts SQL ni configurar nuevamente los secretos: los datos existentes se conservan.
 
 ## Problemas frecuentes
 
 - **No conecta con SQL:** revisar la instancia, el servicio y la cadena de conexión.
-- **Falta BootstrapAdmin:** completar los secretos y reiniciar la API.
+- **La API no arranca por `Jwt:Key`:** completar el secreto del punto 4 con al menos 32 caracteres.
+- **El login del administrador falla:** verificar que se haya ejecutado `database/Seed(v.003).sql` después de `database/Identity(v.001).sql`.
 - **Registro devuelve 400:** revisar el mensaje; el email y el documento no pueden repetirse.
 - **Frontend no conecta:** verificar que Swagger abra, que el certificado sea válido y que `.env.local` tenga la dirección correcta. Reiniciar React si cambiaron ese archivo.
 - **Puerto 5173 ocupado:** cerrar la otra instancia del frontend.
