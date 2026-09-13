@@ -12,15 +12,28 @@ API REST en ASP.NET Core 10 + EF Core 10 (Database First) sobre SQL Server.
 dotnet tool install --global dotnet-ef
 ```
 
+## Dónde está la solución
+
+El archivo de solución vive un nivel más arriba, en `backend/DigitalArs.Api.slnx`, y apunta a
+este proyecto. Se abre con **Archivo → Abrir → Proyecto o solución**.
+
+**No abras la carpeta con "Abrir carpeta".** En modo carpeta Visual Studio trabaja como
+*workspace*: no carga el proyecto .NET, no muestra el desplegable de perfiles y no lee
+`Properties/launchSettings.json`. Sin ese archivo no hay `ConnectionStrings__DefaultConnection`
+ni `ASPNETCORE_ENVIRONMENT`, así que la API arranca como `Production`, sin cadena de conexión, y
+corta en el primer chequeo de `Program.cs`.
+
 ## Setup local (hacelo una sola vez al clonar)
 
-**1. Copiá la plantilla de configuración:**
+**1. Abrí `backend/DigitalArs.Api.slnx` en Visual Studio** (no la carpeta, ver arriba).
+
+**2. Copiá la plantilla de configuración:**
 
 ```powershell
 Copy-Item Properties/launchSettings.Example.json Properties/launchSettings.json
 ```
 
-**2. Abrí `Properties/launchSettings.json` y ajustá `ConnectionStrings__DefaultConnection`
+**3. Abrí `Properties/launchSettings.json` y ajustá `ConnectionStrings__DefaultConnection`
 a tu instancia de SQL Server.** Según cómo tengas instalado el motor, el `Server=` cambia:
 
 | Tu instalación                        | Valor de `Server=`               |
@@ -34,13 +47,14 @@ a tu instancia de SQL Server.** Según cómo tengas instalado el motor, el `Serv
 
 Este archivo **no se versiona** (está en `.gitignore`).
 
-**3. Levantá la API:** F5 en Visual Studio, o desde esta carpeta:
+**4. Levantá la API:** en el desplegable que está al lado del botón verde de ejecutar, elegí el
+perfil **DigitalArs.Api**, y después F5. También podés levantarla desde esta carpeta:
 
 ```powershell
-dotnet run
+dotnet run --launch-profile DigitalArs.Api
 ```
 
-**4. Swagger:** https://localhost:7201/swagger
+**5. Swagger:** https://localhost:7201/swagger
 
 Si falta la cadena de conexión, la API **no arranca** y tira un error que te dice exactamente
 qué archivo copiar. Es a propósito: es mejor fallar al arrancar que descubrir el problema
@@ -69,7 +83,9 @@ hay que cambiar código para desplegar.
 ### Reglas del proyecto
 
 - **Ningún `appsettings*.json` lleva credenciales ni cadenas de conexión reales.**
-  `appsettings.json` tiene la clave `DefaultConnection` vacía solo para documentar que existe.
+  Tampoco llevan la clave `DefaultConnection` vacía: si estuviera, `GetConnectionString`
+  devolvería cadena vacía en vez de `null`, y al depurar parecería que la configuración llegó
+  vacía cuando en realidad el perfil nunca se aplicó. Sin la clave, el `null` lo dice de una.
 - Si necesitás correr un comando de `dotnet` sin perfil de arranque, exportá la variable a mano:
 
 ```powershell
@@ -145,6 +161,10 @@ El script no borra ni altera las tablas de negocio.
 Swagger: https://localhost:7201/swagger (perfil DigitalArs.Api, el único que define launchSettings.json).
 Si pasás un nombre de perfil que no existe, `dotnet run` avisa pero arranca igual sin las variables
 de entorno del perfil, y la API falla diciendo que falta la cadena de conexión aunque esté configurada.
+Visual Studio hace lo mismo en silencio: guarda el perfil elegido en `DigitalArs.Api.csproj.user`
+(archivo local, no versionado), y si ahí quedó uno viejo como `http` o `https` —que ya no existen en
+`launchSettings.json`— ejecuta sin perfil y ves el mismo error. Se arregla eligiendo **DigitalArs.Api**
+en el desplegable.
 Configurá el certificado de desarrollo con dotnet dev-certs https --trust si tu equipo todavía no confía en él.
 En producción, suministrá Jwt__Key desde un gestor de secretos y conservá las claves de Data Protection
 de forma persistente y compartida entre instancias: las invitaciones dependen de ellas.

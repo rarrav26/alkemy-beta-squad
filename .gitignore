@@ -12,6 +12,10 @@ obj/
 
 # Visual Studio (cache/estado local del IDE)
 .vs/
+# La solucion versionada es backend/DigitalArs.Api.slnx. Si alguien abre la carpeta del proyecto
+# con "Abrir carpeta" en vez de la solucion, Visual Studio genera este .slnx de mas; ignorarlo
+# evita que vuelva a commitearse una segunda solucion que compite con la buena.
+backend/DigitalArs.Api/DigitalArs.Api.slnx
 
 # Secretos y Entorno
 # La cadena de conexion vive SOLO en Properties/launchSettings.json (uno por dev, sin versionar).

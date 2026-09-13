@@ -3,17 +3,20 @@
 Cliente React de la API DigitalArs: login, registro, primera contraseña con invitación,
 dashboard y alta de usuarios. Hecho con Vite, React 19 y Material UI.
 
-El backend está en `backend/DigitalArs.Api` y tiene su propio README. Este frontend **no
-funciona solo**: necesita la API levantada.
+El backend está en `backend/DigitalArs.Api` y tiene su propio README; su solución para Visual
+Studio es `backend/DigitalArs.Api.slnx`. Este frontend **no funciona solo**: necesita la API
+levantada.
 
 ## Requisitos
 
 - Node.js 24 (incluye npm).
+- Visual Studio Code: es con lo que el equipo levanta el frontend.
 - La API corriendo en `https://localhost:7201`, con SQL Server preparado según el README de la raíz.
 
 ## Puesta en marcha
 
-Desde esta carpeta:
+Abrir **esta carpeta** en Visual Studio Code (no la raíz del repositorio: los scripts de npm se
+resuelven contra el `package.json` de acá) y, desde la terminal integrada (**Ctrl+Ñ**):
 
 ```powershell
 Copy-Item .env.example .env.local

@@ -73,6 +73,9 @@ Ejemplo: tener un JWT válido identifica a una persona; tener el rol Administrad
 
 ## 3. Mapa de archivos
 
+La solución que se abre en Visual Studio es **backend/DigitalArs.Api.slnx** y está un nivel por
+encima del proyecto, para no confundirla con la carpeta que la contiene.
+
 Dentro de **backend/DigitalArs.Api/**:
 
 | Archivo                                    | Responsabilidad                                                      |
@@ -498,7 +501,7 @@ Los archivos sin uso de aquel flujo (LocalSetupAccess.cs y SetupAdminDto.cs) ya 
 
 | Dato                   | Consumidor                  | Ubicación                                           |
 | ---------------------- | --------------------------- | --------------------------------------------------- |
-| DefaultConnection      | API/EF                      | Configuración del backend o perfil de desarrollo.   |
+| DefaultConnection      | API/EF                      | Perfil DigitalArs.Api de launchSettings.json en local; variable de entorno en el servidor. Ningún appsettings la declara. |
 | Jwt:Key                | Firma y validación de JWT   | Configuración privada.                              |
 | Claves Data Protection | Invitaciones                | Almacén de Data Protection.                         |
 | VITE_API_URL           | React                       | .env.local o configuración de build; no es secreto. |
@@ -616,6 +619,8 @@ routes/Home.jsx y routes/ProductId.jsx quedaron del template original y ninguna 
 
 .NET SDK 10, Visual Studio compatible, SQL Server, Git y Node.js. La entrega se verificó con Node 24.
 
+El backend se trabaja con Visual Studio y el frontend con Visual Studio Code.
+
 ### Base nueva
 
 Aplicar, en orden: Init(v.001).sql, Create(v.002).sql, Identity(v.001).sql y Seed(v.003).sql.
@@ -626,10 +631,14 @@ El seed deja creado al administrador: `admin@digitalars.com` / `Admin123!`.
 
 ### Backend
 
-1. Abrir la API en Visual Studio.
-2. Ajustar DefaultConnection en el perfil DigitalArs.Api de Properties/launchSettings.json.
-3. Mantener ASPNETCORE_ENVIRONMENT=Development.
-4. Agregar la clave JWT mediante **Administrar secretos de usuario**:
+1. Abrir **backend/DigitalArs.Api.slnx** con Archivo → Abrir → Proyecto o solución.
+   **No usar "Abrir carpeta":** en modo carpeta Visual Studio no carga el proyecto .NET ni lee
+   Properties/launchSettings.json, así que la API arranca como Production y sin cadena de conexión.
+2. Copiar Properties/launchSettings.Example.json a Properties/launchSettings.json. Ese archivo no
+   se versiona, así que en un clon nuevo no existe.
+3. Ajustar DefaultConnection en el perfil DigitalArs.Api de Properties/launchSettings.json.
+4. Mantener ASPNETCORE_ENVIRONMENT=Development.
+5. Agregar la clave JWT mediante **Administrar secretos de usuario**:
 
 ```json
 {
@@ -641,7 +650,10 @@ El seed deja creado al administrador: `admin@digitalars.com` / `Admin123!`.
 
 Completar con al menos 32 caracteres y conservar otras configuraciones existentes.
 
-Iniciar con el perfil DigitalArs.Api, que es el único definido en launchSettings.json. Swagger:
+Elegir el perfil DigitalArs.Api en el desplegable que acompaña al botón de ejecutar: es el único
+definido en launchSettings.json. Si el desplegable muestra otro nombre, es un resto guardado en
+DigitalArs.Api.csproj.user; al no existir ese perfil, Visual Studio arranca sin ninguno y la API
+corta por falta de cadena de conexión. Swagger:
 [https://localhost:7201/swagger](https://localhost:7201/swagger).
 
 Si falta confiar en el certificado de desarrollo, puede requerirse una preparación inicial:
@@ -652,7 +664,7 @@ dotnet dev-certs https --trust
 
 ### Frontend
 
-Desde frontend/DigitalArs:
+Abrir frontend/DigitalArs en Visual Studio Code y, desde su terminal integrada:
 
 ```powershell
 npm ci
@@ -723,6 +735,8 @@ La entrega del seed dejó documentadas como pendientes sus pruebas de repetició
 | Invalid object name AspNetRoles | Falta correr database/Identity(v.001).sql, o la conexión apunta a otra base. |
 | No entra el administrador       | Falta correr database/Seed(v.003).sql después de Identity(v.001).sql. |
 | No conecta con SQL              | Instancia, servicio, permisos y DefaultConnection.    |
+| Visual Studio no muestra el proyecto | Se abrió la carpeta en vez de backend/DigitalArs.Api.slnx. |
+| Falta la cadena de conexión y launchSettings.json la tiene | No se aplicó el perfil: solución abierta como carpeta, o perfil viejo en DigitalArs.Api.csproj.user. |
 | Registro 400                    | DTO, duplicados, contraseña o restricciones SQL.      |
 | 401 en Swagger                  | Login y token en Authorize.                           |
 | 403 administrativo              | Rol de la cuenta.                                     |
