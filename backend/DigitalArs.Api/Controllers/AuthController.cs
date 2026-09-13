@@ -145,8 +145,8 @@ public class AuthController(
     private BadRequestObjectResult InvitacionInvalida() =>
         BadRequest(new ErrorResponse { Code = "INVALID_INVITATION", Message = "Invitación inválida o vencida." });
 
-    private ObjectResult FaltaDefinirPassword() =>
-        StatusCode(409, new ErrorResponse
+    private ConflictObjectResult FaltaDefinirPassword() =>
+        Conflict(new ErrorResponse
         {
             Code = "PASSWORD_SETUP_REQUIRED",
             Message = "Todavía no definiste tu contraseña. Usá el código de invitación que te dio el administrador."

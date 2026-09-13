@@ -3,6 +3,7 @@ using System.Text;
 using System.Threading.RateLimiting;
 using DigitalArs.Api.Data.Context;
 using DigitalArs.Api.Interfaces;
+using DigitalArs.Api.Middleware;
 using DigitalArs.Api.OpenApi;
 using DigitalArs.Api.Repositories;
 using DigitalArs.Api.Services;
@@ -40,6 +41,7 @@ builder.Services.AddIdentityCore<IdentityUser>(options =>
 builder.Services.Configure<DataProtectionTokenProviderOptions>(options => options.TokenLifespan = TimeSpan.FromDays(1));
 builder.Services.AddScoped<AccountService>();
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddOptions<JwtOptions>().BindConfiguration("Jwt").ValidateDataAnnotations()
     .Validate(o => Encoding.UTF8.GetByteCount(o.Key) >= 32, "Jwt:Key debe tener al menos 32 bytes.")
     .ValidateOnStart();
@@ -125,6 +127,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi().AllowAnonymous();
     app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "DigitalArs.Api v1"));
 }
+app.UseExceptionHandler();
 app.UseHttpsRedirection();
 app.UseCors("Frontend");
 app.UseAuthentication();
@@ -132,5 +135,3 @@ app.UseAuthorization();
 app.UseRateLimiter();
 app.MapControllers();
 app.Run();
-
-public partial class Program { }
