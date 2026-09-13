@@ -1,25 +1,58 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
+
 namespace DigitalArs.Api.OpenApi;
+
+// Swagger no sabe solo qué endpoints piden token: hay que marcárselos uno por uno para que
+// muestre el candado y mande el header Authorization desde el botón Authorize.
 internal sealed class BearerSecuritySchemeTransformer : IOpenApiDocumentTransformer
 {
-    public Task TransformAsync(OpenApiDocument document, OpenApiDocumentTransformerContext context, CancellationToken cancellationToken)
+    private const string NombreDelEsquema = "Bearer";
+
+    public Task TransformAsync(
+        OpenApiDocument document, OpenApiDocumentTransformerContext context, CancellationToken cancellationToken)
+    {
+        DeclararEsquemaBearer(document);
+
+        foreach (var endpoint in context.DescriptionGroups.SelectMany(grupo => grupo.Items))
+        {
+            if (EsPublico(endpoint)) continue;
+            ExigirTokenEn(document, endpoint);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static void DeclararEsquemaBearer(OpenApiDocument document)
     {
         document.Components ??= new OpenApiComponents();
         document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
-        document.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme
-        { Type = SecuritySchemeType.Http, Scheme = "bearer", BearerFormat = "JWT" };
-        foreach (var description in context.DescriptionGroups.SelectMany(g => g.Items))
+        document.Components.SecuritySchemes[NombreDelEsquema] = new OpenApiSecurityScheme
         {
-            if (description.ActionDescriptor.EndpointMetadata.OfType<IAllowAnonymous>().Any()) continue;
-            var path = "/" + description.RelativePath?.Split('?')[0];
-            if (document.Paths.TryGetValue(path, out var item) && item.Operations is not null)
-                foreach (var operation in item.Operations.Where(o =>
-                    o.Key.ToString().Equals(description.HttpMethod, StringComparison.OrdinalIgnoreCase)))
-                    operation.Value.Security = [new OpenApiSecurityRequirement
-                    { [new OpenApiSecuritySchemeReference("Bearer", document)] = [] }];
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT"
+        };
+    }
+
+    private static bool EsPublico(ApiDescription endpoint) =>
+        endpoint.ActionDescriptor.EndpointMetadata.OfType<IAllowAnonymous>().Any();
+
+    private static void ExigirTokenEn(OpenApiDocument document, ApiDescription endpoint)
+    {
+        var ruta = "/" + endpoint.RelativePath?.Split('?')[0];
+        if (!document.Paths.TryGetValue(ruta, out var item) || item.Operations is null) return;
+
+        foreach (var operacion in item.Operations)
+        {
+            if (!operacion.Key.ToString().Equals(endpoint.HttpMethod, StringComparison.OrdinalIgnoreCase)) continue;
+
+            operacion.Value.Security = [new OpenApiSecurityRequirement
+            {
+                [new OpenApiSecuritySchemeReference(NombreDelEsquema, document)] = []
+            }];
         }
-        return Task.CompletedTask;
     }
 }

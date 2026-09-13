@@ -92,12 +92,18 @@ Dentro de **backend/DigitalArs.Api/**:
 | Data/Entities/Movimiento.cs                | Datos de un movimiento.                                              |
 | Data/Entities/Tipo_Movimiento.cs           | Catálogo de tipos.                                                   |
 | Data/Sql/001_Identity.sql                  | Creación de tablas Identity.                                         |
-| DTOs/LoginDto.cs                           | Datos para ingresar.                                                 |
-| DTOs/RegisterDto.cs                        | Datos para registrarse con contraseña.                               |
-| DTOs/AuthRequests.cs                       | Perfil, primera contraseña, estado activo y respuesta JWT.           |
-| DTOs/AuthResponses.cs                      | Respuestas de registro, de perfil y de mensaje simple.               |
-| DTOs/UsuarioResponses.cs                   | Respuestas del alta de usuario y de la invitación.                   |
-| DTOs/SetupStatusResponse.cs                | Respuesta del estado del alta inicial.                               |
+| DTOs/InicioSesionDto.cs                    | Datos para ingresar.                                                 |
+| DTOs/RegistroDto.cs                        | Datos para registrarse con contraseña.                               |
+| DTOs/PerfilUsuarioDto.cs                   | Nombre, apellido, email y documento, con su validación por tipo.     |
+| DTOs/PrimeraPasswordDto.cs                 | Email, invitación, contraseña y confirmación.                        |
+| DTOs/EstadoActivoDto.cs                    | Estado activo requerido.                                             |
+| DTOs/SesionResponse.cs                     | Respuesta con el JWT: token, rol, vencimiento e id del perfil.       |
+| DTOs/RegistroResponse.cs                   | Respuesta del autorregistro, con los datos de la cuenta creada.      |
+| DTOs/PerfilResponse.cs                     | Respuesta del perfil logueado.                                       |
+| DTOs/MensajeResponse.cs                    | Respuesta de un solo mensaje.                                        |
+| DTOs/UsuarioCreadoResponse.cs              | Respuesta del alta administrativa, con la invitación.                |
+| DTOs/InvitacionResponse.cs                 | Respuesta de la reemisión de invitación.                             |
+| DTOs/EstadoSetupResponse.cs                | Respuesta del estado del alta inicial.                               |
 | DTOs/TipoMovimientoResponse.cs             | Respuesta del catálogo de tipos de movimiento.                       |
 | DTOs/ErrorResponse.cs                      | Forma única de los errores HTTP: code, message y errors.             |
 | Interfaces/ITokenService.cs                | Contrato de generación del JWT.                                      |
@@ -106,6 +112,8 @@ Dentro de **backend/DigitalArs.Api/**:
 | Repositories/UsuarioRepository.cs          | Consultas de perfiles sobre DigitalArsDbContext.                     |
 | Repositories/TipoMovimientoRepository.cs   | Consultas del catálogo sobre DigitalArsDbContext.                    |
 | Services/AccountService.cs                 | Creación de cuentas/perfiles e invitaciones.                         |
+| Services/ResultadoDeAlta.cs                | Resultado del alta: los registros creados o los errores.             |
+| Services/DatosDeCuenta.cs                  | Sorteo del alias y armado del CVU, sin base de datos.                |
 | Services/JwtTokenService.cs                | Generación y firma de JWT.                                           |
 | Services/JwtOptions.cs                     | Opciones y valores predeterminados del JWT.                          |
 | Services/IdentitySetup.cs                  | Creación de roles y del administrador inicial.                       |
@@ -235,14 +243,16 @@ AccountService es la excepción deliberada. Usa los dos contextos directamente p
 
 Un DTO limita qué campos acepta cada operación. No se recibe directamente la entidad SQL con todas sus propiedades modificables.
 
-| Clase              | Dónde                | Uso                                           |
-| ------------------ | -------------------- | --------------------------------------------- |
-| LoginDto           | DTOs/LoginDto.cs     | Email y Password.                             |
-| RegisterDto        | DTOs/RegisterDto.cs  | Hereda el perfil y agrega Password.           |
-| UserProfileDto     | DTOs/AuthRequests.cs | Nombre, apellido, email y documento.          |
-| InitialPasswordDto | DTOs/AuthRequests.cs | Email, invitación, contraseña y confirmación. |
-| ActiveStatusDto    | DTOs/AuthRequests.cs | Estado activo requerido.                      |
-| AuthResponse       | DTOs/AuthRequests.cs | Token, rol, vencimiento e ID del perfil.      |
+Cada DTO vive en su propio archivo, con el mismo nombre que la clase.
+
+| Clase              | Dónde                      | Uso                                           |
+| ------------------ | -------------------------- | --------------------------------------------- |
+| InicioSesionDto    | DTOs/InicioSesionDto.cs    | Email y Password.                             |
+| RegistroDto        | DTOs/RegistroDto.cs        | Hereda el perfil y agrega Password.           |
+| PerfilUsuarioDto   | DTOs/PerfilUsuarioDto.cs   | Nombre, apellido, email y documento.          |
+| PrimeraPasswordDto | DTOs/PrimeraPasswordDto.cs | Email, invitación, contraseña y confirmación. |
+| EstadoActivoDto    | DTOs/EstadoActivoDto.cs    | Estado activo requerido.                      |
+| SesionResponse     | DTOs/SesionResponse.cs     | Token, rol, vencimiento e ID del perfil.      |
 
 Required, EmailAddress, StringLength y Compare son validaciones. Con ApiController, un DTO inválido puede devolver 400 antes de ejecutar el método.
 
@@ -261,7 +271,7 @@ SQL permite DNI o PASAPORTE. El registro normal todavía puede terminar con un e
 **Entrada:** POST /api/auth/register.  
 **Archivos:** AuthController.Register y AccountService.CreateAsync.
 
-1. Recibe RegisterDto.
+1. Recibe RegistroDto.
 2. Inicia una transacción en AuthDbContext.
 3. DigitalArsDbContext utiliza la misma conexión y transacción.
 4. Verifica si el email o la combinación tipo/número de documento existen.
@@ -395,7 +405,7 @@ Los roles del JWT reflejan el momento de emisión. Si se agrega una función par
 
 ### Usuario creado por un administrador
 
-POST /api/usuarios recibe UserProfileDto, sin contraseña. AccountService crea Identity y perfil, y devuelve una invitación:
+POST /api/usuarios recibe PerfilUsuarioDto, sin contraseña. AccountService crea Identity y perfil, y devuelve una invitación:
 
 - usuarioId y email;
 - requiresPasswordSetup: true;
@@ -453,7 +463,7 @@ IdentitySetup.CreateAdminAsync:
 
 1. Asegura que existan los roles Usuario y Administrador.
 2. Si ya hay algún miembro del rol Administrador, corta con un error y no crea nada.
-3. Lee la sección de configuración BootstrapAdmin como un RegisterDto.
+3. Lee la sección de configuración BootstrapAdmin como un RegistroDto.
 4. Valida ese DTO con DataAnnotations antes de tocar la base.
 5. Llama a AccountService.CreateAsync con el rol Administrador.
 

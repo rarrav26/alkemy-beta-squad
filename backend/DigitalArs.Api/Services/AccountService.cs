@@ -11,93 +11,27 @@ public class AccountService(AuthDbContext auth, DigitalArsDbContext db, UserMana
 {
     public const string InitialPasswordPurpose = "DigitalArs.InitialPassword.v1";
 
-    // Palabras simples para armar el alias autogenerado (ejemplo: auto.perro.gato).
-    private static readonly string[] PalabrasParaAlias =
-    [
-        "auto", "perro", "gato", "sol", "luna", "mar", "rio", "arbol",
-        "flor", "nube", "pan", "queso", "libro", "silla", "mesa", "puerta",
-        "campo", "monte", "cielo", "tierra", "fuego", "agua", "viento", "nieve"
-    ];
+    private const string RolUsuario = "Usuario";
 
     private const int IntentosParaGenerarAlias = 10;
 
-    // Los primeros 10 dígitos identifican a la entidad; los 12 restantes son el número de cuenta.
-    private const string PrefijoCvu = "0000003100";
-
-    public async Task<(IdentityUser? User, Usuario? Profile, Cuenta? Cuenta, string[] Errors)> CreateAsync(
-        UserProfileDto dto, string? password, string role = "Usuario")
+    public async Task<ResultadoDeAlta> CreateAsync(PerfilUsuarioDto dto, string? password, string role = RolUsuario)
     {
-        // Both contexts share a scoped SQL connection and one transaction.
-        await using var transaction = await auth.Database.BeginTransactionAsync();
-        await db.Database.UseTransactionAsync(transaction.GetDbTransaction());
+        // Los dos contextos comparten la conexión scoped, así que entran en la misma transacción.
+        // Si falla el perfil de negocio, tampoco queda creado el usuario de Identity.
+        await using var transaccion = await auth.Database.BeginTransactionAsync();
+        await db.Database.UseTransactionAsync(transaccion.GetDbTransaction());
         try
         {
-            var email = dto.Email.Trim();
-            var tipoDoc = dto.TipoDocumento.Trim();
-            var nroDoc = dto.NroDocumento.Trim();
+            var resultado = await CrearUsuarioYCuentaAsync(dto, password, role);
+            if (!resultado.Exitoso) return resultado;
 
-            // Validación: Email duplicado
-            if (await users.FindByEmailAsync(email) != null || await db.Usuarios.AnyAsync(u => u.email == email))
-            {
-                return (null, null, null, ["el email ya esta en uso"]);
-            }
-
-            // Validación: Tipo y número de documento duplicados
-            if (await db.Usuarios.AnyAsync(u => u.tipo_documento == tipoDoc && u.nro_documento == nroDoc))
-            {
-                return (null, null, null, ["El documento ya se encuentra registrado."]);
-            }
-
-            var user = new IdentityUser { UserName = email, Email = email };
-            // Sin contraseña, el usuario queda a la espera de consumir su invitación.
-            IdentityResult result;
-            if (password is null)
-                result = await users.CreateAsync(user);
-            else
-                result = await users.CreateAsync(user, password);
-
-            if (!result.Succeeded) return (null, null, null, Errors(result));
-
-            result = await users.AddToRoleAsync(user, role);
-            if (!result.Succeeded) return (null, null, null, Errors(result));
-
-            var profile = new Usuario
-            {
-                identity_user_id = user.Id,
-                nombre = dto.Nombre.Trim(),
-                apellido = dto.Apellido.Trim(),
-                email = email,
-                tipo_documento = tipoDoc,
-                nro_documento = nroDoc,
-                is_active = true
-            };
-            db.Usuarios.Add(profile);
-            await db.SaveChangesAsync();
-
-            // La cuenta en pesos es para quien opera en la billetera; el administrador no la necesita.
-            Cuenta? cuenta = null;
-            if (role == "Usuario")
-            {
-                var alias = await GenerarAliasDisponibleAsync();
-                if (alias is null) return (null, null, null, ["No se pudo generar el alias de la cuenta. Intentá nuevamente."]);
-
-                cuenta = new Cuenta
-                {
-                    usuario_id = profile.id,
-                    alias = alias,
-                    cvu = GenerarCvu(profile.id),
-                    saldo = 0
-                };
-                db.Cuentas.Add(cuenta);
-                await db.SaveChangesAsync();
-            }
-
-            await transaction.CommitAsync();
-            return (user, profile, cuenta, []);
+            await transaccion.CommitAsync();
+            return resultado;
         }
         catch (DbUpdateException)
         {
-            return (null, null, null, ["No se pudo registrar el usuario con los datos proporcionados."]);
+            return ResultadoDeAlta.Fallo("No se pudo registrar el usuario con los datos proporcionados.");
         }
         finally
         {
@@ -105,23 +39,109 @@ public class AccountService(AuthDbContext auth, DigitalArsDbContext db, UserMana
         }
     }
 
-    // El id del usuario ya es único, así que sirve como número de cuenta sin repetir ni sortear.
-    private static string GenerarCvu(int usuarioId) => PrefijoCvu + usuarioId.ToString("D12");
-
-    private static string SortearTresPalabras()
+    private async Task<ResultadoDeAlta> CrearUsuarioYCuentaAsync(PerfilUsuarioDto dto, string? password, string role)
     {
-        var primera = PalabrasParaAlias[Random.Shared.Next(PalabrasParaAlias.Length)];
-        var segunda = PalabrasParaAlias[Random.Shared.Next(PalabrasParaAlias.Length)];
-        var tercera = PalabrasParaAlias[Random.Shared.Next(PalabrasParaAlias.Length)];
-        return primera + "." + segunda + "." + tercera;
+        QuitarEspaciosSobrantes(dto);
+
+        var errorDeDuplicado = await BuscarErrorDeDuplicadoAsync(dto);
+        if (errorDeDuplicado is not null) return ResultadoDeAlta.Fallo(errorDeDuplicado);
+
+        var usuarioIdentity = new IdentityUser { UserName = dto.Email, Email = dto.Email };
+        var alta = await CrearEnIdentityAsync(usuarioIdentity, password, role);
+        if (!alta.Succeeded) return ResultadoDeAlta.Fallo(Errors(alta));
+
+        var perfil = await GuardarPerfilAsync(dto, usuarioIdentity.Id);
+
+        // La cuenta en pesos es para quien opera en la billetera; el administrador no la necesita.
+        if (role != RolUsuario) return ResultadoDeAlta.Exito(usuarioIdentity, perfil, cuenta: null);
+
+        var cuenta = await CrearCuentaEnPesosAsync(perfil.id);
+        if (cuenta is null) return ResultadoDeAlta.Fallo("No se pudo generar el alias de la cuenta. Intentá nuevamente.");
+
+        return ResultadoDeAlta.Exito(usuarioIdentity, perfil, cuenta);
     }
 
-    // Devuelve null si después de varios intentos todas las combinaciones sorteadas ya estaban tomadas.
-    private async Task<string?> GenerarAliasDisponibleAsync()
+    // Se normaliza una sola vez al principio para que el texto con el que se busca duplicados
+    // sea exactamente el mismo que después se guarda.
+    private static void QuitarEspaciosSobrantes(PerfilUsuarioDto dto)
+    {
+        dto.Nombre = dto.Nombre.Trim();
+        dto.Apellido = dto.Apellido.Trim();
+        dto.Email = dto.Email.Trim();
+        dto.TipoDocumento = dto.TipoDocumento.Trim();
+        dto.NroDocumento = dto.NroDocumento.Trim();
+    }
+
+    // Devuelve el mensaje del duplicado encontrado, o null si el email y el documento están libres.
+    private async Task<string?> BuscarErrorDeDuplicadoAsync(PerfilUsuarioDto dto)
+    {
+        var estaEnIdentity = await users.FindByEmailAsync(dto.Email) is not null;
+        if (estaEnIdentity || await db.Usuarios.AnyAsync(u => u.email == dto.Email))
+            return "el email ya esta en uso";
+
+        var documentoRegistrado = await db.Usuarios.AnyAsync(u =>
+            u.tipo_documento == dto.TipoDocumento && u.nro_documento == dto.NroDocumento);
+        if (documentoRegistrado)
+            return "El documento ya se encuentra registrado.";
+
+        return null;
+    }
+
+    private async Task<IdentityResult> CrearEnIdentityAsync(IdentityUser usuarioIdentity, string? password, string role)
+    {
+        IdentityResult creado;
+        // Sin contraseña, el usuario queda a la espera de consumir su invitación.
+        if (password is null)
+            creado = await users.CreateAsync(usuarioIdentity);
+        else
+            creado = await users.CreateAsync(usuarioIdentity, password);
+
+        if (!creado.Succeeded) return creado;
+
+        return await users.AddToRoleAsync(usuarioIdentity, role);
+    }
+
+    private async Task<Usuario> GuardarPerfilAsync(PerfilUsuarioDto dto, string identityUserId)
+    {
+        var perfil = new Usuario
+        {
+            identity_user_id = identityUserId,
+            nombre = dto.Nombre,
+            apellido = dto.Apellido,
+            email = dto.Email,
+            tipo_documento = dto.TipoDocumento,
+            nro_documento = dto.NroDocumento,
+            is_active = true
+        };
+        db.Usuarios.Add(perfil);
+        await db.SaveChangesAsync();
+        return perfil;
+    }
+
+    // Devuelve null si no se consiguió un alias libre, y entonces el alta completo se cancela.
+    private async Task<Cuenta?> CrearCuentaEnPesosAsync(int usuarioId)
+    {
+        var alias = await BuscarAliasLibreAsync();
+        if (alias is null) return null;
+
+        var cuenta = new Cuenta
+        {
+            usuario_id = usuarioId,
+            alias = alias,
+            cvu = DatosDeCuenta.CvuPara(usuarioId),
+            saldo = 0
+        };
+        db.Cuentas.Add(cuenta);
+        await db.SaveChangesAsync();
+        return cuenta;
+    }
+
+    // Sortea alias hasta dar con uno que no esté tomado. Devuelve null si se acabaron los intentos.
+    private async Task<string?> BuscarAliasLibreAsync()
     {
         for (var intento = 0; intento < IntentosParaGenerarAlias; intento++)
         {
-            var alias = SortearTresPalabras();
+            var alias = DatosDeCuenta.SortearAlias();
             if (!await db.Cuentas.AnyAsync(c => c.alias == alias)) return alias;
         }
         return null;
@@ -132,13 +152,30 @@ public class AccountService(AuthDbContext auth, DigitalArsDbContext db, UserMana
 
     public async Task<IdentityResult> SetInitialPasswordAsync(IdentityUser user, string token, string password)
     {
-        if (await users.HasPasswordAsync(user) ||
-            !await users.VerifyUserTokenAsync(user, TokenOptions.DefaultProvider, InitialPasswordPurpose, token))
-            return IdentityResult.Failed(new IdentityError { Code = "InvalidInvitation", Description = "Invitación inválida o vencida." });
+        if (await users.HasPasswordAsync(user))
+            return InvitacionRechazada();
+
+        if (!await users.VerifyUserTokenAsync(user, TokenOptions.DefaultProvider, InitialPasswordPurpose, token))
+            return InvitacionRechazada();
 
         return await users.AddPasswordAsync(user, password);
     }
 
-    public static string[] Errors(IdentityResult result) => result.Errors.Select(e =>
-        e.Code.StartsWith("Password") ? e.Description : "No se pudo completar la operación con los datos proporcionados.").ToArray();
+    public static string[] Errors(IdentityResult result) =>
+        result.Errors.Select(MensajeSeguro).ToArray();
+
+    private static IdentityResult InvitacionRechazada() =>
+        IdentityResult.Failed(new IdentityError
+        {
+            Code = "InvalidInvitation",
+            Description = "Invitación inválida o vencida."
+        });
+
+    // Los errores de contraseña se muestran tal cual porque ayudan a corregirla. El resto se
+    // generaliza para no revelar si un email o un documento ya estaban registrados.
+    private static string MensajeSeguro(IdentityError error)
+    {
+        if (error.Code.StartsWith("Password")) return error.Description;
+        return "No se pudo completar la operación con los datos proporcionados.";
+    }
 }

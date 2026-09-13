@@ -10,12 +10,12 @@ namespace DigitalArs.Api.Controllers;
 public class SetupController(UserManager<IdentityUser> users) : ControllerBase
 {
     [AllowAnonymous, HttpGet("status")]
-    [ProducesResponseType<SetupStatusResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<EstadoSetupResponse>(StatusCodes.Status200OK)]
     public async Task<IActionResult> Status()
     {
         Response.Headers.CacheControl = "no-store";
-        var hasAdmin = (await users.GetUsersInRoleAsync("Administrador")).Count > 0;
-        return Ok(new SetupStatusResponse(RequiresSetup: !hasAdmin, SetupEnabled: false, RequiresSetupKey: false));
+        var hayAdministrador = (await users.GetUsersInRoleAsync("Administrador")).Count > 0;
+        return Ok(new EstadoSetupResponse(RequiresSetup: !hayAdministrador, SetupEnabled: false, RequiresSetupKey: false));
     }
 
     [AllowAnonymous, HttpPost("admin")]
