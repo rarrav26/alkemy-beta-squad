@@ -1,15 +1,14 @@
-using DigitalArs.Api.Data.Context;
+using DigitalArs.Api.Interfaces;
 using DigitalArs.Api.Services;
 using DigitlaArs.Api.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 namespace DigitalArs.Api.Controllers;
 
 [ApiController, Route("api/[controller]")]
 [Authorize(Roles = "Administrador")]
-public class UsuariosController(AccountService accounts, DigitalArsDbContext db,
+public class UsuariosController(AccountService accounts, IUsuarioRepository usuarios,
     UserManager<IdentityUser> users) : ControllerBase
 {
     [HttpPost]
@@ -29,7 +28,7 @@ public class UsuariosController(AccountService accounts, DigitalArsDbContext db,
     [HttpPost("{id:int}/invitation")]
     public async Task<IActionResult> ReissueInvitation(int id)
     {
-        var profile = await db.Usuarios.FindAsync(id);
+        var profile = await usuarios.GetByIdAsync(id);
         var user = profile?.identity_user_id is null ? null : await users.FindByIdAsync(profile.identity_user_id);
         if (user is null) return NotFound();
         if (!profile!.is_active || await users.HasPasswordAsync(user))
@@ -43,7 +42,7 @@ public class UsuariosController(AccountService accounts, DigitalArsDbContext db,
     [HttpPatch("{id:int}/active")]
     public async Task<IActionResult> SetActive(int id, ActiveStatusDto dto)
     {
-        var profile = await db.Usuarios.FindAsync(id);
+        var profile = await usuarios.GetByIdAsync(id);
         if (profile is null) return NotFound();
         // Rotate first so a failed profile update cannot leave old tokens valid after reactivation.
         if (profile.identity_user_id is not null)
@@ -53,7 +52,7 @@ public class UsuariosController(AccountService accounts, DigitalArsDbContext db,
                 return Conflict(new { message = "No se pudo actualizar el usuario." });
         }
         profile.is_active = dto.IsActive!.Value;
-        await db.SaveChangesAsync();
+        await usuarios.SaveChangesAsync();
         return NoContent();
     }
 }

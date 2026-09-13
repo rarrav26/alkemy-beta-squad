@@ -31,6 +31,7 @@ builder.Services.AddDbContext<AuthDbContext>((sp, options) =>
     options.UseSqlServer(sp.GetRequiredService<SqlConnection>()));
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<ITipoMovimientoRepository, TipoMovimientoRepository>();
+builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
 builder.Services.AddIdentityCore<IdentityUser>(options =>
 {
     options.User.RequireUniqueEmail = true;
