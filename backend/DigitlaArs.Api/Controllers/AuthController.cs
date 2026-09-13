@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using DigitalArs.Api.Data.Context;
 using DigitalArs.Api.Interfaces;
 using DigitalArs.Api.Services;
 using DigitlaArs.Api.DTOs;
@@ -7,7 +6,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.EntityFrameworkCore;
 
 namespace DigitlaArs.Api.Controllers;
 
@@ -16,7 +14,7 @@ namespace DigitlaArs.Api.Controllers;
 [EnableRateLimiting("auth")]
 public class AuthController(
     UserManager<IdentityUser> users,
-    DigitalArsDbContext db,
+    IUsuarioRepository usuarios,
     AccountService accounts,
     ITokenService tokens) : ControllerBase
 {
@@ -58,7 +56,7 @@ public class AuthController(
             return InvalidCredentials();
         }
 
-        var profile = await db.Usuarios.SingleOrDefaultAsync(u => u.identity_user_id == user.Id);
+        var profile = await usuarios.GetByIdentityUserIdAsync(user.Id);
         if (profile is null) return InvalidCredentials();
         if (!profile.is_active)
             return StatusCode(403, new { code = "USER_INACTIVE", message = "Tu usuario está desactivado. Contactá al administrador." });
@@ -75,7 +73,7 @@ public class AuthController(
             !await users.VerifyUserTokenAsync(user, TokenOptions.DefaultProvider, AccountService.InitialPasswordPurpose, dto.InvitationToken))
             return BadRequest(new { code = "INVALID_INVITATION", message = "Invitación inválida o vencida." });
 
-        var profile = await db.Usuarios.SingleOrDefaultAsync(u => u.identity_user_id == user.Id);
+        var profile = await usuarios.GetByIdentityUserIdAsync(user.Id);
         if (profile is null) return BadRequest(new { code = "INVALID_INVITATION", message = "Invitación inválida o vencida." });
         if (!profile.is_active)
             return StatusCode(403, new { code = "USER_INACTIVE", message = "Tu usuario está desactivado. Contactá al administrador." });
@@ -99,9 +97,8 @@ public class AuthController(
         var user = await users.FindByIdAsync(identityUserId);
         if (user is null) return Unauthorized();
 
-        var profile = await db.Usuarios.AsNoTracking()
-            .SingleOrDefaultAsync(u => u.identity_user_id == identityUserId && u.is_active);
-        if (profile is null) return Unauthorized();
+        var profile = await usuarios.GetByIdentityUserIdAsync(identityUserId);
+        if (profile is null || !profile.is_active) return Unauthorized();
 
         var roles = await users.GetRolesAsync(user);
         var role = roles.Contains("Administrador") ? "Administrador" : "Usuario";
