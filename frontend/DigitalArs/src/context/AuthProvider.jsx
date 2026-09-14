@@ -115,13 +115,13 @@ export default function AuthProvider({ children }) {
     [session, logout]
   )
   const obtenerMiCuenta = useCallback(
-    signal => authenticatedRequest('/api/Cuentas/me', { signal }),
+    signal => authenticatedRequest('/api/cuentas/me', { signal }),
     [authenticatedRequest]
   )
 
   const ingresarDinero = useCallback(
     importe =>
-      authenticatedRequest('/api/Movimientos/depositos', {
+      authenticatedRequest('/api/movimientos/depositos', {
         method: 'POST',
         body: { importe }
       }),

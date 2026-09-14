@@ -83,8 +83,6 @@ builder.Services.AddScoped<ITipoMovimientoRepository, TipoMovimientoRepository>(
 builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
 builder.Services.AddScoped<ICuentaRepository, CuentaRepository>();
 builder.Services.AddScoped<IMovimientoRepository, MovimientoRepository>();
-builder.Services.AddScoped<IDepositoService, DepositoService>();
-builder.Services.AddScoped<ICuentaService, CuentaService>();
 
 // -----------------------------------------------------------------------------
 // 3. Identity: cuentas, contraseñas, roles e invitaciones
@@ -119,6 +117,8 @@ builder.Services.Configure<DataProtectionTokenProviderOptions>(options => option
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
+builder.Services.AddScoped<ICuentaService, CuentaService>();
+builder.Services.AddScoped<IDepositoService, DepositoService>();
 
 // -----------------------------------------------------------------------------
 // 5. Manejo global de errores
