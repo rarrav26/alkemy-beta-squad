@@ -12,8 +12,6 @@ public class DepositoService(
     IMovimientoRepository movimientos,
     ITipoMovimientoRepository tipos) : IDepositoService
 {
-    private const decimal SaldoMaximo = 9999999999999999.99m;
-
     public async Task<Resultado<DepositoResponse>> DepositarAsync(
         string identityUserId,
         DepositoDto dto,
@@ -26,25 +24,11 @@ public class DepositoService(
                 "El importe es obligatorio.");
         }
 
-        if (importe <= 0)
-        {
-            return Fallo(
-                MotivoDeRechazo.DatosInvalidos,
-                "El importe debe ser mayor a cero.");
-        }
+        var errorDeImporte = LimitesDeImporte.PrimerErrorDe(importe);
 
-        if (decimal.Round(importe, 2) != importe)
+        if (errorDeImporte is not null)
         {
-            return Fallo(
-                MotivoDeRechazo.DatosInvalidos,
-                "El importe debe tener como máximo 2 decimales.");
-        }
-
-        if (importe > SaldoMaximo)
-        {
-            return Fallo(
-                MotivoDeRechazo.DatosInvalidos,
-                "El importe supera el máximo permitido.");
+            return Fallo(MotivoDeRechazo.DatosInvalidos, errorDeImporte);
         }
 
         var usuario = await usuarios.GetByIdentityUserIdAsync(
@@ -92,7 +76,7 @@ public class DepositoService(
                 "No tenés una cuenta asociada.");
         }
 
-        if (cuenta.saldo > SaldoMaximo - importe)
+        if (cuenta.saldo > LimitesDeImporte.SaldoMaximo - importe)
         {
             return Fallo(
                 MotivoDeRechazo.SaldoMaximoSuperado,

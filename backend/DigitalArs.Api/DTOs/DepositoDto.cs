@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using DigitalArs.Api.Services;
 
 namespace DigitalArs.Api.DTOs;
 
@@ -13,25 +14,11 @@ public class DepositoDto : IValidatableObject
         if (Importe is not decimal importe)
             yield break;
 
-        if (importe <= 0)
-        {
-            yield return new ValidationResult(
-                "El importe debe ser mayor a cero.",
-                new[] { nameof(Importe) });
-        }
+        var error = LimitesDeImporte.PrimerErrorDe(importe);
 
-        if (decimal.Round(importe, 2) != importe)
+        if (error is not null)
         {
-            yield return new ValidationResult(
-                "El importe debe tener como máximo 2 decimales.",
-                new[] { nameof(Importe) });
-        }
-
-        if (importe > 9999999999999999.99m)
-        {
-            yield return new ValidationResult(
-                "El importe supera el máximo permitido.",
-                new[] { nameof(Importe) });
+            yield return new ValidationResult(error, [nameof(Importe)]);
         }
     }
 }

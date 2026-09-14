@@ -1,6 +1,7 @@
 ﻿using DigitalArs.Api.Data.Context;
 using DigitalArs.Api.Data.Entities;
 using DigitalArs.Api.Interfaces;
+using DigitalArs.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace DigitalArs.Api.Repositories;
@@ -8,8 +9,6 @@ namespace DigitalArs.Api.Repositories;
 public class CuentaRepository(DigitalArsDbContext context)
     : ICuentaRepository
 {
-    private const decimal SaldoMaximo = 9999999999999999.99m;
-
     public Task<Cuenta?> GetByUsuarioIdAsync(
         int usuarioId,
         CancellationToken cancellationToken = default)
@@ -26,18 +25,14 @@ public class CuentaRepository(DigitalArsDbContext context)
         decimal importe,
         CancellationToken cancellationToken = default)
     {
-        if (importe <= 0 ||
-            importe > SaldoMaximo ||
-            decimal.Round(importe, 2) != importe)
-        {
-            return false;
-        }
-
+        // Las condiciones viajan dentro del UPDATE y no como un chequeo previo: así dos
+        // depósitos simultáneos no pueden pasarse del tope entre los dos. Quien llama ya
+        // validó el importe con LimitesDeImporte.
         var filasActualizadas = await context.Cuentas
             .Where(cuenta =>
                 cuenta.usuario_id == usuarioId &&
                 cuenta.usuario.is_active &&
-                cuenta.saldo <= SaldoMaximo - importe)
+                cuenta.saldo <= LimitesDeImporte.SaldoMaximo - importe)
             .ExecuteUpdateAsync(
                 cambios => cambios.SetProperty(
                     cuenta => cuenta.saldo,
