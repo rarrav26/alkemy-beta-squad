@@ -39,13 +39,9 @@ public class MovimientosController(IDepositoService depositos)
         if (resultado.Exitoso)
             return Ok(resultado.Valor);
 
-        var error = new ErrorResponse
-        {
-            Code = resultado.Motivo?.ToString(),
-            Message = resultado.Errores.FirstOrDefault()
-                ?? "No se pudo realizar el depósito.",
-            Errors = resultado.Errores
-        };
+        var error = RespuestaDeError.Desde(
+            resultado,
+            "No se pudo realizar el depósito.");
 
         return resultado.Motivo switch
         {
