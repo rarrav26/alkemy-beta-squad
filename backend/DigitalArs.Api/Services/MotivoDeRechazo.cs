@@ -1,7 +1,7 @@
 namespace DigitalArs.Api.Services;
 
-// El motivo por el que un servicio rechazó una operación. Es un motivo de negocio, no de HTTP:
-// el servicio dice qué pasó y cada controller decide con qué status y con qué texto responder.
+// El servicio indica qué ocurrió.
+// El controller decide el código HTTP y el mensaje de respuesta.
 public enum MotivoDeRechazo
 {
     CredencialesInvalidas,
@@ -11,5 +11,9 @@ public enum MotivoDeRechazo
     DatosInvalidos,
     NoEncontrado,
     NoPuedeRecibirInvitacion,
-    NoSePudoActualizar
+    NoSePudoActualizar,
+
+    CuentaNoEncontrada,
+    SaldoMaximoSuperado,
+    TipoMovimientoNoConfigurado
 }

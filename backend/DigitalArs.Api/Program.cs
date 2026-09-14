@@ -79,6 +79,10 @@ builder.Services.AddDbContext<AuthDbContext>((sp, options) =>
 // Un repositorio por recurso. Los controllers y servicios dependen de la interfaz.
 builder.Services.AddScoped<ITipoMovimientoRepository, TipoMovimientoRepository>();
 builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+builder.Services.AddScoped<ICuentaRepository, CuentaRepository>();
+builder.Services.AddScoped<IMovimientoRepository, MovimientoRepository>();
+builder.Services.AddScoped<IDepositoService, DepositoService>();
+builder.Services.AddScoped<ICuentaService, CuentaService>();
 
 // -----------------------------------------------------------------------------
 // 3. Identity: cuentas, contraseñas, roles e invitaciones

@@ -1,12 +1,17 @@
 import axios from 'axios'
 
 // La URL base sale de VITE_API_URL (.env); el valor por defecto es el backend local.
-const baseURL = (import.meta.env?.VITE_API_URL || 'https://localhost:7201').replace(/\/$/, '')
+const baseURL = (
+  import.meta.env?.VITE_API_URL || 'https://localhost:7201'
+).replace(/\/$/, '')
 
 // Instancia única de Axios: todas las llamadas de la app salen desde acá.
 export const api = axios.create({ baseURL })
 
-export async function apiRequest(path, { token, body, signal, method = 'GET' } = {}) {
+export async function apiRequest(
+  path,
+  { token, body, signal, method = 'GET' } = {}
+) {
   try {
     const response = await api.request({
       url: path,
@@ -42,19 +47,27 @@ function errorDeCancelacion() {
 }
 
 function errorDeConexion(cause) {
-  return new Error('No pudimos conectar con la API. Comprobá que esté iniciada y volvé a intentar.', { cause })
+  return new Error(
+    'No pudimos conectar con la API. Comprobá que esté iniciada y volvé a intentar.',
+    { cause }
+  )
 }
 
 function errorDeRespuesta({ status, data }) {
-  const detalles = data?.errors ? Object.values(data.errors).flat().join(' ') : ''
-  const error = new Error([mensajePara(status, data), detalles].filter(Boolean).join(' '))
+  const detalles = data?.errors
+    ? Object.values(data.errors).flat().join(' ')
+    : ''
+  const error = new Error(
+    [mensajePara(status, data), detalles].filter(Boolean).join(' ')
+  )
   error.status = status
   error.code = data?.code
   return error
 }
 
 function mensajePara(status, data) {
-  if (status === 429) return 'Demasiados intentos. Esperá un minuto y volvé a intentar.'
+  if (status === 429)
+    return 'Demasiados intentos. Esperá un minuto y volvé a intentar.'
   if (data?.message) return data.message
   if (status === 401) return 'Tu sesión venció. Volvé a ingresar.'
   if (status === 403) return 'No tenés permiso para realizar esta acción.'
