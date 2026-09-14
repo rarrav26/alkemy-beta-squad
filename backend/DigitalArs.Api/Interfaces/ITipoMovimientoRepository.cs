@@ -10,4 +10,6 @@ public interface ITipoMovimientoRepository
     Task<List<TipoMovimientoResponse>> GetAllAsync(CancellationToken cancellationToken = default);
 
     Task<TipoMovimientoResponse?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+
+    Task<TipoMovimientoResponse?> GetByDescripcionAsync(string descripcion, CancellationToken cancellationToken = default);
 }

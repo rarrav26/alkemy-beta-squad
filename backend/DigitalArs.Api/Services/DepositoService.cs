@@ -12,6 +12,8 @@ public class DepositoService(
     IMovimientoRepository movimientos,
     ITipoMovimientoRepository tipos) : IDepositoService
 {
+    private const string TipoDeposito = "DEPOSITO";
+
     public async Task<Resultado<DepositoResponse>> DepositarAsync(
         string identityUserId,
         DepositoDto dto,
@@ -48,13 +50,8 @@ public class DepositoService(
                 "Tu usuario está desactivado. No podés ingresar dinero.");
         }
 
-        var catalogo = await tipos.GetAllAsync(cancellationToken);
-
-        var tipoDeposito = catalogo.SingleOrDefault(tipo =>
-            string.Equals(
-                tipo.Descripcion,
-                "DEPOSITO",
-                StringComparison.OrdinalIgnoreCase));
+        var tipoDeposito = await tipos.GetByDescripcionAsync(
+            TipoDeposito, cancellationToken);
 
         if (tipoDeposito is null)
         {
