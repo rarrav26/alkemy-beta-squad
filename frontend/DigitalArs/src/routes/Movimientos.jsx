@@ -25,6 +25,17 @@ const formatoPesos = new Intl.NumberFormat('es-AR', {
   currency: 'ARS'
 })
 
+// La API manda la fecha con el huso argentino incluido ("...-03:00"), pero Intl
+// formatea en el huso del navegador: si no se lo fijamos, alguien que abra la
+// app desde otro país vería un movimiento de las 22:00 con la fecha del día
+// siguiente.
+const formatoFecha = new Intl.DateTimeFormat('es-AR', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  timeZone: 'America/Argentina/Buenos_Aires'
+})
+
 function normalizarMovimiento(movimiento, index = 0) {
   const tipo = (movimiento.tipo ?? '').toUpperCase()
   const signo = (movimiento.signo ?? 'DEBITO').toUpperCase()
@@ -38,11 +49,7 @@ function normalizarMovimiento(movimiento, index = 0) {
     importe,
     descripcion: tipoMovimientoMap[tipo] ?? 'Movimiento',
     esCredito: signo === 'CREDITO',
-    etiqueta: `${tipoMovimientoMap[tipo] ?? 'Movimiento'} · ${new Intl.DateTimeFormat('es-AR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    }).format(new Date(movimiento.fecha ?? Date.now()))}`
+    etiqueta: `${tipoMovimientoMap[tipo] ?? 'Movimiento'} · ${formatoFecha.format(new Date(movimiento.fecha ?? Date.now()))}`
   }
 }
 
@@ -51,11 +58,7 @@ export function getTipoMovimientoLabel(tipoMovimientoId) {
 }
 
 export function formatearFecha(fecha) {
-  return new Intl.DateTimeFormat('es-AR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  }).format(new Date(fecha))
+  return formatoFecha.format(new Date(fecha))
 }
 
 export function MovimientosPreview() {

@@ -7,4 +7,8 @@ public interface IMovimientoRepository
     Task AddAsync(
         Movimiento movimiento,
         CancellationToken cancellationToken = default);
+
+    Task<PaginaDeMovimientos> ListarPaginaAsync(
+        FiltroDeMovimientos filtro,
+        CancellationToken cancellationToken = default);
 }

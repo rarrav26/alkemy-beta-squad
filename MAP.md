@@ -128,13 +128,12 @@ Dentro de **backend/DigitalArs.Api/**:
 | Repositories/UsuarioRepository.cs          | Consultas de perfiles sobre DigitalArsDbContext.                     |
 | Repositories/TipoMovimientoRepository.cs   | Consultas del catálogo sobre DigitalArsDbContext.                    |
 | Repositories/CuentaRepository.cs           | Consulta de la cuenta y acreditación atómica del saldo.              |
-| Repositories/MovimientoRepository.cs       | Alta de un movimiento sobre DigitalArsDbContext.                     |
+| Repositories/MovimientoRepository.cs       | Alta de un movimiento y consulta paginada del historial.             |
 | Services/AuthService.cs                    | Reglas de login, primera contraseña y consulta del perfil.           |
 | Services/AccountService.cs                 | Creación de cuentas/perfiles, invitaciones y estado activo.          |
 | Services/CuentaService.cs                  | Resuelve la cuenta del usuario logueado y arma su respuesta.         |
 | Services/DepositoService.cs                | Reglas del depósito: valida, acredita y registra el movimiento.      |
-| Services/HistorialSimuladoService.cs       | Filtra y pagina el historial. Provisorio: usa datos inventados.      |
-| Services/MovimientosDeEjemplo.cs           | Los movimientos inventados. Se borra al implementar la consulta real.|
+| Services/HistorialService.cs               | Resuelve la cuenta del token y arma la página del historial.         |
 | Services/SignoDeMovimiento.cs              | Traduce el filtro ?tipo= al signo del movimiento (CREDITO/DEBITO).   |
 | Services/HoraDeArgentina.cs                | Convierte entre el UTC de la base y el huso -03:00 del front.        |
 | Services/LimitesDeImporte.cs               | Regla única del importe de un movimiento, sin base de datos.         |
@@ -577,7 +576,7 @@ Las instancias que emiten y validan tokens necesitan una configuración de firma
 | GET /api/tiposdemovimientos/{id}   | Autenticado             | 200: un tipo, o 404 si no existe.        |
 | GET /api/cuentas/me                | Autenticado             | 200: alias, CVU y saldo propios; 404 si no tiene cuenta. |
 | POST /api/movimientos/depositos    | Autenticado             | 200: acredita el importe y devuelve el saldo actualizado. |
-| GET /api/movimientos               | Autenticado             | 200: historial propio paginado. Datos simulados por ahora. |
+| GET /api/movimientos               | Autenticado             | 200: historial propio paginado, leído de la tabla Movimientos. |
 | GET /api/setup/status              | Público                 | Estado de existencia del administrador.  |
 
 No existe GET /api/usuarios para listar usuarios en esta entrega.
@@ -827,8 +826,6 @@ No están implementados en esta entrega:
 - Recuperación de contraseña de cuentas que ya tienen una.
 - Confirmación de email, correo automático, segundo factor y login externo.
 - Transferencias entre cuentas.
-- La consulta real del historial: `GET /api/movimientos` ya existe con su contrato
-  definitivo, pero devuelve datos inventados en lugar de leer la tabla Movimientos.
 - Despliegue de la API y gestor de secretos de producción.
 - Rotación de claves con transición.
 - Integración automatizada completa con SQL Server.
@@ -838,11 +835,17 @@ y el historial.
 De la operatoria pendiente queda la transferencia entre cuentas, que va a necesitar mover
 saldo en dos cuentas y registrar dos movimientos dentro de la misma transacción.
 
-Para que el historial deje de ser simulado hace falta, además de la consulta,
-decidir dos cosas en la base: cómo se distingue un crédito de un débito (hoy el
-signo está implícito en la descripción del tipo) y dónde se guarda la relación
-entre las dos patas de una transferencia (`Movimientos.transferencia_id` apunta a
-una tabla `Transferencias` que todavía no existe).
+El historial ya lee la tabla Movimientos. Queda una decisión de modelo pendiente
+para la transferencia: dónde se guarda la relación entre sus dos patas.
+`Movimientos.transferencia_id` existe pero está siempre en NULL y apunta a una
+tabla `Transferencias` que todavía no se creó.
+
+Sobre eso hay una propuesta a discutir en el squad: reducir el catálogo a dos
+tipos (`DEBITO` / `CREDITO`) y deducir la operación de `transferencia_id`, en
+lugar de los tres tipos actuales. Hoy el signo está implícito en la descripción
+del tipo (`SignoDeMovimiento.DeTipo`) y la etiqueta que muestra el front sale de
+esa misma descripción; cambiarlo obligaría a migrar las filas existentes,
+re-scaffoldear la entidad y tocar `DepositoService` y el front.
 Tener tablas y entidades no implica tener sus operaciones HTTP implementadas.
 
 **Orden sugerido para estudiar:** AuthPages → AuthProvider → AuthController → AuthService → IUsuarioRepository/UsuarioRepository → AccountService → contextos → JwtTokenService → Program.cs. Así se sigue una acción desde la pantalla hasta la base y los controles de acceso, y se ve el corte entre el controlador que traduce HTTP y el servicio que aplica las reglas.

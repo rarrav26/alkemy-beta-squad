@@ -30,7 +30,10 @@ public static class HoraDeArgentina
     // rango queda exacto sin truncar la columna fecha con un CAST por fila.
     public static DateTime? ComienzoDelDiaSiguienteEnUtc(DateTime? diaArgentino)
     {
+        
         if (diaArgentino is not DateTime dia)
+            return null;
+        if (dia.Date >= DateTime.MaxValue.Date)
             return null;
 
         return dia.Date.AddDays(1) - Huso;

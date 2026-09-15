@@ -15,8 +15,7 @@ public class MovimientosController(
     IHistorialService historial)
     : ControllerBase
 {
-    // Devuelve solo los movimientos de la cuenta del token: no hay forma de pedir
-    // los de otra cuenta porque la cuenta nunca llega por parámetro.
+
     [HttpGet]
     [ProducesResponseType<PaginaResponse<MovimientoResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]

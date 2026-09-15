@@ -1,25 +1,12 @@
-// =============================================================================
-// Program.cs — punto de entrada de la API.
-//
-// El archivo tiene dos mitades y la línea que las separa es builder.Build():
-//
-//   ANTES   (builder.Services.Add...)  se REGISTRA qué servicios existen y cómo
-//           se construyen. Todavía no se atiende ninguna petición.
-//   DESPUÉS (app.Use...)               se ARMA EL PIPELINE: los pasos por los que
-//           pasa cada petición, y en qué orden.
-//
-// Son dos cosas distintas: registrar un servicio no lo pone en el pipeline. Por
-// eso varias funciones vienen de a pares (AddCors/UseCors,
-// AddAuthentication/UseAuthentication): una registra, la otra activa.
-//
-// Índice de secciones:
-//   1. Arranque y cadena de conexión          7. Autenticación con JWT
-//   2. Acceso a datos                          8. Autorización
-//   3. Identity                                9. Límite de solicitudes
-//   4. Servicios propios                      10. Controllers, CORS y Swagger
-//   5. Manejo global de errores               11. Verificaciones de arranque
-//   6. Opciones del JWT                       12. El pipeline
-// =============================================================================
+/* =============================================================================
+Índice de secciones:
+   1. Arranque y cadena de conexión          7. Autenticación con JWT
+   2. Acceso a datos                          8. Autorización
+   3. Identity                                9. Límite de solicitudes
+   4. Servicios propios                      10. Controllers, CORS y Swagger
+   5. Manejo global de errores               11. Verificaciones de arranque
+   6. Opciones del JWT                       12. El pipeline
+=============================================================================*/
 
 using System.Security.Claims;
 using System.Text;
@@ -119,10 +106,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
 builder.Services.AddScoped<ICuentaService, CuentaService>();
 builder.Services.AddScoped<IDepositoService, DepositoService>();
-
-// TODO HU-011: cambiar por la implementación que consulta Movimientos. Es el
-// único punto que hay que tocar para pasar de datos simulados a datos reales.
-builder.Services.AddScoped<IHistorialService, HistorialSimuladoService>();
+builder.Services.AddScoped<IHistorialService, HistorialService>();
 
 // -----------------------------------------------------------------------------
 // 5. Manejo global de errores
