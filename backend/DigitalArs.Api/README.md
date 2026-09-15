@@ -199,9 +199,65 @@ La contraseña debe tener al menos ocho caracteres, mayúscula, minúscula, núm
 | GET /api/tiposdemovimientos/{id} | JWT | 200: un tipo, o 404 si no existe |
 | GET /api/cuentas/me | JWT | 200: id, alias, CVU y saldo de la cuenta propia; 404 si no tiene |
 | POST /api/movimientos/depositos | JWT | 200: acredita { "importe": 500 } y devuelve el saldo actualizado |
+| GET /api/movimientos | JWT | 200: historial propio paginado. **Devuelve datos simulados** (ver abajo) |
 | GET /api/setup/status | Público | Informa si la instalación ya tiene administrador |
 
 No existe GET /api/usuarios para listar usuarios en esta entrega.
+
+### GET /api/movimientos — historial paginado
+
+Este endpoint todavía **no consulta la base**: devuelve una lista fija de 18
+movimientos inventados (`Services/MovimientosDeEjemplo.cs`) para que el front
+pueda integrar el historial antes de que exista la consulta real. Los filtros y
+la paginación sí funcionan de verdad sobre esa lista.
+
+Todos los parámetros son opcionales y viajan por query string:
+
+| Parámetro | Valores | Default |
+| --- | --- | --- |
+| page | entero >= 1 | 1 |
+| pageSize | entero entre 1 y 50 | 5 |
+| desde | yyyy-MM-dd (día incluido) | sin filtro |
+| hasta | yyyy-MM-dd (día incluido) | sin filtro |
+| tipo | credito, debito o todas | todas |
+
+El orden es fijo: los más recientes primero. Sin ningún parámetro,
+`GET /api/movimientos` devuelve los 5 movimientos más recientes.
+
+La cuenta sale siempre del token, nunca de un parámetro: por eso un usuario no
+puede pedir los movimientos de otra cuenta.
+
+Respuesta 200:
+
+```json
+{
+  "items": [
+    { "id": 18, "fecha": "2026-09-14T10:05:22-03:00", "tipo": "DEPOSITO", "signo": "CREDITO", "importe": 1500.00 },
+    { "id": 17, "fecha": "2026-09-13T18:41:07-03:00", "tipo": "TRANSFERENCIA_ENVIADA", "signo": "DEBITO", "importe": 320.50 }
+  ],
+  "page": 1,
+  "pageSize": 5,
+  "totalItems": 18,
+  "totalPages": 4
+}
+```
+
+`fecha` viaja en hora argentina con el huso incluido, así que el front la muestra
+sin convertir nada.
+
+Cuando no hay resultados devuelve `items: []` con `totalItems: 0` y
+`totalPages: 0`, y el status sigue siendo **200**: no tener movimientos no es un
+error. Se puede forzar ese caso con `?desde=2020-01-01&hasta=2020-01-02`.
+
+Errores: `400` si `page`/`pageSize` están fuera de rango, si `desde` es posterior
+a `hasta` o si `tipo` no es uno de los tres valores aceptados; `401` sin token o
+con token inválido. Cuando se implemente la consulta real se van a sumar `403`
+(usuario desactivado) y `404` (sin cuenta asociada), sin cambiar el contrato:
+conviene que el front ya los contemple.
+
+Para pasar a datos reales se cambia una sola línea en `Program.cs` (el registro
+de `IHistorialService`) y se borran `HistorialSimuladoService` y
+`MovimientosDeEjemplo`. El controller y el contrato no se tocan.
 
 Todos los errores usan la misma forma, `ErrorResponse`: `{ "code", "message", "errors" }`,
 donde `code` y `errors` se omiten cuando no aplican. Eso incluye los 400 de validación de

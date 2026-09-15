@@ -120,6 +120,10 @@ builder.Services.AddScoped<ITokenService, JwtTokenService>();
 builder.Services.AddScoped<ICuentaService, CuentaService>();
 builder.Services.AddScoped<IDepositoService, DepositoService>();
 
+// TODO HU-011: cambiar por la implementación que consulta Movimientos. Es el
+// único punto que hay que tocar para pasar de datos simulados a datos reales.
+builder.Services.AddScoped<IHistorialService, HistorialSimuladoService>();
+
 // -----------------------------------------------------------------------------
 // 5. Manejo global de errores
 // -----------------------------------------------------------------------------

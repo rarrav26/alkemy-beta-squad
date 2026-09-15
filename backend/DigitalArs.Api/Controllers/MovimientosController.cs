@@ -10,9 +10,59 @@ namespace DigitalArs.Api.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [Authorize]
-public class MovimientosController(IDepositoService depositos)
+public class MovimientosController(
+    IDepositoService depositos,
+    IHistorialService historial)
     : ControllerBase
 {
+    // Devuelve solo los movimientos de la cuenta del token: no hay forma de pedir
+    // los de otra cuenta porque la cuenta nunca llega por parámetro.
+    [HttpGet]
+    [ProducesResponseType<PaginaResponse<MovimientoResponse>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> ObtenerHistorial(
+        [FromQuery] HistorialMovimientosDto filtros,
+        CancellationToken cancellationToken)
+    {
+        var identityUserId =
+            User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrWhiteSpace(identityUserId))
+            return Unauthorized();
+
+        var resultado = await historial.ConsultarAsync(
+            identityUserId,
+            filtros,
+            cancellationToken);
+
+        if (resultado.Exitoso)
+            return Ok(resultado.Valor);
+
+        var error = RespuestaDeError.Desde(
+            resultado,
+            "No se pudo consultar el historial de movimientos.");
+
+        return resultado.Motivo switch
+        {
+            MotivoDeRechazo.NoEncontrado =>
+                Unauthorized(),
+
+            MotivoDeRechazo.UsuarioDesactivado =>
+                StatusCode(StatusCodes.Status403Forbidden, error),
+
+            MotivoDeRechazo.CuentaNoEncontrada =>
+                NotFound(error),
+
+            _ => StatusCode(
+                StatusCodes.Status500InternalServerError,
+                error)
+        };
+    }
+
     [HttpPost("depositos")]
     [ProducesResponseType<DepositoResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
