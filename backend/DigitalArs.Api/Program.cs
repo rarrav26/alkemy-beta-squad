@@ -25,6 +25,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
 using DigitalArs.Api.Data.Context;
+using DigitalArs.Api.DTOs;
 using DigitalArs.Api.Interfaces;
 using DigitalArs.Api.Middleware;
 using DigitalArs.Api.OpenApi;
@@ -33,6 +34,7 @@ using DigitalArs.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -79,6 +81,8 @@ builder.Services.AddDbContext<AuthDbContext>((sp, options) =>
 // Un repositorio por recurso. Los controllers y servicios dependen de la interfaz.
 builder.Services.AddScoped<ITipoMovimientoRepository, TipoMovimientoRepository>();
 builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+builder.Services.AddScoped<ICuentaRepository, CuentaRepository>();
+builder.Services.AddScoped<IMovimientoRepository, MovimientoRepository>();
 
 // -----------------------------------------------------------------------------
 // 3. Identity: cuentas, contraseñas, roles e invitaciones
@@ -113,6 +117,8 @@ builder.Services.Configure<DataProtectionTokenProviderOptions>(options => option
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
+builder.Services.AddScoped<ICuentaService, CuentaService>();
+builder.Services.AddScoped<IDepositoService, DepositoService>();
 
 // -----------------------------------------------------------------------------
 // 5. Manejo global de errores
@@ -230,7 +236,44 @@ builder.Services.AddRateLimiter(options =>
 // 10. Controllers, CORS y Swagger
 // -----------------------------------------------------------------------------
 
-builder.Services.AddControllers();
+const string MensajeDeDatosInvalidos = "Revisá los datos ingresados.";
+
+// Sin esta fábrica, un DTO inválido devuelve el ValidationProblemDetails que arma
+// [ApiController] por su cuenta, con otra forma que el ErrorResponse que usan el resto de
+// los endpoints y el GlobalExceptionHandler. Acá se unifica: un solo contrato de error.
+BadRequestObjectResult ErrorDeValidacion(ActionContext context)
+{
+    // Las claves con $ son rutas del JSON y solo aparecen cuando el cuerpo no se pudo
+    // deserializar. Su texto nombra los tipos internos del DTO, así que no se publica:
+    // si el cuerpo no se entiende, no hay nada puntual que contarle a quien llama.
+    var cuerpoIlegible = context.ModelState.Keys.Any(clave => clave.StartsWith('$'));
+
+    if (cuerpoIlegible)
+    {
+        return new BadRequestObjectResult(new ErrorResponse
+        {
+            Code = "VALIDATION_ERROR",
+            Message = MensajeDeDatosInvalidos
+        });
+    }
+
+    var errores = context.ModelState
+        .SelectMany(entrada => entrada.Value?.Errors ?? [])
+        .Select(error => error.ErrorMessage)
+        .Where(mensaje => !string.IsNullOrWhiteSpace(mensaje))
+        .ToArray();
+
+    return new BadRequestObjectResult(new ErrorResponse
+    {
+        Code = "VALIDATION_ERROR",
+        Message = errores.FirstOrDefault() ?? MensajeDeDatosInvalidos,
+        Errors = errores
+    });
+}
+
+builder.Services.AddControllers()
+    .ConfigureApiBehaviorOptions(options =>
+        options.InvalidModelStateResponseFactory = ErrorDeValidacion);
 
 // El frontend de Vite corre en otro puerto, así que el navegador exige CORS explícito.
 // En producción los orígenes se declaran en Cors:AllowedOrigins; no hay valor por defecto.

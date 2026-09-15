@@ -197,9 +197,17 @@ La contraseña debe tener al menos ocho caracteres, mayúscula, minúscula, núm
 | PATCH /api/usuarios/{id}/active | Administrador | Activa/desactiva con { "isActive": false } |
 | GET /api/tiposdemovimientos | JWT | 200: catálogo completo de tipos de movimiento |
 | GET /api/tiposdemovimientos/{id} | JWT | 200: un tipo, o 404 si no existe |
+| GET /api/cuentas/me | JWT | 200: id, alias, CVU y saldo de la cuenta propia; 404 si no tiene |
+| POST /api/movimientos/depositos | JWT | 200: acredita { "importe": 500 } y devuelve el saldo actualizado |
 | GET /api/setup/status | Público | Informa si la instalación ya tiene administrador |
 
 No existe GET /api/usuarios para listar usuarios en esta entrega.
+
+Todos los errores usan la misma forma, `ErrorResponse`: `{ "code", "message", "errors" }`,
+donde `code` y `errors` se omiten cuando no aplican. Eso incluye los 400 de validación de
+DTO, que salen con `code` VALIDATION_ERROR: `Program.cs` reemplaza el ValidationProblemDetails
+que `[ApiController]` devolvería por su cuenta. Cuando el cuerpo no se puede deserializar
+el mensaje es genérico a propósito, porque el texto del framework nombra los tipos internos.
 
 Todos los endpoints nuevos quedan protegidos por defecto salvo los marcados AllowAnonymous.
 Las invitaciones duran 24 horas y se consumen al definir la contraseña.

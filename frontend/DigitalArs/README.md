@@ -143,7 +143,8 @@ const { session, ready, connectionError, login, register, initialPassword, creat
 ## Endpoints que consume
 
 `POST /api/auth/login`, `POST /api/auth/register`, `POST /api/auth/initial-password`,
-`GET /api/auth/me`, `GET /api/setup/status` y `POST /api/usuarios`.
+`GET /api/auth/me`, `GET /api/setup/status`, `POST /api/usuarios`,
+`GET /api/cuentas/me` y `POST /api/movimientos/depositos`.
 
 El catálogo `GET /api/tiposdemovimientos` existe en la API pero todavía no se usa acá.
 
@@ -184,8 +185,8 @@ arriba.
 
 ## Pendientes conocidos
 
-- El dashboard es solo el punto de entrada: no muestra saldos ni movimientos, porque la API
-  todavía no expone esos endpoints.
+- El dashboard muestra el saldo, el alias y el CVU de la cuenta propia, y permite ingresar
+  dinero. Todavía no lista los movimientos: la API no expone ese endpoint.
 - No hay listado de usuarios ni interfaz para renovar invitaciones o desactivar cuentas, aunque
   la API sí tiene esos endpoints.
 - `src/routes/Home.jsx` y `src/routes/ProductId.jsx` quedaron del template original: ninguna

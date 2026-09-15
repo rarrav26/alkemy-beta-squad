@@ -86,8 +86,9 @@ Dentro de **backend/DigitalArs.Api/**:
 | Controllers/UsuariosController.cs          | Crear usuarios con invitación, renovarla y cambiar estado.           |
 | Controllers/SetupController.cs             | Estado del alta inicial: informa si ya existe un administrador.      |
 | Controllers/TiposDeMovimientosController.cs | Catálogo de tipos de movimiento: listado y detalle por id.          |
-| Controllers/CuentasController.cs           | Estructura vacía, todavía sin endpoints.                             |
-| Controllers/MovimientosController.cs       | Estructura vacía, todavía sin endpoints.                             |
+| Controllers/CuentasController.cs           | Consulta de la cuenta propia: alias, CVU y saldo.                    |
+| Controllers/MovimientosController.cs       | Depósitos sobre la cuenta propia.                                    |
+| Controllers/RespuestaDeError.cs            | Arma el ErrorResponse desde un Resultado, compartido por controllers.|
 | Data/Context/DigitalArsDbContext.cs        | Modelo de las tablas del negocio.                                    |
 | Data/Context/AuthDbContext.cs              | Modelo de las tablas Identity.                                       |
 | Data/Entities/Usuario.cs                   | Perfil del usuario de negocio.                                       |
@@ -107,16 +108,28 @@ Dentro de **backend/DigitalArs.Api/**:
 | DTOs/InvitacionResponse.cs                 | Respuesta de la reemisión de invitación.                             |
 | DTOs/EstadoSetupResponse.cs                | Respuesta del estado del alta inicial.                               |
 | DTOs/TipoMovimientoResponse.cs             | Respuesta del catálogo de tipos de movimiento.                       |
+| DTOs/CuentaResponse.cs                     | Respuesta de la cuenta propia: id, alias, CVU y saldo.               |
+| DTOs/DepositoDto.cs                        | Importe a depositar, con su validación.                              |
+| DTOs/DepositoResponseDto.cs                | Respuesta del depósito, con el saldo ya actualizado.                 |
 | DTOs/ErrorResponse.cs                      | Forma única de los errores HTTP: code, message y errors.             |
 | Interfaces/ITokenService.cs                | Contrato de generación del JWT.                                      |
 | Interfaces/IAuthService.cs                 | Contrato de login, primera contraseña y perfil de la sesión.         |
 | Interfaces/IAccountService.cs              | Contrato del alta, la invitación y el estado de un usuario.          |
+| Interfaces/ICuentaService.cs               | Contrato de la consulta de la cuenta propia.                         |
+| Interfaces/IDepositoService.cs             | Contrato del depósito.                                               |
 | Interfaces/IUsuarioRepository.cs           | Contrato de acceso a los perfiles de usuario.                        |
 | Interfaces/ITipoMovimientoRepository.cs    | Contrato de acceso al catálogo de tipos de movimiento.               |
+| Interfaces/ICuentaRepository.cs            | Contrato de acceso a las cuentas y a la acreditación de saldo.       |
+| Interfaces/IMovimientoRepository.cs        | Contrato de alta de movimientos.                                     |
 | Repositories/UsuarioRepository.cs          | Consultas de perfiles sobre DigitalArsDbContext.                     |
 | Repositories/TipoMovimientoRepository.cs   | Consultas del catálogo sobre DigitalArsDbContext.                    |
+| Repositories/CuentaRepository.cs           | Consulta de la cuenta y acreditación atómica del saldo.              |
+| Repositories/MovimientoRepository.cs       | Alta de un movimiento sobre DigitalArsDbContext.                     |
 | Services/AuthService.cs                    | Reglas de login, primera contraseña y consulta del perfil.           |
 | Services/AccountService.cs                 | Creación de cuentas/perfiles, invitaciones y estado activo.          |
+| Services/CuentaService.cs                  | Resuelve la cuenta del usuario logueado y arma su respuesta.         |
+| Services/DepositoService.cs                | Reglas del depósito: valida, acredita y registra el movimiento.      |
+| Services/LimitesDeImporte.cs               | Regla única del importe de un movimiento, sin base de datos.         |
 | Services/Resultado.cs                      | Lo que devuelve un servicio: la respuesta lista o el motivo.         |
 | Services/MotivoDeRechazo.cs                | Los motivos de negocio por los que un servicio rechaza.              |
 | Services/Invitacion.cs                     | Propósito y duración de la invitación, compartidos.                  |
@@ -240,7 +253,9 @@ Cada recurso tiene su propia interfaz en **Interfaces/** y su implementación en
 | Interfaz | Métodos | Quién la usa |
 | ---------------------------- | ------------------------------------------------------------------- | ------------------------------ |
 | IUsuarioRepository           | GetByIdAsync, GetByIdentityUserIdAsync, ActualizarEstadoActivoAsync  | AuthService y AccountService.  |
-| ITipoMovimientoRepository    | GetAllAsync, GetByIdAsync                                            | TiposDeMovimientosController.  |
+| ITipoMovimientoRepository    | GetAllAsync, GetByIdAsync, GetByDescripcionAsync                     | TiposDeMovimientosController y DepositoService. |
+| ICuentaRepository            | GetByUsuarioIdAsync, IncrementarSaldoAsync                           | CuentaService y DepositoService. |
+| IMovimientoRepository        | AddAsync                                                             | DepositoService.               |
 
 En IUsuarioRepository las dos consultas usan AsNoTracking, porque solo leen. La única escritura sobre un perfil es el estado activo, y la hace `ActualizarEstadoActivoAsync`, que busca con seguimiento y guarda adentro. El repositorio no expone `SaveChangesAsync`: quien lo llama pide una operación con nombre, no maneja la unidad de trabajo.
 
@@ -250,7 +265,11 @@ ITipoMovimientoRepository devuelve `TipoMovimientoResponse` y no la entidad. Es 
 
 El reparto queda así: el **servicio** aplica las reglas y devuelve un `Resultado<T>` con la respuesta lista o con un `MotivoDeRechazo`; el **controlador** traduce ese motivo al status y al mensaje del endpoint. Así las reglas de negocio se pueden probar sin levantar SQL Server, y el contrato HTTP vive en un solo lugar.
 
-AccountService es la excepción deliberada. Usa los dos contextos directamente porque abre una transacción que abarca a ambos (Identity y negocio), y eso necesita `db.Database`, que un repositorio no expone. Para lo que no es transaccional usa IUsuarioRepository. Tampoco hay que implementar hashing ni altas de Identity mediante un repositorio: de eso se encarga UserManager.
+Dos servicios son la excepción deliberada, y por el mismo motivo: necesitan `db.Database.BeginTransactionAsync()`, que ningún repositorio expone. **AccountService** abre una transacción que abarca los dos contextos (Identity y negocio), así que si el alta del perfil falla tampoco queda creada la cuenta de acceso. **DepositoService** abre una sobre el contexto de negocio para que la acreditación del saldo y el alta del movimiento se confirmen juntas o no se confirme ninguna. Los dos usan repositorios para todo lo que no es transaccional. Tampoco hay que implementar hashing ni altas de Identity mediante un repositorio: de eso se encarga UserManager.
+
+La regla, entonces: se inyecta el DbContext solo para manejar una transacción. Cualquier otra consulta o escritura va por su repositorio.
+
+En ese reparto, el repositorio no valida reglas de negocio. `CuentaRepository.IncrementarSaldoAsync` no revisa el importe —eso ya lo hizo `LimitesDeImporte` en el DTO y en el servicio—, pero sí lleva las condiciones del saldo y del usuario activo dentro del `UPDATE`: no son una validación más, son lo que evita que dos depósitos simultáneos se pasen del tope entre los dos.
 
 ## 6. DTOs y validaciones
 
@@ -548,9 +567,15 @@ Las instancias que emiten y validan tokens necesitan una configuración de firma
 | PATCH /api/usuarios/{id}/active    | Administrador           | 204: cambio de estado.                   |
 | GET /api/tiposdemovimientos        | Autenticado             | 200: catálogo completo de tipos.         |
 | GET /api/tiposdemovimientos/{id}   | Autenticado             | 200: un tipo, o 404 si no existe.        |
+| GET /api/cuentas/me                | Autenticado             | 200: alias, CVU y saldo propios; 404 si no tiene cuenta. |
+| POST /api/movimientos/depositos    | Autenticado             | 200: acredita el importe y devuelve el saldo actualizado. |
 | GET /api/setup/status              | Público                 | Estado de existencia del administrador.  |
 
 No existe GET /api/usuarios para listar usuarios en esta entrega.
+
+Los dos endpoints de cuenta y depósito no reciben ningún identificador: resuelven la cuenta desde el claim del token. Por eso no hay forma de pedir el saldo de otra persona, ni siquiera cambiando un parámetro.
+
+Todos los errores comparten la forma `ErrorResponse` (`code`, `message`, `errors`), incluidos los 400 de validación de DTO: `Program.cs` reemplaza con `InvalidModelStateResponseFactory` el ValidationProblemDetails que `[ApiController]` devolvería por su cuenta. Si el cuerpo no se puede deserializar el mensaje es genérico a propósito, porque el texto que arma el framework nombra los tipos internos del DTO.
 
 La política auth limita a 20 solicitudes por IP/minuto donde se aplica, como AuthController. No es un límite global de toda la API. El exceso devuelve 429.
 
@@ -792,14 +817,15 @@ No están implementados en esta entrega:
 - Refresh tokens.
 - Recuperación de contraseña de cuentas que ya tienen una.
 - Confirmación de email, correo automático, segundo factor y login externo.
-- Operatoria completa de cuentas, depósitos y transferencias.
+- Transferencias entre cuentas, y listado de movimientos.
 - Despliegue de la API y gestor de secretos de producción.
 - Rotación de claves con transición.
 - Integración automatizada completa con SQL Server.
 
-CuentasController y MovimientosController son estructuras vacías en esta versión.
+CuentasController resuelve la consulta de saldo y MovimientosController el depósito.
+De la operatoria pendiente queda la transferencia entre cuentas, que va a necesitar mover
+saldo en dos cuentas y registrar dos movimientos dentro de la misma transacción.
 Tener tablas y entidades no implica tener sus operaciones HTTP implementadas.
-TiposDeMovimientosController sí está implementado y sirve de plantilla para los otros dos.
 
 **Orden sugerido para estudiar:** AuthPages → AuthProvider → AuthController → AuthService → IUsuarioRepository/UsuarioRepository → AccountService → contextos → JwtTokenService → Program.cs. Así se sigue una acción desde la pantalla hasta la base y los controles de acceso, y se ve el corte entre el controlador que traduce HTTP y el servicio que aplica las reglas.
 

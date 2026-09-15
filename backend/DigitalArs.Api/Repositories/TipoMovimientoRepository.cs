@@ -15,6 +15,10 @@ public class TipoMovimientoRepository(DigitalArsDbContext context) : ITipoMovimi
         Proyectar(context.Tipo_Movimientos.Where(tipoMovimiento => tipoMovimiento.id == id))
             .SingleOrDefaultAsync(cancellationToken);
 
+    public Task<TipoMovimientoResponse?> GetByDescripcionAsync(string descripcion, CancellationToken cancellationToken = default) =>
+        Proyectar(context.Tipo_Movimientos.Where(tipoMovimiento => tipoMovimiento.descripcion == descripcion))
+            .SingleOrDefaultAsync(cancellationToken);
+
     // El filtro tiene que aplicarse antes de proyectar: sobre el DTO ya armado, EF no sabe a qué
     // columna corresponde cada propiedad y no puede traducir la consulta a SQL.
     private static IQueryable<TipoMovimientoResponse> Proyectar(IQueryable<Tipo_Movimiento> tipos) =>
