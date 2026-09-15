@@ -10,13 +10,14 @@ export const api = axios.create({ baseURL })
 
 export async function apiRequest(
   path,
-  { token, body, signal, method = 'GET' } = {}
+  { token, body, signal, method = 'GET', params } = {}
 ) {
   try {
     const response = await api.request({
       url: path,
       method,
       signal,
+      ...(params ? { params } : {}),
       ...(body ? { data: body } : {}),
       ...(token ? { headers: { Authorization: 'Bearer ' + token } } : {})
     })

@@ -119,6 +119,19 @@ export default function AuthProvider({ children }) {
     [authenticatedRequest]
   )
 
+  const obtenerMovimientos = useCallback(
+    (signal, pagination = {}) =>
+      authenticatedRequest('/api/movimientos', {
+        signal,
+        params: {
+          page: pagination.page ?? 1,
+          pageSize: pagination.pageSize ?? 5,
+          ...pagination
+        }
+      }),
+    [authenticatedRequest]
+  )
+
   const ingresarDinero = useCallback(
     importe =>
       authenticatedRequest('/api/movimientos/depositos', {
@@ -149,6 +162,7 @@ export default function AuthProvider({ children }) {
         logout,
         retry,
         obtenerMiCuenta,
+        obtenerMovimientos,
         ingresarDinero
       }}
     >

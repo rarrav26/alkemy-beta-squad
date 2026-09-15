@@ -6,13 +6,18 @@ import {
   Chip,
   Paper,
   Stack,
-  TextField,
   Typography
 } from '@mui/material'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/authContext'
 import AuthForm, { ProfileFields } from '../components/Auth/AuthForm'
 import DepositoModal from '../components/Cuentas/DepositoModal'
+import { MovimientosPreview } from './Movimientos'
+
+const formatoPesos = new Intl.NumberFormat('es-AR', {
+  style: 'currency',
+  currency: 'ARS'
+})
 
 export default function Dashboard() {
   const { session, obtenerMiCuenta } = useAuth()
@@ -58,10 +63,6 @@ export default function Dashboard() {
     return () => controller.abort()
   }, [obtenerMiCuenta, esAdministrador, intento])
 
-  const formatoPesos = new Intl.NumberFormat('es-AR', {
-    style: 'currency',
-    currency: 'ARS'
-  })
   function depositoRealizado(resultado) {
     setCuenta(actual =>
       actual ? { ...actual, saldo: resultado.saldoActual } : actual
@@ -170,6 +171,10 @@ export default function Dashboard() {
           )}
         </Stack>
       </Paper>
+      {!esAdministrador && cuenta && (
+        <MovimientosPreview />
+      )}
+
       {!esAdministrador && cuenta && (
         <DepositoModal
           open={depositoAbierto}
