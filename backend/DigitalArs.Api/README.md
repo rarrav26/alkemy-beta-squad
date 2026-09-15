@@ -198,7 +198,7 @@ La contraseña debe tener al menos ocho caracteres, mayúscula, minúscula, núm
 | GET /api/tiposdemovimientos | JWT | 200: catálogo completo de tipos de movimiento |
 | GET /api/tiposdemovimientos/{id} | JWT | 200: un tipo, o 404 si no existe |
 | GET /api/cuentas/me | JWT | 200: id, alias, CVU y saldo de la cuenta propia; 404 si no tiene |
-| POST /api/movimientos/depositos | JWT | 200: acredita { "importe": 500 } y devuelve el saldo actualizado |
+| POST /api/movimientos/depositos | JWT | 200: acredita { "importe": 500 } y devuelve el saldo actualizado y la fecha en hora argentina |
 | GET /api/movimientos | JWT | 200: historial propio paginado. **Devuelve datos simulados** (ver abajo) |
 | GET /api/setup/status | Público | Informa si la instalación ya tiene administrador |
 
@@ -242,8 +242,14 @@ Respuesta 200:
 }
 ```
 
-`fecha` viaja en hora argentina con el huso incluido, así que el front la muestra
-sin convertir nada.
+`fecha` viaja en hora argentina con el huso incluido. Es la forma única de toda la
+API: el depósito devuelve su `fecha` igual. En la base se guarda siempre UTC y la
+conversión a -03:00 vive en un solo lugar (`Services/HoraDeArgentina.cs`).
+
+El front igual tiene que fijar el huso al formatear (`timeZone:
+'America/Argentina/Buenos_Aires'`): `Intl.DateTimeFormat` usa el del navegador, y
+sin eso un movimiento de las 22:00 se vería con la fecha del día siguiente desde
+otro país.
 
 Cuando no hay resultados devuelve `items: []` con `totalItems: 0` y
 `totalPages: 0`, y el status sigue siendo **200**: no tener movimientos no es un

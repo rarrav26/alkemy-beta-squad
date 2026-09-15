@@ -129,13 +129,18 @@ DECLARE @CuentaCarlos INT = (SELECT id FROM dbo.Cuentas WHERE alias = 'carlos.cu
 
 /* ----------------------------------------------------------------------------
    Depositos: tipo 1, sin transferencia_id.
+
+   La columna fecha guarda SIEMPRE UTC: el backend escribe DateTime.UtcNow y la
+   API la devuelve convertida a -03:00. Por eso estos literales estan en UTC y
+   son tres horas mas que la hora argentina que se ve en pantalla: 13:00 UTC se
+   muestra como las 10:00 del 1 de septiembre.
    ---------------------------------------------------------------------------- */
 IF NOT EXISTS (SELECT 1 FROM dbo.Movimientos WHERE cuenta_id = @CuentaJuan)
     INSERT INTO dbo.Movimientos (cuenta_id, tipo_movimiento_id, transferencia_id, importe, fecha)
     VALUES
-        (@CuentaJuan,   1, NULL,  5000.00, '2026-09-01T10:00:00'),
-        (@CuentaMaria,  1, NULL, 25000.00, '2026-09-02T11:30:00'),
-        (@CuentaCarlos, 1, NULL,   300.00, '2026-09-04T09:15:00');
+        (@CuentaJuan,   1, NULL,  5000.00, '2026-09-01T13:00:00'),
+        (@CuentaMaria,  1, NULL, 25000.00, '2026-09-02T14:30:00'),
+        (@CuentaCarlos, 1, NULL,   300.00, '2026-09-04T12:15:00');
 
 
 COMMIT TRANSACTION;

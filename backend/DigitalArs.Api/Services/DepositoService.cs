@@ -116,7 +116,7 @@ public class DepositoService(
             MovimientoId: movimiento.id,
             Importe: movimiento.importe,
             SaldoActual: cuentaActualizada.saldo,
-            Fecha: movimiento.fecha);
+            Fecha: HoraDeArgentina.DesdeUtc(movimiento.fecha));
 
         await transaccion.CommitAsync(cancellationToken);
 

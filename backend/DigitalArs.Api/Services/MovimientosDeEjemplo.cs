@@ -16,9 +16,6 @@ public static class MovimientosDeEjemplo
     private const string TransferenciaEnviada = "TRANSFERENCIA_ENVIADA";
     private const string TransferenciaRecibida = "TRANSFERENCIA_RECIBIDA";
 
-    // Argentina no aplica horario de verano, así que el huso es siempre -03:00.
-    private static readonly TimeSpan HusoArgentino = TimeSpan.FromHours(-3);
-
     public static IReadOnlyList<MovimientoResponse> Todos { get; } =
     [
         Credito(18, Deposito, "2026-09-14 10:05:22", 1500.00m),
@@ -62,6 +59,6 @@ public static class MovimientosDeEjemplo
             "yyyy-MM-dd HH:mm:ss",
             System.Globalization.CultureInfo.InvariantCulture);
 
-        return new DateTimeOffset(sinHuso, HusoArgentino);
+        return new DateTimeOffset(sinHuso, HoraDeArgentina.Huso);
     }
 }

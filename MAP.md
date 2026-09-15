@@ -110,7 +110,7 @@ Dentro de **backend/DigitalArs.Api/**:
 | DTOs/TipoMovimientoResponse.cs             | Respuesta del catálogo de tipos de movimiento.                       |
 | DTOs/CuentaResponse.cs                     | Respuesta de la cuenta propia: id, alias, CVU y saldo.               |
 | DTOs/DepositoDto.cs                        | Importe a depositar, con su validación.                              |
-| DTOs/DepositoResponseDto.cs                | Respuesta del depósito, con el saldo ya actualizado.                 |
+| DTOs/DepositoResponseDto.cs                | Respuesta del depósito: saldo actualizado y fecha argentina.         |
 | DTOs/ErrorResponse.cs                      | Forma única de los errores HTTP: code, message y errors.             |
 | DTOs/HistorialMovimientosDto.cs            | Filtros del historial que llegan por query string.                   |
 | DTOs/MovimientoResponse.cs                 | Una fila del historial, con su signo y la fecha en hora argentina.   |
@@ -136,6 +136,7 @@ Dentro de **backend/DigitalArs.Api/**:
 | Services/HistorialSimuladoService.cs       | Filtra y pagina el historial. Provisorio: usa datos inventados.      |
 | Services/MovimientosDeEjemplo.cs           | Los movimientos inventados. Se borra al implementar la consulta real.|
 | Services/SignoDeMovimiento.cs              | Traduce el filtro ?tipo= al signo del movimiento (CREDITO/DEBITO).   |
+| Services/HoraDeArgentina.cs                | Convierte entre el UTC de la base y el huso -03:00 del front.        |
 | Services/LimitesDeImporte.cs               | Regla única del importe de un movimiento, sin base de datos.         |
 | Services/Resultado.cs                      | Lo que devuelve un servicio: la respuesta lista o el motivo.         |
 | Services/MotivoDeRechazo.cs                | Los motivos de negocio por los que un servicio rechaza.              |
