@@ -119,6 +119,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
 builder.Services.AddScoped<ICuentaService, CuentaService>();
 builder.Services.AddScoped<IDepositoService, DepositoService>();
+builder.Services.AddScoped<ITransferenciaService, TransferenciaService>();
 
 // -----------------------------------------------------------------------------
 // 5. Manejo global de errores

@@ -12,4 +12,8 @@ public interface ICuentaRepository
         int usuarioId,
         decimal importe,
         CancellationToken cancellationToken = default);
+
+    Task<Cuenta?> GetByAliasOCvuAsync(
+        string destino,
+        CancellationToken cancellationToken = default);
 }

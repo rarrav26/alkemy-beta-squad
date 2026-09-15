@@ -15,5 +15,6 @@ public enum MotivoDeRechazo
 
     CuentaNoEncontrada,
     SaldoMaximoSuperado,
-    TipoMovimientoNoConfigurado
+    TipoMovimientoNoConfigurado,
+    DestinoNoEncontrado
 }

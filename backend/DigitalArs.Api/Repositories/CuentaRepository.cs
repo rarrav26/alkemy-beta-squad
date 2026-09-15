@@ -41,4 +41,16 @@ public class CuentaRepository(DigitalArsDbContext context)
 
         return filasActualizadas == 1;
     }
+
+    public Task<Cuenta?> GetByAliasOCvuAsync(
+        string destino,
+        CancellationToken cancellationToken = default)
+    {
+        return context.Cuentas
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                cuenta => cuenta.alias == destino || cuenta.cvu == destino,
+                cancellationToken);
+    }
+
 }

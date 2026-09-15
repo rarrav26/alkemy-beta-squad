@@ -1,0 +1,11 @@
+using DigitalArs.Api.DTOs;
+using DigitalArs.Api.Services;
+
+namespace DigitalArs.Api.Interfaces;
+
+public interface ITransferenciaService
+{
+    Task<Resultado<DestinoResponseDto>> ResolverDestinoAsync(
+        TransferenciaDto dto,
+        CancellationToken cancellationToken = default);
+}
