@@ -43,10 +43,11 @@ public class CuentaRepository(DigitalArsDbContext context)
     }
 
     public Task<Cuenta?> GetByAliasOCvuAsync(
-        string destino,
-        CancellationToken cancellationToken = default)
+     string destino,
+     CancellationToken cancellationToken = default)
     {
         return context.Cuentas
+            .Include(cuenta => cuenta.usuario)
             .AsNoTracking()
             .SingleOrDefaultAsync(
                 cuenta => cuenta.alias == destino || cuenta.cvu == destino,

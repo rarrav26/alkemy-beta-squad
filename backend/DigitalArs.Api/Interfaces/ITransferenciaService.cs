@@ -6,6 +6,7 @@ namespace DigitalArs.Api.Interfaces;
 public interface ITransferenciaService
 {
     Task<Resultado<DestinoResponseDto>> ResolverDestinoAsync(
+        string identityUserId,
         TransferenciaDto dto,
         CancellationToken cancellationToken = default);
 }

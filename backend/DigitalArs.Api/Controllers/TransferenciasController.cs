@@ -2,15 +2,16 @@ using DigitalArs.Api.DTOs;
 using DigitalArs.Api.Interfaces;
 using DigitalArs.Api.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace DigitalArs.Api.Controllers;
 
-[Route("api/[controller]")]
 [ApiController]
+[Route("api/[controller]")]
 [Authorize]
-public class TransferenciasController(ITransferenciaService transferencias)
-    : ControllerBase
+public class TransferenciasController(ITransferenciaService transferencias) : ControllerBase
 {
     [HttpPost("resolver-destino")]
     [ProducesResponseType<DestinoResponseDto>(StatusCodes.Status200OK)]
@@ -24,7 +25,13 @@ public class TransferenciasController(ITransferenciaService transferencias)
         if (!ModelState.IsValid)
             return ValidationProblem(ModelState);
 
-        var resultado = await transferencias.ResolverDestinoAsync(dto, cancellationToken);
+        var identityUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                             ?? User.FindFirst("sub")?.Value;
+
+        if (string.IsNullOrWhiteSpace(identityUserId))
+            return Unauthorized();
+
+        var resultado = await transferencias.ResolverDestinoAsync(identityUserId, dto, cancellationToken);
 
         if (resultado.Exitoso)
             return Ok(resultado.Valor);
@@ -34,6 +41,8 @@ public class TransferenciasController(ITransferenciaService transferencias)
         return resultado.Motivo switch
         {
             MotivoDeRechazo.DestinoNoEncontrado => NotFound(error),
+            MotivoDeRechazo.UsuarioDesactivado => BadRequest(error),
+            MotivoDeRechazo.MismaCuenta => BadRequest(error),
             _ => StatusCode(StatusCodes.Status500InternalServerError, error)
         };
     }
