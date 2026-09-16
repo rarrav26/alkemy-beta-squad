@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from "react";
 import {
   Alert,
   Box,
@@ -6,86 +6,87 @@ import {
   Chip,
   Paper,
   Stack,
-  Typography
-} from '@mui/material'
-import { Link } from 'react-router-dom'
-import { useAuth } from '../context/authContext'
-import AuthForm, { ProfileFields } from '../components/Auth/AuthForm'
-import DepositoModal from '../components/Cuentas/DepositoModal'
-import { MovimientosPreview } from './Movimientos'
+  Typography,
+  TextField,
+} from "@mui/material";
+import { Link } from "react-router-dom";
+import { useAuth } from "../context/authContext";
+import AuthForm, { ProfileFields } from "../components/Auth/AuthForm";
+import DepositoModal from "../components/Cuentas/DepositoModal";
+import { MovimientosPreview } from "./Movimientos";
 
-const formatoPesos = new Intl.NumberFormat('es-AR', {
-  style: 'currency',
-  currency: 'ARS'
-})
+const formatoPesos = new Intl.NumberFormat("es-AR", {
+  style: "currency",
+  currency: "ARS",
+});
 
 export default function Dashboard() {
-  const { session, obtenerMiCuenta } = useAuth()
-  const [cuenta, setCuenta] = useState(null)
-  const [cargando, setCargando] = useState(true)
-  const [error, setError] = useState('')
-  const [intento, setIntento] = useState(0)
-  const [depositoAbierto, setDepositoAbierto] = useState(false)
-  const [mensajeExito, setMensajeExito] = useState('')
+  const { session, obtenerMiCuenta } = useAuth();
+  const [cuenta, setCuenta] = useState(null);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState("");
+  const [intento, setIntento] = useState(0);
+  const [depositoAbierto, setDepositoAbierto] = useState(false);
+  const [mensajeExito, setMensajeExito] = useState("");
 
-  const esAdministrador = session.user.role === 'Administrador'
+  const esAdministrador = session.user.role === "Administrador";
 
   useEffect(() => {
     // El administrador usa el panel de gestión.
-    if (esAdministrador) return
+    if (esAdministrador) return;
 
-    const controller = new AbortController()
+    const controller = new AbortController();
 
     async function cargarCuenta() {
-      setCargando(true)
-      setError('')
-      setCuenta(null)
+      setCargando(true);
+      setError("");
+      setCuenta(null);
 
       try {
-        const datos = await obtenerMiCuenta(controller.signal)
+        const datos = await obtenerMiCuenta(controller.signal);
 
         if (!controller.signal.aborted) {
-          setCuenta(datos)
+          setCuenta(datos);
         }
       } catch (error) {
         if (!controller.signal.aborted) {
-          setError(error.message)
+          setError(error.message);
         }
       } finally {
         if (!controller.signal.aborted) {
-          setCargando(false)
+          setCargando(false);
         }
       }
     }
 
-    cargarCuenta()
+    cargarCuenta();
 
-    return () => controller.abort()
-  }, [obtenerMiCuenta, esAdministrador, intento])
+    return () => controller.abort();
+  }, [obtenerMiCuenta, esAdministrador, intento]);
 
   function depositoRealizado(resultado) {
-    setCuenta(actual =>
-      actual ? { ...actual, saldo: resultado.saldoActual } : actual
-    )
+    setCuenta((actual) =>
+      actual ? { ...actual, saldo: resultado.saldoActual } : actual,
+    );
 
-    setMensajeExito(resultado.message)
+    setMensajeExito(resultado.message);
   }
   return (
-    <Box sx={{ maxWidth: 900, mx: 'auto', p: { xs: 3, md: 6 } }}>
-      <Typography variant='overline' color='primary'>
+    <Box sx={{ maxWidth: 900, mx: "auto", p: { xs: 3, md: 6 } }}>
+      <Typography variant="overline" color="primary">
         Tu espacio
       </Typography>
 
-      <Typography component='h1' variant='h3' fontWeight={700}>
+      <Typography component="h1" variant="h3" fontWeight={700}>
         Hola, {session.user.nombre}
       </Typography>
 
-      <Typography color='text.secondary' sx={{ mt: 1, mb: 4 }}>
+      <Typography color="text.secondary" sx={{ mt: 1, mb: 4 }}>
         Bienvenido a tu cuenta de DigitalArs.
       </Typography>
 
-      <Paper variant='outlined' sx={{ p: 3 }}>
-        <Stack spacing={2} alignItems='flex-start'>
+      <Paper variant="outlined" sx={{ p: 3 }}>
+        <Stack spacing={2} alignItems="flex-start">
           <Chip label={session.user.role} />
           <Typography>{session.user.email}</Typography>
 
@@ -96,24 +97,24 @@ export default function Dashboard() {
                 contraseña.
               </Typography>
 
-              <Button component={Link} to='/usuarios/nuevo' variant='contained'>
+              <Button component={Link} to="/usuarios/nuevo" variant="contained">
                 Registrar usuario
               </Button>
             </>
           ) : (
-            <Box sx={{ width: '100%' }} aria-busy={cargando}>
+            <Box sx={{ width: "100%" }} aria-busy={cargando}>
               {cargando && (
-                <Typography role='status'>Cargando tu cuenta…</Typography>
+                <Typography role="status">Cargando tu cuenta…</Typography>
               )}
 
               {!cargando && error && (
                 <Alert
-                  severity='error'
+                  severity="error"
                   action={
                     <Button
-                      color='inherit'
-                      size='small'
-                      onClick={() => setIntento(valor => valor + 1)}
+                      color="inherit"
+                      size="small"
+                      onClick={() => setIntento((valor) => valor + 1)}
                     >
                       Reintentar
                     </Button>
@@ -126,42 +127,42 @@ export default function Dashboard() {
               {!cargando && !error && cuenta && (
                 <Stack spacing={2}>
                   <Box>
-                    <Typography color='text.secondary'>
+                    <Typography color="text.secondary">
                       Saldo disponible en pesos
                     </Typography>
 
-                    <Typography variant='h4' fontWeight={700}>
+                    <Typography variant="h4" fontWeight={700}>
                       {formatoPesos.format(cuenta.saldo)}
                     </Typography>
                   </Box>
                   {mensajeExito && (
                     <Alert
-                      severity='success'
-                      onClose={() => setMensajeExito('')}
+                      severity="success"
+                      onClose={() => setMensajeExito("")}
                     >
                       {mensajeExito}
                     </Alert>
                   )}
                   <Button
-                    variant='contained'
-                    sx={{ alignSelf: 'flex-start' }}
+                    variant="contained"
+                    sx={{ alignSelf: "flex-start" }}
                     onClick={() => {
-                      setMensajeExito('')
-                      setDepositoAbierto(true)
+                      setMensajeExito("");
+                      setDepositoAbierto(true);
                     }}
                   >
                     Ingresar dinero
                   </Button>
                   <Box>
-                    <Typography color='text.secondary'>Alias</Typography>
-                    <Typography sx={{ overflowWrap: 'anywhere' }}>
+                    <Typography color="text.secondary">Alias</Typography>
+                    <Typography sx={{ overflowWrap: "anywhere" }}>
                       {cuenta.alias}
                     </Typography>
                   </Box>
 
                   <Box>
-                    <Typography color='text.secondary'>CVU</Typography>
-                    <Typography sx={{ overflowWrap: 'anywhere' }}>
+                    <Typography color="text.secondary">CVU</Typography>
+                    <Typography sx={{ overflowWrap: "anywhere" }}>
                       {cuenta.cvu}
                     </Typography>
                   </Box>
@@ -171,9 +172,7 @@ export default function Dashboard() {
           )}
         </Stack>
       </Paper>
-      {!esAdministrador && cuenta && (
-        <MovimientosPreview />
-      )}
+      {!esAdministrador && cuenta && <MovimientosPreview />}
 
       {!esAdministrador && cuenta && (
         <DepositoModal
@@ -183,22 +182,22 @@ export default function Dashboard() {
         />
       )}
     </Box>
-  )
+  );
 }
 
 export function NewUserPage() {
-  const { createUser } = useAuth()
-  const [invitation, setInvitation] = useState(null)
-  const [copyMessage, setCopyMessage] = useState('')
+  const { createUser } = useAuth();
+  const [invitation, setInvitation] = useState(null);
+  const [copyMessage, setCopyMessage] = useState("");
   if (invitation)
     return (
-      <Box sx={{ maxWidth: 650, mx: 'auto', p: 3 }}>
-        <Paper variant='outlined' sx={{ p: 3 }}>
+      <Box sx={{ maxWidth: 650, mx: "auto", p: 3 }}>
+        <Paper variant="outlined" sx={{ p: 3 }}>
           <Stack spacing={3}>
-            <Typography component='h1' variant='h4'>
+            <Typography component="h1" variant="h4">
               Usuario registrado
             </Typography>
-            <Alert severity='success'>
+            <Alert severity="success">
               Se creó la cuenta de {invitation.email}. Todavía debe elegir su
               contraseña.
             </Alert>
@@ -207,7 +206,7 @@ export function NewUserPage() {
               usa una sola vez.
             </Typography>
             <TextField
-              label='Código de invitación'
+              label="Código de invitación"
               value={invitation.invitationToken}
               multiline
               minRows={3}
@@ -217,50 +216,50 @@ export function NewUserPage() {
               onClick={async () => {
                 try {
                   await navigator.clipboard.writeText(
-                    invitation.invitationToken
-                  )
-                  setCopyMessage('Código copiado.')
+                    invitation.invitationToken,
+                  );
+                  setCopyMessage("Código copiado.");
                 } catch {
-                  setCopyMessage('Seleccioná el código y copialo manualmente.')
+                  setCopyMessage("Seleccioná el código y copialo manualmente.");
                 }
               }}
             >
               Copiar código
             </Button>
-            {copyMessage && <Alert severity='info'>{copyMessage}</Alert>}
+            {copyMessage && <Alert severity="info">{copyMessage}</Alert>}
             <Typography>
               Debe entrar a {window.location.origin}/primera-password con su
               correo y este código.
             </Typography>
             <Button
-              variant='contained'
+              variant="contained"
               onClick={() => {
-                setInvitation(null)
-                setCopyMessage('')
+                setInvitation(null);
+                setCopyMessage("");
               }}
             >
               Registrar otro usuario
             </Button>
-            <Button component={Link} to='/dashboard'>
+            <Button component={Link} to="/dashboard">
               Volver al dashboard
             </Button>
           </Stack>
         </Paper>
       </Box>
-    )
+    );
   return (
     <AuthForm
-      title='Registrar usuario'
-      description='El usuario establecerá su contraseña mediante una invitación.'
-      submitLabel='Crear usuario'
-      onSubmit={async data => setInvitation(await createUser(data))}
+      title="Registrar usuario"
+      description="El usuario establecerá su contraseña mediante una invitación."
+      submitLabel="Crear usuario"
+      onSubmit={async (data) => setInvitation(await createUser(data))}
       footer={
-        <Button component={Link} to='/dashboard'>
+        <Button component={Link} to="/dashboard">
           Volver al dashboard
         </Button>
       }
     >
       <ProfileFields />
     </AuthForm>
-  )
+  );
 }

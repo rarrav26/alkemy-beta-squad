@@ -1,15 +1,34 @@
+// Los tres tipos que existen en la tabla Tipo_Movimiento. Si algún día se agrega
+// uno nuevo en la base, hay que sumarlo acá para que la pantalla lo muestre con
+// su nombre en castellano en vez del texto crudo.
 export const tipoMovimientoMap = {
   DEPOSITO: 'Depósito',
   TRANSFERENCIA_ENVIADA: 'Transferencia enviada',
-  TRANSFERENCIA_RECIBIDA: 'Transferencia recibida',
-  RETIRO: 'Retiro',
-  PAGO: 'Pago'
+  TRANSFERENCIA_RECIBIDA: 'Transferencia recibida'
 }
 
+// Cada value es, tal cual, lo que acepta el parámetro ?tipo= de la API.
+// Escribirlo distinto (por ejemplo 'todos' en vez de 'todas') hace que el
+// backend responda 400, así que no tocar sin cambiar SignoDeMovimiento.cs.
 export const opcionesTipo = [
-  { value: 'todos', label: 'Todos' },
-  ...Object.entries(tipoMovimientoMap).map(([value, label]) => ({ value, label }))
+  { value: 'todas', label: 'Todas' },
+  { value: 'credito', label: 'Créditos (entra plata)' },
+  { value: 'debito', label: 'Débitos (sale plata)' }
 ]
+
+export const filtrosIniciales = {
+  tipo: 'todas',
+  desde: '',
+  hasta: ''
+}
+
+export const paginaVacia = {
+  items: [],
+  page: 1,
+  pageSize: 5,
+  totalItems: 0,
+  totalPages: 1
+}
 
 const formatoFecha = new Intl.DateTimeFormat('es-AR', {
   day: '2-digit',
@@ -18,57 +37,60 @@ const formatoFecha = new Intl.DateTimeFormat('es-AR', {
   timeZone: 'America/Argentina/Buenos_Aires'
 })
 
-export function getTipoMovimientoLabel(tipoMovimientoId) {
-  return tipoMovimientoMap[tipoMovimientoId] ?? 'Movimiento'
-}
-
 export function formatearFecha(fecha) {
   return formatoFecha.format(new Date(fecha))
 }
 
-export function normalizarMovimiento(movimiento, index = 0) {
-  const tipo = (movimiento.tipo ?? '').toUpperCase()
-  const signo = (movimiento.signo ?? 'DEBITO').toUpperCase()
-  const importe = Number(movimiento.importe ?? 0)
+// Arma los parámetros de la consulta dejando afuera los filtros vacíos: para la
+// API, un parámetro ausente significa "no filtres por esto".
+export function construirConsulta(filtros, pagina, tamanioPagina) {
+  const consulta = { page: pagina, pageSize: tamanioPagina }
+
+  if (filtros.tipo !== 'todas') {
+    consulta.tipo = filtros.tipo
+  }
+
+  if (filtros.desde) {
+    consulta.desde = filtros.desde
+  }
+
+  if (filtros.hasta) {
+    consulta.hasta = filtros.hasta
+  }
+
+  return consulta
+}
+
+export function hayFiltrosAplicados(filtros) {
+  return filtros.tipo !== 'todas' || filtros.desde !== '' || filtros.hasta !== ''
+}
+
+export function normalizarMovimiento(movimiento) {
+  const tipo = movimiento.tipo ?? ''
 
   return {
-    id: movimiento.id ?? index + 1,
-    fecha: movimiento.fecha ?? new Date().toISOString(),
+    id: movimiento.id,
+    fecha: movimiento.fecha,
     tipo,
-    signo,
-    importe,
+    importe: Number(movimiento.importe),
     descripcion: tipoMovimientoMap[tipo] ?? 'Movimiento',
-    esCredito: signo === 'CREDITO',
-    etiqueta: `${tipoMovimientoMap[tipo] ?? 'Movimiento'} · ${formatearFecha(movimiento.fecha ?? Date.now())}`
+    esCredito: movimiento.signo === 'CREDITO'
   }
 }
 
-export function normalizarRespuestaMovimientos(response, fallbackPage = 1) {
-  const items = Array.isArray(response?.items)
-    ? response.items
-    : Array.isArray(response)
-      ? response
-      : []
-
-  const paginaActual = Number(response?.page ?? fallbackPage) || fallbackPage
-  const tamanioPagina = Number(response?.pageSize ?? response?.page_size ?? (items.length || 5)) || 5
-  const totalItems = Number(
-    response?.totalCount ??
-    response?.total ??
-    response?.totalItems ??
-    response?.count ??
-    items.length
-  ) || items.length
-
-  const totalPaginas = totalItems > 0
-    ? Math.max(1, Math.ceil(totalItems / Math.max(tamanioPagina, 1)))
-    : 1
+// La API siempre responde con la misma forma (PaginaResponse<MovimientoResponse>),
+// así que alcanza con leer esos campos. El total ya viene filtrado por el
+// backend: es el que hace que el paginador diga la verdad.
+export function normalizarRespuestaMovimientos(respuesta) {
+  const items = Array.isArray(respuesta?.items) ? respuesta.items : []
 
   return {
     items: items.map(normalizarMovimiento),
-    page: paginaActual,
-    pageSize: tamanioPagina,
-    totalItems,
-    totalPages: totalPaginas
+    page: respuesta?.page ?? 1,
+    pageSize: respuesta?.pageSize ?? 5,
+    totalItems: respuesta?.totalItems ?? 0,
+    // Sin resultados la API manda 0 páginas; para el cartel "Página 1 de N"
+    // queda mejor mostrar 1 que 0.
+    totalPages: Math.max(1, respuesta?.totalPages ?? 1)
   }
 }

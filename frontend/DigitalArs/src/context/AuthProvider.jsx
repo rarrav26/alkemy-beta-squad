@@ -119,21 +119,11 @@ export default function AuthProvider({ children }) {
     [authenticatedRequest]
   )
 
+  // consulta lleva page y pageSize, y opcionalmente los filtros tipo, desde y
+  // hasta. Se manda tal cual viene: quien llama decide qué filtros aplica.
   const obtenerMovimientos = useCallback(
-    (signalOrPagination, maybePagination = {}) => {
-      const hasSignal = signalOrPagination && typeof signalOrPagination === 'object' && 'aborted' in signalOrPagination
-      const signal = hasSignal ? signalOrPagination : undefined
-      const pagination = hasSignal ? maybePagination : (signalOrPagination ?? maybePagination)
-
-      return authenticatedRequest('/api/movimientos', {
-        signal,
-        params: {
-          page: pagination.page ?? 1,
-          pageSize: pagination.pageSize ?? 5,
-          ...pagination
-        }
-      })
-    },
+    (consulta, signal) =>
+      authenticatedRequest('/api/movimientos', { signal, params: consulta }),
     [authenticatedRequest]
   )
 
