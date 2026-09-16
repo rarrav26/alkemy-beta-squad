@@ -14,6 +14,22 @@ public class TransferenciaService(
     {
         var destino = (dto.Destino ?? "").Trim();
 
+        if (dto.Importe is not decimal importe)
+        {
+            return Resultado<DestinoResponseDto>.Fallo(
+                MotivoDeRechazo.DatosInvalidos,
+                "El importe es obligatorio.");
+        }
+
+        var errorDeImporte = LimitesDeImporte.PrimerErrorDe(importe);
+
+        if (errorDeImporte is not null)
+        {
+            return Resultado<DestinoResponseDto>.Fallo(
+                MotivoDeRechazo.DatosInvalidos,
+                errorDeImporte);
+        }
+
         // 1. Obtener la cuenta del usuario autenticado (origen)
         var usuarioOrigen = await usuarios.GetByIdentityUserIdAsync(identityUserId, cancellationToken);
         if (usuarioOrigen is null)
@@ -24,6 +40,13 @@ public class TransferenciaService(
         }
 
         var cuentaOrigen = await cuentas.GetByUsuarioIdAsync(usuarioOrigen.id, cancellationToken);
+
+        if (cuentaOrigen is null)
+        {
+            return Resultado<DestinoResponseDto>.Fallo(
+                MotivoDeRechazo.CuentaNoEncontrada,
+                "No tenés una cuenta asociada.");
+        }
 
         // 2. Buscar cuenta destino
         var cuentaDestino = await cuentas.GetByAliasOCvuAsync(destino, cancellationToken);
@@ -36,7 +59,7 @@ public class TransferenciaService(
         }
 
         // 3. Validar que no sea la propia cuenta
-        if (cuentaOrigen is not null && cuentaDestino.id == cuentaOrigen.id)
+        if (cuentaDestino.id == cuentaOrigen.id)
         {
             return Resultado<DestinoResponseDto>.Fallo(
                 MotivoDeRechazo.MismaCuenta,
@@ -49,6 +72,14 @@ public class TransferenciaService(
             return Resultado<DestinoResponseDto>.Fallo(
                 MotivoDeRechazo.UsuarioDesactivado,
                 "La cuenta destino no pertenece a un usuario activo.");
+        }
+
+        // 5. Validar saldo suficiente en origen
+        if (cuentaOrigen.saldo < importe)
+        {
+            return Resultado<DestinoResponseDto>.Fallo(
+                MotivoDeRechazo.SaldoInsuficiente,
+                "Saldo insuficiente para realizar la transferencia.");
         }
 
         var respuesta = new DestinoResponseDto(

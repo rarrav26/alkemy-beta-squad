@@ -13,9 +13,9 @@ public enum MotivoDeRechazo
     NoEncontrado,
     NoPuedeRecibirInvitacion,
     NoSePudoActualizar,
-
     CuentaNoEncontrada,
     SaldoMaximoSuperado,
+    SaldoInsuficiente,
     TipoMovimientoNoConfigurado,
     DestinoNoEncontrado
 }

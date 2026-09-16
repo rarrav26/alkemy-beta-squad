@@ -18,6 +18,7 @@ public class TransferenciasController(ITransferenciaService transferencias) : Co
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> ResolverDestino(
         [FromBody] TransferenciaDto dto,
         CancellationToken cancellationToken)
@@ -43,6 +44,10 @@ public class TransferenciasController(ITransferenciaService transferencias) : Co
             MotivoDeRechazo.DestinoNoEncontrado => NotFound(error),
             MotivoDeRechazo.UsuarioDesactivado => BadRequest(error),
             MotivoDeRechazo.MismaCuenta => BadRequest(error),
+            MotivoDeRechazo.DatosInvalidos => BadRequest(error),
+            MotivoDeRechazo.CuentaNoEncontrada => NotFound(error),
+            MotivoDeRechazo.SaldoInsuficiente => Conflict(error),
+            MotivoDeRechazo.NoEncontrado => Unauthorized(),
             _ => StatusCode(StatusCodes.Status500InternalServerError, error)
         };
     }
