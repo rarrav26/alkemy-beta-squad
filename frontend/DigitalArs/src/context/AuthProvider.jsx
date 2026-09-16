@@ -120,15 +120,20 @@ export default function AuthProvider({ children }) {
   )
 
   const obtenerMovimientos = useCallback(
-    (signal, pagination = {}) =>
-      authenticatedRequest('/api/movimientos', {
+    (signalOrPagination, maybePagination = {}) => {
+      const hasSignal = signalOrPagination && typeof signalOrPagination === 'object' && 'aborted' in signalOrPagination
+      const signal = hasSignal ? signalOrPagination : undefined
+      const pagination = hasSignal ? maybePagination : (signalOrPagination ?? maybePagination)
+
+      return authenticatedRequest('/api/movimientos', {
         signal,
         params: {
           page: pagination.page ?? 1,
           pageSize: pagination.pageSize ?? 5,
           ...pagination
         }
-      }),
+      })
+    },
     [authenticatedRequest]
   )
 

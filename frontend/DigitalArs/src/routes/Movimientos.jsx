@@ -1,65 +1,29 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useContext, useEffect, useMemo, useState } from 'react'
 import {
   Alert,
   Box,
   Button,
+  InputAdornment,
+  MenuItem,
   Paper,
   Stack,
   TextField,
   Typography
 } from '@mui/material'
+import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/authContext'
-
-
-const tipoMovimientoMap = {
-  DEPOSITO: 'Depósito',
-  TRANSFERENCIA_ENVIADA: 'Transferencia enviada',
-  TRANSFERENCIA_RECIBIDA: 'Transferencia recibida',
-  RETIRO: 'Retiro',
-  PAGO: 'Pago'
-}
+import { ElementosGlobales } from '../context/ElementosGlobales'
+import {
+  formatearFecha,
+  normalizarRespuestaMovimientos,
+  opcionesTipo
+} from './movimientosUtils'
 
 const formatoPesos = new Intl.NumberFormat('es-AR', {
   style: 'currency',
   currency: 'ARS'
 })
-
-// La API manda la fecha con el huso argentino incluido ("...-03:00"), pero Intl
-// formatea en el huso del navegador: si no se lo fijamos, alguien que abra la
-// app desde otro país vería un movimiento de las 22:00 con la fecha del día
-// siguiente.
-const formatoFecha = new Intl.DateTimeFormat('es-AR', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  timeZone: 'America/Argentina/Buenos_Aires'
-})
-
-function normalizarMovimiento(movimiento, index = 0) {
-  const tipo = (movimiento.tipo ?? '').toUpperCase()
-  const signo = (movimiento.signo ?? 'DEBITO').toUpperCase()
-  const importe = Number(movimiento.importe ?? 0)
-
-  return {
-    id: movimiento.id ?? index + 1,
-    fecha: movimiento.fecha ?? new Date().toISOString(),
-    tipo,
-    signo,
-    importe,
-    descripcion: tipoMovimientoMap[tipo] ?? 'Movimiento',
-    esCredito: signo === 'CREDITO',
-    etiqueta: `${tipoMovimientoMap[tipo] ?? 'Movimiento'} · ${formatoFecha.format(new Date(movimiento.fecha ?? Date.now()))}`
-  }
-}
-
-export function getTipoMovimientoLabel(tipoMovimientoId) {
-  return tipoMovimientoMap[tipoMovimientoId] ?? 'Movimiento'
-}
-
-export function formatearFecha(fecha) {
-  return formatoFecha.format(new Date(fecha))
-}
 
 export function MovimientosPreview() {
   const { obtenerMovimientos } = useAuth()
@@ -67,39 +31,54 @@ export function MovimientosPreview() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    const controller = new AbortController()
+    let ignore = false
 
     async function cargarPreview() {
       try {
-        const response = await obtenerMovimientos(controller.signal, { page: 1, pageSize: 5 })
-        const items = response?.items ?? []
+        const response = await obtenerMovimientos(undefined, { page: 1, pageSize: 5 })
+        if (ignore) return
 
-        if (!controller.signal.aborted) {
-          setMovimientos(items.map(normalizarMovimiento))
-          setError('')
-        }
+        const datos = normalizarRespuestaMovimientos(response, 1)
+        setMovimientos(datos.items)
+        setError('')
       } catch (error) {
-        if (!controller.signal.aborted) {
-          setMovimientos([])
-          setError(error.message)
-        }
+        if (ignore) return
+        setMovimientos([])
+        setError(error.message)
       }
     }
 
-    cargarPreview()
-    return () => controller.abort()
-  }, [obtenerMovimientos])
+    void cargarPreview()
+    const intervalo = window.setInterval(() => {
+      void cargarPreview()
+    }, 15000)
 
-  const datos = movimientos
+    return () => {
+      ignore = true
+      window.clearInterval(intervalo)
+    }
+  }, [obtenerMovimientos])
 
   return (
     <Paper variant='outlined' sx={{ p: 3, mt: 3 }}>
-      <Stack direction='row' justifyContent='space-between' alignItems='center' sx={{ mb: 2 }}>
-        <Box>
+      <Stack direction='row' justifyContent='space-between' alignItems='flex-end' sx={{ mb: 2, gap: 2 }}>
+        <Box sx={{ flex: 1 }}>
           <Typography variant='overline' color='primary'>Historial</Typography>
           <Typography variant='h6' fontWeight={700}>Últimos movimientos</Typography>
         </Box>
-        <Button component={Link} to='/movimientos' variant='text'>Ver todos</Button>
+        <Button
+          component={Link}
+          to='/movimientos'
+          variant='text'
+          sx={{
+            minWidth: 0,
+            px: 0,
+            alignSelf: 'flex-end',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          Ver todos
+        </Button>
       </Stack>
 
       {error && (
@@ -107,7 +86,7 @@ export function MovimientosPreview() {
       )}
 
       <Stack spacing={1.5}>
-        {datos.slice(0, 5).map(movimiento => {
+        {movimientos.map(movimiento => {
           const esCredito = movimiento.signo === 'CREDITO' || movimiento.esCredito
 
           return (
@@ -160,56 +139,78 @@ export function MovimientosPreview() {
 
 export function MovimientosPage() {
   const { obtenerMovimientos } = useAuth()
+  const { darkMode } = useContext(ElementosGlobales)
   const [movimientos, setMovimientos] = useState([])
   const [busqueda, setBusqueda] = useState('')
-  const [cargando, setCargando] = useState(true)
+  const [tipoFiltro, setTipoFiltro] = useState('todos')
+  const [fechaDesde, setFechaDesde] = useState('')
+  const [fechaHasta, setFechaHasta] = useState('')
+  const [pagina, setPagina] = useState(1)
+  const [pageSize, setPageSize] = useState(5)
+  const [totalPages, setTotalPages] = useState(1)
   const [error, setError] = useState('')
+  const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
-    const controller = new AbortController()
+    let ignore = false
 
     async function cargarMovimientos() {
       setCargando(true)
       setError('')
 
       try {
-        const response = await obtenerMovimientos(controller.signal, { page: 1, pageSize: 10 })
-        const items = response?.items ?? []
+        const response = await obtenerMovimientos(undefined, { page: pagina, pageSize })
+        if (ignore) return
 
-        if (!controller.signal.aborted) {
-          setMovimientos(items.map(normalizarMovimiento))
+        const datos = normalizarRespuestaMovimientos(response, pagina)
+        setMovimientos(datos.items)
+        setTotalPages(datos.totalPages)
+
+        if (pagina > datos.totalPages) {
+          setPagina(datos.totalPages || 1)
         }
       } catch (error) {
-        if (!controller.signal.aborted) {
-          setMovimientos([])
-          setError(error.message)
-        }
+        if (ignore) return
+        setMovimientos([])
+        setError(error.message)
       } finally {
-        if (!controller.signal.aborted) {
+        if (!ignore) {
           setCargando(false)
         }
       }
     }
 
-    cargarMovimientos()
+    void cargarMovimientos()
+    const intervalo = window.setInterval(() => {
+      void cargarMovimientos()
+    }, 15000)
 
-    return () => controller.abort()
-  }, [obtenerMovimientos])
+    return () => {
+      ignore = true
+      window.clearInterval(intervalo)
+    }
+  }, [obtenerMovimientos, pagina, pageSize])
 
   const movimientosFiltrados = useMemo(() => {
-    const texto = busqueda.trim().toLowerCase()
-
-    if (!texto) return movimientos
-
     return movimientos.filter(movimiento => {
       const tipo = (movimiento.tipo ?? '').toLowerCase()
       const descripcion = (movimiento.descripcion ?? '').toLowerCase()
-      const fecha = formatearFecha(movimiento.fecha).toLowerCase()
+      const fecha = new Date(movimiento.fecha)
+      const fechaTexto = formatearFecha(movimiento.fecha).toLowerCase()
       const signo = (movimiento.signo ?? '').toLowerCase()
+      const texto = busqueda.trim().toLowerCase()
 
-      return [tipo, descripcion, fecha, signo].some(valor => valor.includes(texto))
+      const coincideTexto = !texto || [tipo, descripcion, fechaTexto, signo].some(valor => valor.includes(texto))
+      const coincideTipo = !tipoFiltro || tipoFiltro === 'todos' || movimiento.tipo === tipoFiltro
+
+      const fechaDesdeValor = fechaDesde ? new Date(`${fechaDesde}T00:00:00`) : null
+      const fechaHastaValor = fechaHasta ? new Date(`${fechaHasta}T23:59:59`) : null
+      const coincideDesde = !fechaDesdeValor || fecha >= fechaDesdeValor
+      const coincideHasta = !fechaHastaValor || fecha <= fechaHastaValor
+
+      return coincideTexto && coincideTipo && coincideDesde && coincideHasta
     })
-  }, [busqueda, movimientos])
+  }, [busqueda, fechaDesde, fechaHasta, movimientos, tipoFiltro])
 
   return (
     <Box sx={{ maxWidth: 980, mx: 'auto', p: { xs: 3, md: 6 } }}>
@@ -224,13 +225,120 @@ export function MovimientosPage() {
         )}
 
         <Paper variant='outlined' sx={{ p: 2.5 }}>
-          <TextField
-            fullWidth
-            label='Buscar movimiento'
-            placeholder='Por tipo, signo o fecha'
-            value={busqueda}
-            onChange={event => setBusqueda(event.target.value)}
-          />
+          <Stack spacing={2}>
+            <TextField
+              fullWidth
+              label='Buscar movimiento'
+              placeholder='Por tipo, signo o fecha'
+              value={busqueda}
+              onChange={event => setBusqueda(event.target.value)}
+            />
+
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant='body2' color='text.secondary' sx={{ mb: 0.75 }}>
+                  Tipo de movimiento
+                </Typography>
+                <TextField
+                  select
+                  fullWidth
+                  value={tipoFiltro}
+                  onChange={event => setTipoFiltro(event.target.value)}
+                  sx={{ '& .MuiOutlinedInput-root': { height: 56 } }}
+                >
+                  {opcionesTipo.map(opcion => (
+                    <MenuItem key={opcion.value} value={opcion.value}>
+                      {opcion.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Box>
+
+              <Box sx={{ flex: 1 }}>
+                <Typography variant='body2' color='text.secondary' sx={{ mb: 0.75 }}>
+                  Fecha desde
+                </Typography>
+                <TextField
+                  fullWidth
+                  type='date'
+                  value={fechaDesde}
+                  onChange={event => setFechaDesde(event.target.value)}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position='end'>
+                        <CalendarMonthOutlinedIcon
+                          sx={{
+                            color: darkMode ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.62)',
+                            fontSize: 22
+                          }}
+                        />
+                      </InputAdornment>
+                    )
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': { height: 56 },
+                    '& input': {
+                      color: fechaDesde ? 'text.primary' : 'text.secondary'
+                    },
+                    '& input::-webkit-calendar-picker-indicator': {
+                      filter: darkMode ? 'invert(1)' : 'none',
+                      opacity: 0.9
+                    }
+                  }}
+                />
+              </Box>
+
+              <Box sx={{ flex: 1 }}>
+                <Typography variant='body2' color='text.secondary' sx={{ mb: 0.75 }}>
+                  Fecha hasta
+                </Typography>
+                <TextField
+                  fullWidth
+                  type='date'
+                  value={fechaHasta}
+                  onChange={event => setFechaHasta(event.target.value)}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position='end'>
+                        <CalendarMonthOutlinedIcon
+                          sx={{
+                            color: darkMode ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.62)',
+                            fontSize: 22
+                          }}
+                        />
+                      </InputAdornment>
+                    )
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': { height: 56 },
+                    '& input': {
+                      color: fechaHasta ? 'text.primary' : 'text.secondary'
+                    },
+                    '& input::-webkit-calendar-picker-indicator': {
+                      filter: darkMode ? 'invert(1)' : 'none',
+                      opacity: 0.9
+                    }
+                  }}
+                />
+              </Box>
+            </Stack>
+
+            {(tipoFiltro || fechaDesde || fechaHasta || busqueda) && (
+              <Button
+                variant='text'
+                color='inherit'
+                onClick={() => {
+                  setTipoFiltro('')
+                  setFechaDesde('')
+                  setFechaHasta('')
+                  setBusqueda('')
+                }}
+                sx={{ alignSelf: 'flex-start', px: 0 }}
+              >
+                Limpiar filtros
+              </Button>
+            )}
+          </Stack>
         </Paper>
 
         <Paper variant='outlined' sx={{ p: 2 }}>
@@ -284,6 +392,39 @@ export function MovimientosPage() {
             )}
           </Stack>
         </Paper>
+
+        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent='space-between' alignItems='center' spacing={2}>
+          <Stack direction='row' spacing={1}>
+            <Button variant='outlined' disabled={pagina === 1 || cargando} onClick={() => setPagina(valor => Math.max(1, valor - 1))}>
+              Anterior
+            </Button>
+            <Button variant='outlined' disabled={pagina >= totalPages || cargando} onClick={() => setPagina(valor => Math.min(totalPages, valor + 1))}>
+              Siguiente
+            </Button>
+          </Stack>
+
+          <Stack direction='row' spacing={2} alignItems='center'>
+            <TextField
+              select
+              size='small'
+              label='Por página'
+              value={pageSize}
+              onChange={event => {
+                setPageSize(Number(event.target.value))
+                setPagina(1)
+              }}
+              sx={{ minWidth: 120 }}
+            >
+              <MenuItem value={5}>5</MenuItem>
+              <MenuItem value={10}>10</MenuItem>
+              <MenuItem value={20}>20</MenuItem>
+            </TextField>
+
+            <Typography color='text.secondary'>
+              Página {pagina} de {totalPages}
+            </Typography>
+          </Stack>
+        </Stack>
 
         <Button component={Link} to='/dashboard' variant='outlined' sx={{ alignSelf: 'flex-start' }}>
           Volver al dashboard
