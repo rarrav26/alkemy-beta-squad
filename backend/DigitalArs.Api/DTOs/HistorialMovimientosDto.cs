@@ -23,6 +23,12 @@ public class HistorialMovimientosDto : IValidatableObject
 
     public string? Tipo { get; set; }
 
+    // Texto libre del buscador. Filtra por el nombre del tipo de movimiento, ignorando
+    // mayúsculas y acentos. Un texto que no coincide con ningún tipo devuelve una página
+    // vacía, no un error: no encontrar nada es un resultado válido.
+    [StringLength(100, ErrorMessage = "La búsqueda no puede superar los 100 caracteres.")]
+    public string? Busqueda { get; set; }
+
     public IEnumerable<ValidationResult> Validate(
         ValidationContext validationContext)
     {

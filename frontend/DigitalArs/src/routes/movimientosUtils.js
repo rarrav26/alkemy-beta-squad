@@ -31,11 +31,12 @@ export const opcionesTipo = [
   { value: 'debito', label: 'Débitos (sale plata)' }
 ]
 
+// La busqueda no esta aca: el texto que se tipea y el que ya se envio son dos
+// estados distintos de la pantalla, y solo el enviado cuenta como filtro puesto.
 export const filtrosIniciales = {
   tipo: 'todas',
   desde: '',
-  hasta: '',
-  busqueda: ''
+  hasta: ''
 }
 
 export const paginaVacia = {
@@ -46,10 +47,15 @@ export const paginaVacia = {
   totalPages: 1
 }
 
+// Con la hora incluida, dos movimientos del mismo dia se pueden distinguir entre
+// si; mostrando solo la fecha todas las filas de un mismo dia se ven iguales.
 const formatoFecha = new Intl.DateTimeFormat('es-AR', {
   day: '2-digit',
   month: '2-digit',
   year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
   timeZone: 'America/Argentina/Buenos_Aires'
 })
 
@@ -74,16 +80,31 @@ export function construirConsulta(filtros, pagina, tamanioPagina) {
     consulta.hasta = filtros.hasta
   }
 
+  const busqueda = (filtros.busqueda ?? '').trim()
+
+  if (busqueda) {
+    consulta.busqueda = busqueda
+  }
+
   return consulta
 }
 
-export function hayFiltrosAplicados(filtros) {
-  return (
-    filtros.tipo !== 'todas' ||
-    filtros.desde !== '' ||
-    filtros.hasta !== '' ||
+// Cuantos filtros hay puestos. Lo usan el mensaje de "sin resultados", el boton de
+// limpiar y el contador del boton Filtros en pantallas chicas, asi el criterio de
+// que cuenta como filtro esta escrito una sola vez.
+export function contarFiltrosAplicados(filtros) {
+  const puestos = [
+    filtros.tipo !== 'todas',
+    filtros.desde !== '',
+    filtros.hasta !== '',
     (filtros.busqueda ?? '').trim() !== ''
-  )
+  ]
+
+  return puestos.filter(Boolean).length
+}
+
+export function hayFiltrosAplicados(filtros) {
+  return contarFiltrosAplicados(filtros) > 0
 }
 
 export function normalizarMovimiento(movimiento) {
@@ -97,7 +118,10 @@ export function normalizarMovimiento(movimiento) {
     tipoRaw: tipo,
     importe: Number(movimiento.importe),
     descripcion: movimiento.descripcion || tipoMovimientoMap[tipo] || 'Movimiento',
-    esCredito: movimiento.signo === 'CREDITO'
+    // Dos booleanos y no uno: un movimiento con signo DESCONOCIDO no es crédito ni
+    // débito, y con un solo flag caía del lado del débito y se pintaba en rojo.
+    esCredito: movimiento.signo === 'CREDITO',
+    esDebito: movimiento.signo === 'DEBITO'
   }
 }
 

@@ -60,7 +60,19 @@ public class HistorialService(
             HastaUtc: HoraDeArgentina.ComienzoDelDiaSiguienteEnUtc(filtros.Hasta),
             TiposIncluidos: SignoDeMovimiento.TiposDelFiltro(filtros.Tipo),
             Page: filtros.Page,
-            PageSize: filtros.PageSize);
+            PageSize: filtros.PageSize,
+            TiposDeLaBusqueda: TiposDeLaBusqueda(filtros.Busqueda));
+
+    // Sin texto no hay filtro de búsqueda, y eso es null. Con texto sí lo hay, aunque no
+    // coincida con ningún tipo: ahí la lista vacía es la respuesta correcta y el repositorio
+    // la traduce a cero resultados.
+    private static IReadOnlyList<string>? TiposDeLaBusqueda(string? busqueda)
+    {
+        if (string.IsNullOrWhiteSpace(busqueda))
+            return null;
+
+        return SignoDeMovimiento.TiposQueCoincidenCon(busqueda);
+    }
 
     private static PaginaResponse<MovimientoResponse> ArmarRespuesta(
         PaginaDeMovimientos pagina,
