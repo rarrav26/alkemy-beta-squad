@@ -10,13 +10,14 @@ export const api = axios.create({ baseURL })
 
 export async function apiRequest(
   path,
-  { token, body, signal, method = 'GET' } = {}
+  { token, body, signal, method = 'GET', params } = {}
 ) {
   try {
     const response = await api.request({
       url: path,
       method,
       signal,
+      ...(params ? { params } : {}),
       ...(body ? { data: body } : {}),
       ...(token ? { headers: { Authorization: 'Bearer ' + token } } : {})
     })
@@ -54,12 +55,14 @@ function errorDeConexion(cause) {
 }
 
 function errorDeRespuesta({ status, data }) {
-  const detalles = data?.errors
-    ? Object.values(data.errors).flat().join(' ')
-    : ''
-  const error = new Error(
-    [mensajePara(status, data), detalles].filter(Boolean).join(' ')
-  )
+  const detalles = data?.errors ? Object.values(data.errors).flat() : []
+
+  // Una misma validación puede llegar repetida: el backend la manda en message y
+  // además bajo cada campo al que afecta (desde y hasta, por ejemplo). Sin el
+  // Set, el usuario lee tres veces la misma frase.
+  const partes = [...new Set([mensajePara(status, data), ...detalles])]
+
+  const error = new Error(partes.filter(Boolean).join(' '))
   error.status = status
   error.code = data?.code
   return error

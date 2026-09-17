@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from '../../context/authContext'
 import { InitialPasswordPage, LoginPage, RegisterPage } from '../../routes/AuthPages'
 import Dashboard, { NewUserPage } from '../../routes/Dashboard'
+import { MovimientosPage } from '../../routes/Movimientos'
 
 function Protected({ children, admin = false }) {
   const { session } = useAuth()
@@ -26,6 +27,7 @@ export default function Main() {
     <Route path="/register" element={<RegisterPage />} />
     <Route path="/primera-password" element={<InitialPasswordPage />} />
     <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+    <Route path="/movimientos" element={<Protected><MovimientosPage /></Protected>} />
     <Route path="/usuarios/nuevo" element={<Protected admin><NewUserPage /></Protected>} />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes></Box>

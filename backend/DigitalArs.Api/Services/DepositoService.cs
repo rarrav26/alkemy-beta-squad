@@ -12,8 +12,6 @@ public class DepositoService(
     IMovimientoRepository movimientos,
     ITipoMovimientoRepository tipos) : IDepositoService
 {
-    private const string TipoDeposito = "DEPOSITO";
-
     public async Task<Resultado<DepositoResponse>> DepositarAsync(
         string identityUserId,
         DepositoDto dto,
@@ -51,7 +49,7 @@ public class DepositoService(
         }
 
         var tipoDeposito = await tipos.GetByDescripcionAsync(
-            TipoDeposito, cancellationToken);
+            SignoDeMovimiento.TipoDeposito, cancellationToken);
 
         if (tipoDeposito is null)
         {
@@ -116,7 +114,7 @@ public class DepositoService(
             MovimientoId: movimiento.id,
             Importe: movimiento.importe,
             SaldoActual: cuentaActualizada.saldo,
-            Fecha: movimiento.fecha);
+            Fecha: HoraDeArgentina.DesdeUtc(movimiento.fecha));
 
         await transaccion.CommitAsync(cancellationToken);
 

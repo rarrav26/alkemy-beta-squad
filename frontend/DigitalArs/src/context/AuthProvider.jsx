@@ -119,6 +119,14 @@ export default function AuthProvider({ children }) {
     [authenticatedRequest]
   )
 
+  // consulta lleva page y pageSize, y opcionalmente los filtros tipo, desde y
+  // hasta. Se manda tal cual viene: quien llama decide qué filtros aplica.
+  const obtenerMovimientos = useCallback(
+    (consulta, signal) =>
+      authenticatedRequest('/api/movimientos', { signal, params: consulta }),
+    [authenticatedRequest]
+  )
+
   const ingresarDinero = useCallback(
     importe =>
       authenticatedRequest('/api/movimientos/depositos', {
@@ -149,6 +157,7 @@ export default function AuthProvider({ children }) {
         logout,
         retry,
         obtenerMiCuenta,
+        obtenerMovimientos,
         ingresarDinero
       }}
     >

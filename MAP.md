@@ -110,13 +110,17 @@ Dentro de **backend/DigitalArs.Api/**:
 | DTOs/TipoMovimientoResponse.cs             | Respuesta del catálogo de tipos de movimiento.                       |
 | DTOs/CuentaResponse.cs                     | Respuesta de la cuenta propia: id, alias, CVU y saldo.               |
 | DTOs/DepositoDto.cs                        | Importe a depositar, con su validación.                              |
-| DTOs/DepositoResponseDto.cs                | Respuesta del depósito, con el saldo ya actualizado.                 |
+| DTOs/DepositoResponseDto.cs                | Respuesta del depósito: saldo actualizado y fecha argentina.         |
 | DTOs/ErrorResponse.cs                      | Forma única de los errores HTTP: code, message y errors.             |
+| DTOs/HistorialMovimientosDto.cs            | Filtros del historial que llegan por query string.                   |
+| DTOs/MovimientoResponse.cs                 | Una fila del historial, con su signo y la fecha en hora argentina.   |
+| DTOs/PaginaResponse.cs                     | Envoltorio común de cualquier listado paginado de la API.            |
 | Interfaces/ITokenService.cs                | Contrato de generación del JWT.                                      |
 | Interfaces/IAuthService.cs                 | Contrato de login, primera contraseña y perfil de la sesión.         |
 | Interfaces/IAccountService.cs              | Contrato del alta, la invitación y el estado de un usuario.          |
 | Interfaces/ICuentaService.cs               | Contrato de la consulta de la cuenta propia.                         |
 | Interfaces/IDepositoService.cs             | Contrato del depósito.                                               |
+| Interfaces/IHistorialService.cs            | Contrato de la consulta del historial propio paginado.               |
 | Interfaces/IUsuarioRepository.cs           | Contrato de acceso a los perfiles de usuario.                        |
 | Interfaces/ITipoMovimientoRepository.cs    | Contrato de acceso al catálogo de tipos de movimiento.               |
 | Interfaces/ICuentaRepository.cs            | Contrato de acceso a las cuentas y a la acreditación de saldo.       |
@@ -124,11 +128,14 @@ Dentro de **backend/DigitalArs.Api/**:
 | Repositories/UsuarioRepository.cs          | Consultas de perfiles sobre DigitalArsDbContext.                     |
 | Repositories/TipoMovimientoRepository.cs   | Consultas del catálogo sobre DigitalArsDbContext.                    |
 | Repositories/CuentaRepository.cs           | Consulta de la cuenta y acreditación atómica del saldo.              |
-| Repositories/MovimientoRepository.cs       | Alta de un movimiento sobre DigitalArsDbContext.                     |
+| Repositories/MovimientoRepository.cs       | Alta de un movimiento y consulta paginada del historial.             |
 | Services/AuthService.cs                    | Reglas de login, primera contraseña y consulta del perfil.           |
 | Services/AccountService.cs                 | Creación de cuentas/perfiles, invitaciones y estado activo.          |
 | Services/CuentaService.cs                  | Resuelve la cuenta del usuario logueado y arma su respuesta.         |
 | Services/DepositoService.cs                | Reglas del depósito: valida, acredita y registra el movimiento.      |
+| Services/HistorialService.cs               | Resuelve la cuenta del token y arma la página del historial.         |
+| Services/SignoDeMovimiento.cs              | Traduce el filtro ?tipo= al signo del movimiento (CREDITO/DEBITO).   |
+| Services/HoraDeArgentina.cs                | Convierte entre el UTC de la base y el huso -03:00 del front.        |
 | Services/LimitesDeImporte.cs               | Regla única del importe de un movimiento, sin base de datos.         |
 | Services/Resultado.cs                      | Lo que devuelve un servicio: la respuesta lista o el motivo.         |
 | Services/MotivoDeRechazo.cs                | Los motivos de negocio por los que un servicio rechaza.              |
@@ -569,6 +576,7 @@ Las instancias que emiten y validan tokens necesitan una configuración de firma
 | GET /api/tiposdemovimientos/{id}   | Autenticado             | 200: un tipo, o 404 si no existe.        |
 | GET /api/cuentas/me                | Autenticado             | 200: alias, CVU y saldo propios; 404 si no tiene cuenta. |
 | POST /api/movimientos/depositos    | Autenticado             | 200: acredita el importe y devuelve el saldo actualizado. |
+| GET /api/movimientos               | Autenticado             | 200: historial propio paginado, leído de la tabla Movimientos. |
 | GET /api/setup/status              | Público                 | Estado de existencia del administrador.  |
 
 No existe GET /api/usuarios para listar usuarios en esta entrega.
@@ -817,14 +825,27 @@ No están implementados en esta entrega:
 - Refresh tokens.
 - Recuperación de contraseña de cuentas que ya tienen una.
 - Confirmación de email, correo automático, segundo factor y login externo.
-- Transferencias entre cuentas, y listado de movimientos.
+- Transferencias entre cuentas.
 - Despliegue de la API y gestor de secretos de producción.
 - Rotación de claves con transición.
 - Integración automatizada completa con SQL Server.
 
-CuentasController resuelve la consulta de saldo y MovimientosController el depósito.
+CuentasController resuelve la consulta de saldo y MovimientosController el depósito
+y el historial.
 De la operatoria pendiente queda la transferencia entre cuentas, que va a necesitar mover
 saldo en dos cuentas y registrar dos movimientos dentro de la misma transacción.
+
+El historial ya lee la tabla Movimientos. Queda una decisión de modelo pendiente
+para la transferencia: dónde se guarda la relación entre sus dos patas.
+`Movimientos.transferencia_id` existe pero está siempre en NULL y apunta a una
+tabla `Transferencias` que todavía no se creó.
+
+Sobre eso hay una propuesta a discutir en el squad: reducir el catálogo a dos
+tipos (`DEBITO` / `CREDITO`) y deducir la operación de `transferencia_id`, en
+lugar de los tres tipos actuales. Hoy el signo está implícito en la descripción
+del tipo (`SignoDeMovimiento.DeTipo`) y la etiqueta que muestra el front sale de
+esa misma descripción; cambiarlo obligaría a migrar las filas existentes,
+re-scaffoldear la entidad y tocar `DepositoService` y el front.
 Tener tablas y entidades no implica tener sus operaciones HTTP implementadas.
 
 **Orden sugerido para estudiar:** AuthPages → AuthProvider → AuthController → AuthService → IUsuarioRepository/UsuarioRepository → AccountService → contextos → JwtTokenService → Program.cs. Así se sigue una acción desde la pantalla hasta la base y los controles de acceso, y se ve el corte entre el controlador que traduce HTTP y el servicio que aplica las reglas.

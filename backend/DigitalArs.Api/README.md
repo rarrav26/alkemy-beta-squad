@@ -198,10 +198,121 @@ La contraseña debe tener al menos ocho caracteres, mayúscula, minúscula, núm
 | GET /api/tiposdemovimientos | JWT | 200: catálogo completo de tipos de movimiento |
 | GET /api/tiposdemovimientos/{id} | JWT | 200: un tipo, o 404 si no existe |
 | GET /api/cuentas/me | JWT | 200: id, alias, CVU y saldo de la cuenta propia; 404 si no tiene |
-| POST /api/movimientos/depositos | JWT | 200: acredita { "importe": 500 } y devuelve el saldo actualizado |
+| POST /api/movimientos/depositos | JWT | 200: acredita { "importe": 500 } y devuelve el saldo actualizado y la fecha en hora argentina |
+| GET /api/movimientos | JWT | 200: historial propio paginado, con filtros de fecha y tipo y búsqueda por nombre de tipo |
 | GET /api/setup/status | Público | Informa si la instalación ya tiene administrador |
 
 No existe GET /api/usuarios para listar usuarios en esta entrega.
+
+### GET /api/movimientos — historial paginado
+
+Consulta la tabla `Movimientos` de la cuenta del usuario del token. El filtrado,
+el conteo y la paginación los resuelve SQL Server (`WHERE` + `OFFSET/FETCH`):
+nunca se traen todos los movimientos para recortarlos en memoria.
+
+Todos los parámetros son opcionales y viajan por query string:
+
+| Parámetro | Valores | Default |
+| --- | --- | --- |
+| page | entero >= 1 | 1 |
+| pageSize | entero entre 1 y 50 | 5 |
+| desde | yyyy-MM-dd (día incluido) | sin filtro |
+| hasta | yyyy-MM-dd (día incluido) | sin filtro |
+| tipo | credito, debito o todas | todas |
+| busqueda | texto de hasta 100 caracteres | sin filtro |
+
+El orden es fijo, `fecha DESC, id DESC`: los más recientes primero. El desempate
+por id garantiza que una fila no aparezca en dos páginas distintas cuando dos
+movimientos comparten la misma fecha. Sin ningún parámetro,
+`GET /api/movimientos` devuelve los 5 movimientos más recientes.
+
+`desde` y `hasta` son días de calendario argentinos y los dos se incluyen. Como
+la columna `fecha` está en UTC, los límites se convierten antes de consultar: un
+movimiento guardado a las `2026-09-15T01:00Z` es el 14 a las 22:00 en Argentina y
+entra en `?hasta=2026-09-14`.
+
+`signo` no es una columna de la base: se deriva del tipo
+(`Services/SignoDeMovimiento.cs`). `DEPOSITO` y `TRANSFERENCIA_RECIBIDA` son
+`CREDITO`, `TRANSFERENCIA_ENVIADA` es `DEBITO`. Por eso `?tipo=credito` se
+traduce a un `IN` sobre los tipos que suman, y no a un filtro en memoria.
+
+Hay un tercer valor, `DESCONOCIDO`: un tipo que está cargado en la base pero que
+`SignoDeMovimiento` todavía no clasifica sale con ese signo, y el front lo muestra
+sin signo en vez de romper el historial entero con un 500. Es un texto y no `null`
+a propósito, así `signo` nunca falta en la respuesta. El movimiento se lista igual
+en `?tipo=todas`, pero queda afuera de `?tipo=credito` y de `?tipo=debito`, porque
+no se sabe para qué lado suma. Clasificarlo es agregar una línea al diccionario de
+`Services/SignoDeMovimiento.cs`, nada más.
+
+`busqueda` filtra por el **nombre del tipo de movimiento**, no por importe ni por
+fecha: es el buscador de la pantalla de historial, y lo que compara es la
+`descripcion` de `Tipo_Movimiento`. Ignora mayúsculas y acentos, así que `depósito`,
+`deposito` y `DEPÓSITO` traen lo mismo. Normalizar los dos lados
+(`Services/TextoDeBusqueda.cs`) hace falta porque la collation de la base es
+`Modern_Spanish_CI_AS`: ignora las mayúsculas pero **sí distingue los acentos**, y
+sin eso el `depósito` que escribe el usuario no encontraría el `DEPOSITO` guardado.
+
+El usuario también puede escribir con espacios lo que en la base va con guion bajo:
+`transferencia enviada` encuentra `TRANSFERENCIA_ENVIADA`, porque el nombre se
+compara como se lee en pantalla. Y alcanza con una parte del nombre:
+`transferencia` trae la enviada y la recibida. Los tipos buscables salen del mismo
+diccionario que el signo, así que un tipo que todavía sale con `DESCONOCIDO`
+tampoco se encuentra escribiendo su nombre.
+
+Un término que no coincide con ningún tipo devuelve una **página vacía**, no el
+historial completo ni un error: no encontrar nada es un resultado válido, igual que
+un rango de fechas sin movimientos. Esa diferencia vive en `FiltroDeMovimientos`,
+donde la búsqueda en `null` significa "no buscó nada" y la lista vacía significa
+"buscó algo que no existe", o sea cero resultados.
+
+La búsqueda se combina con los demás filtros con AND, no los reemplaza:
+`?tipo=credito&busqueda=transferencia` devuelve solo transferencias recibidas,
+porque la enviada es un débito y queda afuera por el otro filtro.
+
+La cuenta sale siempre del token, nunca de un parámetro: por eso un usuario no
+puede pedir los movimientos de otra cuenta.
+
+Respuesta 200:
+
+```json
+{
+  "items": [
+    { "id": 18, "fecha": "2026-09-14T10:05:22-03:00", "tipo": "DEPOSITO", "signo": "CREDITO", "importe": 1500.00 },
+    { "id": 17, "fecha": "2026-09-13T18:41:07-03:00", "tipo": "TRANSFERENCIA_ENVIADA", "signo": "DEBITO", "importe": 320.50 }
+  ],
+  "page": 1,
+  "pageSize": 5,
+  "totalItems": 18,
+  "totalPages": 4
+}
+```
+
+`fecha` viaja en hora argentina con el huso incluido. Es la forma única de toda la
+API: el depósito devuelve su `fecha` igual. En la base se guarda siempre UTC y la
+conversión a -03:00 vive en un solo lugar (`Services/HoraDeArgentina.cs`).
+
+El front igual tiene que fijar el huso al formatear (`timeZone:
+'America/Argentina/Buenos_Aires'`): `Intl.DateTimeFormat` usa el del navegador, y
+sin eso un movimiento de las 22:00 se vería con la fecha del día siguiente desde
+otro país.
+
+Cuando no hay resultados devuelve `items: []` con `totalItems: 0` y
+`totalPages: 0`, y el status sigue siendo **200**: no tener movimientos no es un
+error. Se puede forzar ese caso con `?desde=2020-01-01&hasta=2020-01-02`.
+
+Pedir una página que no existe (`?page=99`) también devuelve **200**, con
+`items: []` y el `totalItems` real. No se corrige el `page` que mandó el front ni
+se responde 404: el front se da cuenta solo comparando contra `totalPages`.
+
+Errores: `400` si `page`/`pageSize` están fuera de rango, si `desde` es posterior
+a `hasta`, si `tipo` no es uno de los tres valores aceptados o si `busqueda` pasa
+los 100 caracteres; `401` sin token o
+con token inválido; `403` si el usuario está desactivado; `404` si no tiene cuenta
+asociada.
+
+En la práctica un usuario desactivado ve un `401` y no el `403`: `Program.cs`
+revalida `is_active` contra la base en cada request y descarta el token antes de
+que llegue al servicio. La rama `403` queda como red de seguridad.
 
 Todos los errores usan la misma forma, `ErrorResponse`: `{ "code", "message", "errors" }`,
 donde `code` y `errors` se omiten cuando no aplican. Eso incluye los 400 de validación de
