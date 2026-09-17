@@ -80,6 +80,22 @@ var expired = new JwtSecurityToken(settings.Issuer, settings.Audience, expires: 
     signingCredentials: new SigningCredentials(parameters.IssuerSigningKey, SecurityAlgorithms.HmacSha256));
 Reject(handler.WriteToken(expired), parameters, "Rechaza JWT vencido");
 Reject(invitation, parameters, "Invitación no puede usarse como JWT");
+
+// Criterio 1 (HU-010): el destino de una transferencia se resuelve desde un único campo,
+// aceptando un alias (3 palabras separadas por punto) o un CVU (22 dígitos). El formato se
+// valida antes de tocar la base, con DatosDeCuenta como única fuente de verdad.
+Check(DatosDeCuenta.EsDestinoValido("auto.perro.gato"), "Acepta alias de 3 palabras");
+Check(DatosDeCuenta.EsDestinoValido(DatosDeCuenta.SortearAlias()), "Acepta un alias generado por el sistema");
+Check(DatosDeCuenta.EsDestinoValido("0000003100000012345678"), "Acepta CVU de 22 dígitos");
+Check(DatosDeCuenta.EsDestinoValido(DatosDeCuenta.CvuPara(42)), "Acepta un CVU generado por el sistema");
+Check(!DatosDeCuenta.EsDestinoValido("auto.perro"), "Rechaza alias de solo 2 palabras");
+Check(!DatosDeCuenta.EsDestinoValido("auto.perro.gato.sol"), "Rechaza alias de 4 palabras");
+Check(!DatosDeCuenta.EsDestinoValido("autoperrogato"), "Rechaza alias sin puntos");
+Check(!DatosDeCuenta.EsDestinoValido("00000031000000123456"), "Rechaza CVU de menos de 22 dígitos");
+Check(!DatosDeCuenta.EsDestinoValido("000000310000001234567X"), "Rechaza CVU con caracteres no numéricos");
+Check(!DatosDeCuenta.EsDestinoValido(""), "Rechaza destino vacío");
+Check(!DatosDeCuenta.EsDestinoValido(null), "Rechaza destino nulo");
+
 Console.WriteLine("Todas las verificaciones pasaron.");
 
 Task<string> CrearInvitacion(IdentityUser usuario) =>

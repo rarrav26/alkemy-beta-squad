@@ -41,6 +41,13 @@ public class TransferenciaService(
                 MotivoDeRechazo.NoEncontrado,
                 "No se encontró el usuario emisor.");
         }
+        //Agregamos el chequeo que no pueda buscar otros CVU si esta inactivo
+        if (!usuarioOrigen.is_active)
+        {
+            return Resultado<DestinoResponseDto>.Fallo(
+                MotivoDeRechazo.UsuarioDesactivado,
+                "Tu usuario se encuentra desactivado.");
+        }
 
         var cuentaOrigen = await cuentas.GetByUsuarioIdAsync(usuarioOrigen.id, cancellationToken);
 
@@ -84,7 +91,8 @@ public class TransferenciaService(
         var respuesta = new DestinoResponseDto(
             Id: cuentaDestino.id,
             Alias: cuentaDestino.alias,
-            Cvu: cuentaDestino.cvu);
+            Cvu: cuentaDestino.cvu,
+            Titular: $"{cuentaDestino.usuario!.nombre} {cuentaDestino.usuario.apellido}");
 
         return Resultado<DestinoResponseDto>.Exito(respuesta);
     }

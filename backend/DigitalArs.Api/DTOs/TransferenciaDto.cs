@@ -14,6 +14,15 @@ public class TransferenciaDto : IValidatableObject
     public IEnumerable<ValidationResult> Validate(
         ValidationContext validationContext)
     {
+        var destino = (Destino ?? "").Trim();
+
+        if (!DatosDeCuenta.EsDestinoValido(destino))
+        {
+            yield return new ValidationResult(
+                "El destino debe ser un alias (ej. auto.perro.gato) o un CVU de 22 dígitos.",
+                [nameof(Destino)]);
+        }
+
         if (Importe is not decimal importe)
             yield break;
 
