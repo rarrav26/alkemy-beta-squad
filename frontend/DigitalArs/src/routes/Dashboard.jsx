@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/authContext'
 import AuthForm, { ProfileFields } from '../components/Auth/AuthForm'
 import DepositoModal from '../components/Cuentas/DepositoModal'
+import TransferenciaModal from '../components/Cuentas/TransferenciaModal'
 
 export default function Dashboard() {
   const { session, obtenerMiCuenta } = useAuth()
@@ -21,12 +22,12 @@ export default function Dashboard() {
   const [error, setError] = useState('')
   const [intento, setIntento] = useState(0)
   const [depositoAbierto, setDepositoAbierto] = useState(false)
+  const [transferenciaAbierta, setTransferenciaAbierta] = useState(false)
   const [mensajeExito, setMensajeExito] = useState('')
 
   const esAdministrador = session.user.role === 'Administrador'
 
   useEffect(() => {
-    // El administrador usa el panel de gestión.
     if (esAdministrador) return
 
     const controller = new AbortController()
@@ -44,7 +45,19 @@ export default function Dashboard() {
         }
       } catch (error) {
         if (!controller.signal.aborted) {
-          setError(error.message)
+          const mensajeCrudo = (error.message || '').trim()
+          const frasesUnicas = [
+            ...new Set(
+              mensajeCrudo
+                .split('.')
+                .map(frase => frase.trim())
+                .filter(Boolean)
+            )
+          ]
+          const mensajeNormalizado =
+            frasesUnicas.length > 0 ? `${frasesUnicas.join('. ')}.` : mensajeCrudo
+
+          setError(mensajeNormalizado)
         }
       } finally {
         if (!controller.signal.aborted) {
@@ -62,13 +75,26 @@ export default function Dashboard() {
     style: 'currency',
     currency: 'ARS'
   })
+
   function depositoRealizado(resultado) {
     setCuenta(actual =>
       actual ? { ...actual, saldo: resultado.saldoActual } : actual
     )
-
     setMensajeExito(resultado.message)
   }
+
+  function transferenciaRealizada(resultado) {
+    setCuenta(actual => {
+      if (!actual) return actual
+      const nuevoSaldo =
+        resultado?.saldoActual !== undefined
+          ? resultado.saldoActual
+          : actual.saldo - (resultado?.importe || 0)
+      return { ...actual, saldo: nuevoSaldo }
+    })
+    setMensajeExito(resultado?.message || 'Transferencia realizada con éxito.')
+  }
+
   return (
     <Box sx={{ maxWidth: 900, mx: 'auto', p: { xs: 3, md: 6 } }}>
       <Typography variant='overline' color='primary'>
@@ -133,6 +159,7 @@ export default function Dashboard() {
                       {formatoPesos.format(cuenta.saldo)}
                     </Typography>
                   </Box>
+
                   {mensajeExito && (
                     <Alert
                       severity='success'
@@ -141,16 +168,29 @@ export default function Dashboard() {
                       {mensajeExito}
                     </Alert>
                   )}
-                  <Button
-                    variant='contained'
-                    sx={{ alignSelf: 'flex-start' }}
-                    onClick={() => {
-                      setMensajeExito('')
-                      setDepositoAbierto(true)
-                    }}
-                  >
-                    Ingresar dinero
-                  </Button>
+
+                  <Stack direction='row' spacing={2}>
+                    <Button
+                      variant='contained'
+                      onClick={() => {
+                        setMensajeExito('')
+                        setDepositoAbierto(true)
+                      }}
+                    >
+                      Ingresar dinero
+                    </Button>
+
+                    <Button
+                      variant='outlined'
+                      onClick={() => {
+                        setMensajeExito('')
+                        setTransferenciaAbierta(true)
+                      }}
+                    >
+                      Transferir dinero
+                    </Button>
+                  </Stack>
+
                   <Box>
                     <Typography color='text.secondary'>Alias</Typography>
                     <Typography sx={{ overflowWrap: 'anywhere' }}>
@@ -170,12 +210,21 @@ export default function Dashboard() {
           )}
         </Stack>
       </Paper>
+
       {!esAdministrador && cuenta && (
-        <DepositoModal
-          open={depositoAbierto}
-          onClose={() => setDepositoAbierto(false)}
-          onDepositoRealizado={depositoRealizado}
-        />
+        <>
+          <DepositoModal
+            open={depositoAbierto}
+            onClose={() => setDepositoAbierto(false)}
+            onDepositoRealizado={depositoRealizado}
+          />
+          <TransferenciaModal
+            open={transferenciaAbierta}
+            onClose={() => setTransferenciaAbierta(false)}
+            saldoDisponible={cuenta.saldo}
+            onTransferenciaRealizada={transferenciaRealizada}
+          />
+        </>
       )}
     </Box>
   )
@@ -185,6 +234,7 @@ export function NewUserPage() {
   const { createUser } = useAuth()
   const [invitation, setInvitation] = useState(null)
   const [copyMessage, setCopyMessage] = useState('')
+
   if (invitation)
     return (
       <Box sx={{ maxWidth: 650, mx: 'auto', p: 3 }}>
@@ -243,6 +293,7 @@ export function NewUserPage() {
         </Paper>
       </Box>
     )
+
   return (
     <AuthForm
       title='Registrar usuario'
