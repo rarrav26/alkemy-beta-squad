@@ -1,13 +1,17 @@
 import { useContext, useEffect, useState } from "react";
+import FilterListIcon from "@mui/icons-material/FilterList";
 import {
   Alert,
   Box,
   Button,
+  Collapse,
   MenuItem,
   Paper,
   Stack,
   TextField,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/authContext";
@@ -68,18 +72,6 @@ function FilaDeMovimiento({ movimiento }) {
           flexShrink: 0,
         }}
       >
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{
-            textTransform: "uppercase",
-            whiteSpace: "nowrap",
-            lineHeight: 1.3,
-          }}
-        >
-          {movimiento.tipo}
-        </Typography>
-
         <Typography
           fontWeight={700}
           sx={{
@@ -196,12 +188,15 @@ export function MovimientosPreview() {
 export function MovimientosPage() {
   const { obtenerMovimientos } = useAuth();
   const { darkMode } = useContext(ElementosGlobales);
+  const theme = useTheme();
+  const esPantallaPequena = useMediaQuery(theme.breakpoints.down("md"));
   const [filtros, setFiltros] = useState(filtrosIniciales);
   const [pagina, setPagina] = useState(1);
   const [pageSize, setPageSize] = useState(5);
   const [datos, setDatos] = useState(paginaVacia);
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(true);
+  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
 
   // Se desarman los filtros para que el efecto dependa de tres textos y no de un
   // objeto nuevo en cada render, que lo haria correr de mas.
@@ -349,73 +344,161 @@ export function MovimientosPage() {
               />
             </Box>
 
-            <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-              <Box sx={{ flex: 1 }}>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mb: 0.75 }}
-                >
-                  Tipo de movimiento
-                </Typography>
-                <TextField
-                  select
+            {esPantallaPequena ? (
+              <Box>
+                <Button
                   fullWidth
-                  size="small"
-                  value={tipo}
-                  onChange={(event) =>
-                    cambiarFiltro("tipo", event.target.value)
-                  }
-                  sx={estiloInputCompacto}
+                  variant="outlined"
+                  startIcon={<FilterListIcon />}
+                  onClick={() => setFiltrosAbiertos((valor) => !valor)}
+                  sx={{
+                    borderRadius: 999,
+                    justifyContent: "center",
+                    fontWeight: 700,
+                  }}
                 >
-                  {opcionesTipo.map((opcion) => (
-                    <MenuItem key={opcion.value} value={opcion.value}>
-                      {opcion.label}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Box>
+                  {filtrosAbiertos ? "Ocultar filtros" : "Filtros"}
+                </Button>
 
-              <Box sx={{ flex: 1 }}>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mb: 0.75 }}
-                >
-                  Fecha desde
-                </Typography>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="date"
-                  value={desde}
-                  onChange={(event) =>
-                    cambiarFiltro("desde", event.target.value)
-                  }
-                  sx={estiloDeFecha}
-                />
-              </Box>
+                <Collapse in={filtrosAbiertos} unmountOnExit sx={{ mt: 2 }}>
+                  <Stack spacing={2}>
+                    <Box>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 0.75 }}
+                      >
+                        Tipo
+                      </Typography>
+                      <TextField
+                        select
+                        fullWidth
+                        size="small"
+                        value={tipo}
+                        onChange={(event) =>
+                          cambiarFiltro("tipo", event.target.value)
+                        }
+                        sx={estiloInputCompacto}
+                      >
+                        {opcionesTipo.map((opcion) => (
+                          <MenuItem key={opcion.value} value={opcion.value}>
+                            {opcion.label}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Box>
 
-              <Box sx={{ flex: 1 }}>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mb: 0.75 }}
-                >
-                  Fecha hasta
-                </Typography>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="date"
-                  value={hasta}
-                  onChange={(event) =>
-                    cambiarFiltro("hasta", event.target.value)
-                  }
-                  sx={estiloDeFecha}
-                />
+                    <Box>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 0.75 }}
+                      >
+                        Desde
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type="date"
+                        value={desde}
+                        onChange={(event) =>
+                          cambiarFiltro("desde", event.target.value)
+                        }
+                        sx={estiloDeFecha}
+                      />
+                    </Box>
+
+                    <Box>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 0.75 }}
+                      >
+                        Hasta
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type="date"
+                        value={hasta}
+                        onChange={(event) =>
+                          cambiarFiltro("hasta", event.target.value)
+                        }
+                        sx={estiloDeFecha}
+                      />
+                    </Box>
+                  </Stack>
+                </Collapse>
               </Box>
-            </Stack>
+            ) : (
+              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                <Box sx={{ flex: 1 }}>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mb: 0.75 }}
+                  >
+                    Tipo de movimiento
+                  </Typography>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    value={tipo}
+                    onChange={(event) =>
+                      cambiarFiltro("tipo", event.target.value)
+                    }
+                    sx={estiloInputCompacto}
+                  >
+                    {opcionesTipo.map((opcion) => (
+                      <MenuItem key={opcion.value} value={opcion.value}>
+                        {opcion.label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
+
+                <Box sx={{ flex: 1 }}>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mb: 0.75 }}
+                  >
+                    Fecha desde
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    type="date"
+                    value={desde}
+                    onChange={(event) =>
+                      cambiarFiltro("desde", event.target.value)
+                    }
+                    sx={estiloDeFecha}
+                  />
+                </Box>
+
+                <Box sx={{ flex: 1 }}>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mb: 0.75 }}
+                  >
+                    Fecha hasta
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    type="date"
+                    value={hasta}
+                    onChange={(event) =>
+                      cambiarFiltro("hasta", event.target.value)
+                    }
+                    sx={estiloDeFecha}
+                  />
+                </Box>
+              </Stack>
+            )}
 
             {filtrosAplicados ? (
               <Button
