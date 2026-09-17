@@ -33,15 +33,15 @@ const MILISEGUNDOS_ENTRE_REFRESCOS = 15000;
 // completa, asi que el formato de los montos y las fechas es siempre el mismo.
 function FilaDeMovimiento({ movimiento }) {
   const signo = movimiento.esCredito ? "+" : "-";
-  const color = movimiento.esCredito ? "success.main" : "text.primary";
+  const color = movimiento.esCredito ? "success.main" : "error.main";
 
   return (
     <Box
       sx={{
-        display: "grid",
-        gridTemplateColumns: { xs: "1fr", sm: "1.5fr 1fr auto" },
+        display: "flex",
         alignItems: "center",
-        gap: 1,
+        justifyContent: "space-between",
+        gap: 1.5,
         px: 1.5,
         py: 1.25,
         border: "1px solid",
@@ -50,28 +50,48 @@ function FilaDeMovimiento({ movimiento }) {
         backgroundColor: "background.paper",
       }}
     >
-      <Box>
-        <Typography fontWeight={700}>{movimiento.descripcion}</Typography>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Typography fontWeight={700} sx={{ lineHeight: 1.3 }}>
+          {movimiento.descripcion}
+        </Typography>
         <Typography variant="body2" color="text.secondary">
           {formatearFecha(movimiento.fecha)}
         </Typography>
       </Box>
 
-      <Typography
-        variant="body2"
-        color="text.secondary"
-        sx={{ textAlign: { xs: "left", sm: "right" } }}
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-end",
+          textAlign: "right",
+          flexShrink: 0,
+        }}
       >
-        {movimiento.tipo}
-      </Typography>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{
+            textTransform: "uppercase",
+            whiteSpace: "nowrap",
+            lineHeight: 1.3,
+          }}
+        >
+          {movimiento.tipo}
+        </Typography>
 
-      <Typography
-        fontWeight={700}
-        sx={{ color, textAlign: { xs: "left", sm: "right" } }}
-      >
-        {signo}
-        {formatoPesos.format(Math.abs(movimiento.importe))}
-      </Typography>
+        <Typography
+          fontWeight={700}
+          sx={{
+            color,
+            whiteSpace: "nowrap",
+            lineHeight: 1.3,
+          }}
+        >
+          {signo}
+          {formatoPesos.format(Math.abs(movimiento.importe))}
+        </Typography>
+      </Box>
     </Box>
   );
 }
@@ -185,7 +205,7 @@ export function MovimientosPage() {
 
   // Se desarman los filtros para que el efecto dependa de tres textos y no de un
   // objeto nuevo en cada render, que lo haria correr de mas.
-  const { tipo, desde, hasta } = filtros;
+  const { tipo, desde, hasta, busqueda } = filtros;
 
   useEffect(() => {
     let ignorar = false;
@@ -247,6 +267,18 @@ export function MovimientosPage() {
   }
 
   const filtrosAplicados = hayFiltrosAplicados(filtros);
+  const movimientosVisibles = datos.items.filter((movimiento) => {
+    const textoBusqueda = busqueda.trim().toLowerCase();
+
+    if (!textoBusqueda) {
+      return true;
+    }
+
+    const descripcion = (movimiento.descripcion ?? '').toLowerCase();
+    const tipo = (movimiento.tipo ?? '').toLowerCase();
+
+    return descripcion.includes(textoBusqueda) || tipo.includes(textoBusqueda);
+  });
 
   const mensajeSinResultados = filtrosAplicados
     ? "No hay movimientos que coincidan con los filtros."
@@ -255,8 +287,28 @@ export function MovimientosPage() {
   // El ícono de calendario lo dibuja el propio navegador dentro del input date, y
   // es el que abre el almanaque al hacer clic. En tema oscuro viene negro sobre
   // fondo negro, así que se invierte para que se vea.
+  const estiloInputCompacto = {
+    "& .MuiOutlinedInput-root": {
+      height: 44,
+      borderRadius: 999,
+      backgroundColor: "rgba(255,255,255,0.02)",
+      "& fieldset": {
+        borderColor: "divider",
+      },
+      "&:hover fieldset": {
+        borderColor: "primary.main",
+      },
+      "&.Mui-focused fieldset": {
+        borderWidth: 1,
+      },
+    },
+    "& .MuiInputBase-input": {
+      fontSize: "0.95rem",
+    },
+  };
+
   const estiloDeFecha = {
-    "& .MuiOutlinedInput-root": { height: 56 },
+    ...estiloInputCompacto,
     "& input::-webkit-calendar-picker-indicator": {
       filter: darkMode ? "invert(1)" : "none",
       opacity: 0.9,
@@ -279,6 +331,24 @@ export function MovimientosPage() {
 
         <Paper variant="outlined" sx={{ p: 2.5 }}>
           <Stack spacing={2}>
+            <Box sx={{ width: "100%" }}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mb: 0.75, fontSize: "0.78rem", letterSpacing: 0.3 }}
+              >
+                Buscar
+              </Typography>
+              <TextField
+                fullWidth
+                placeholder="Buscar movimientos..."
+                size="small"
+                value={busqueda}
+                onChange={(event) => cambiarFiltro("busqueda", event.target.value)}
+                sx={estiloInputCompacto}
+              />
+            </Box>
+
             <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
               <Box sx={{ flex: 1 }}>
                 <Typography
@@ -291,11 +361,12 @@ export function MovimientosPage() {
                 <TextField
                   select
                   fullWidth
+                  size="small"
                   value={tipo}
                   onChange={(event) =>
                     cambiarFiltro("tipo", event.target.value)
                   }
-                  sx={{ "& .MuiOutlinedInput-root": { height: 56 } }}
+                  sx={estiloInputCompacto}
                 >
                   {opcionesTipo.map((opcion) => (
                     <MenuItem key={opcion.value} value={opcion.value}>
@@ -315,6 +386,7 @@ export function MovimientosPage() {
                 </Typography>
                 <TextField
                   fullWidth
+                  size="small"
                   type="date"
                   value={desde}
                   onChange={(event) =>
@@ -334,6 +406,7 @@ export function MovimientosPage() {
                 </Typography>
                 <TextField
                   fullWidth
+                  size="small"
                   type="date"
                   value={hasta}
                   onChange={(event) =>
@@ -361,7 +434,7 @@ export function MovimientosPage() {
           <Stack spacing={1.5}>
             <ContenidoDeLaLista
               cargando={cargando}
-              movimientos={datos.items}
+              movimientos={movimientosVisibles}
               mensajeSinResultados={mensajeSinResultados}
             />
           </Stack>
@@ -410,14 +483,32 @@ export function MovimientosPage() {
           </Stack>
         </Stack>
 
-        <Button
-          component={Link}
-          to="/dashboard"
-          variant="outlined"
-          sx={{ alignSelf: "flex-start" }}
+        <Box
+          sx={{
+            width: { xs: "100%", sm: "auto" },
+            display: "flex",
+            justifyContent: { xs: "stretch", sm: "flex-start" },
+          }}
         >
-          Volver al dashboard
-        </Button>
+          <Button
+            component={Link}
+            to="/dashboard"
+            variant="contained"
+            size="large"
+            sx={{
+              width: { xs: "100%", sm: "auto" },
+              minWidth: { xs: 0, sm: 200 },
+              borderRadius: 999,
+              px: { xs: 2.5, sm: 3 },
+              py: 1.25,
+              fontWeight: 700,
+              boxShadow: "none",
+              "&:hover": { boxShadow: "none" },
+            }}
+          >
+            Volver al dashboard
+          </Button>
+        </Box>
       </Stack>
     </Box>
   );

@@ -7,6 +7,21 @@ export const tipoMovimientoMap = {
   TRANSFERENCIA_RECIBIDA: 'Transferencia recibida'
 }
 
+export function formatearTipoMovimiento(tipo = '') {
+  if (!tipo) return 'Movimiento'
+
+  if (tipoMovimientoMap[tipo]) {
+    return tipoMovimientoMap[tipo]
+  }
+
+  return tipo
+    .toLowerCase()
+    .split('_')
+    .filter(Boolean)
+    .map((parte) => parte.charAt(0).toUpperCase() + parte.slice(1))
+    .join(' ')
+}
+
 // Cada value es, tal cual, lo que acepta el parámetro ?tipo= de la API.
 // Escribirlo distinto (por ejemplo 'todos' en vez de 'todas') hace que el
 // backend responda 400, así que no tocar sin cambiar SignoDeMovimiento.cs.
@@ -19,7 +34,8 @@ export const opcionesTipo = [
 export const filtrosIniciales = {
   tipo: 'todas',
   desde: '',
-  hasta: ''
+  hasta: '',
+  busqueda: ''
 }
 
 export const paginaVacia = {
@@ -62,18 +78,25 @@ export function construirConsulta(filtros, pagina, tamanioPagina) {
 }
 
 export function hayFiltrosAplicados(filtros) {
-  return filtros.tipo !== 'todas' || filtros.desde !== '' || filtros.hasta !== ''
+  return (
+    filtros.tipo !== 'todas' ||
+    filtros.desde !== '' ||
+    filtros.hasta !== '' ||
+    (filtros.busqueda ?? '').trim() !== ''
+  )
 }
 
 export function normalizarMovimiento(movimiento) {
   const tipo = movimiento.tipo ?? ''
+  const tipoFormateado = formatearTipoMovimiento(tipo)
 
   return {
     id: movimiento.id,
     fecha: movimiento.fecha,
-    tipo,
+    tipo: tipoFormateado,
+    tipoRaw: tipo,
     importe: Number(movimiento.importe),
-    descripcion: tipoMovimientoMap[tipo] ?? 'Movimiento',
+    descripcion: movimiento.descripcion || tipoMovimientoMap[tipo] || 'Movimiento',
     esCredito: movimiento.signo === 'CREDITO'
   }
 }
