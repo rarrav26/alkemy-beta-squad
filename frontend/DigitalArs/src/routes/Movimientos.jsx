@@ -18,9 +18,9 @@ import { useAuth } from "../context/authContext";
 import { ElementosGlobales } from "../context/ElementosGlobales";
 import {
   construirConsulta,
+  contarFiltrosAplicados,
   filtrosIniciales,
   formatearFecha,
-  hayFiltrosAplicados,
   normalizarRespuestaMovimientos,
   opcionesTipo,
   paginaVacia,
@@ -97,12 +97,26 @@ function FilaDeMovimiento({ movimiento }) {
 }
 
 // Decide que se ve dentro del recuadro de la lista. Se resuelve con returns
-// tempranos para no anidar condiciones dentro del JSX.
-function ContenidoDeLaLista({ cargando, movimientos, mensajeSinResultados }) {
+// tempranos para no anidar condiciones dentro del JSX. Lo usan la pantalla
+// completa y la card del dashboard, asi las dos muestran los mismos estados.
+function ContenidoDeLaLista({
+  cargando,
+  error,
+  movimientos,
+  mensajeSinResultados,
+}) {
   if (cargando) {
     return (
-      <Typography color="text.secondary">Cargando movimientos…</Typography>
+      <Typography color="text.secondary" role="status">
+        Cargando movimientos…
+      </Typography>
     );
+  }
+
+  // El error va antes que el vacio: si la lista quedo vacia porque la carga fallo,
+  // no sabemos si el usuario tiene movimientos, asi que no lo afirmamos.
+  if (error) {
+    return <Alert severity="error">{error}</Alert>;
   }
 
   if (movimientos.length === 0) {
@@ -120,11 +134,14 @@ export function MovimientosPreview() {
   const { obtenerMovimientos } = useAuth();
   const [movimientos, setMovimientos] = useState([]);
   const [error, setError] = useState("");
+  const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
     let ignorar = false;
 
-    async function pedirUltimosMovimientos() {
+    // Igual que en la pantalla completa: un fallo del refresco automatico no pisa
+    // lo que ya se esta viendo, solo lo hace un fallo de la carga de primer plano.
+    async function pedirUltimosMovimientos({ mostrarCargando }) {
       try {
         const respuesta = await obtenerMovimientos({ page: 1, pageSize: 5 });
         if (ignorar) return;
@@ -133,13 +150,19 @@ export function MovimientosPreview() {
         setError("");
       } catch (err) {
         if (ignorar) return;
-        setError(err.message);
+        if (mostrarCargando) {
+          setError(err.message);
+        }
+      } finally {
+        if (!ignorar) {
+          setCargando(false);
+        }
       }
     }
 
-    void pedirUltimosMovimientos();
+    void pedirUltimosMovimientos({ mostrarCargando: true });
     const intervalo = window.setInterval(() => {
-      void pedirUltimosMovimientos();
+      void pedirUltimosMovimientos({ mostrarCargando: false });
     }, MILISEGUNDOS_ENTRE_REFRESCOS);
 
     return () => {
@@ -178,16 +201,13 @@ export function MovimientosPreview() {
         </Button>
       </Stack>
 
-      {error ? (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      ) : null}
-
-      <Stack spacing={1.5}>
-        {movimientos.map((movimiento) => (
-          <FilaDeMovimiento key={movimiento.id} movimiento={movimiento} />
-        ))}
+      <Stack spacing={1.5} aria-busy={cargando}>
+        <ContenidoDeLaLista
+          cargando={cargando}
+          error={error}
+          movimientos={movimientos}
+          mensajeSinResultados="Todavía no tenés movimientos en tu cuenta."
+        />
       </Stack>
     </Paper>
   );
@@ -199,6 +219,10 @@ export function MovimientosPage() {
   const theme = useTheme();
   const esPantallaPequena = useMediaQuery(theme.breakpoints.down("md"));
   const [filtros, setFiltros] = useState(filtrosIniciales);
+  // Lo que hay escrito en la caja y lo ultimo que se envio son dos cosas: tipear no
+  // consulta nada, solo enviar el formulario cambia la busqueda aplicada.
+  const [busqueda, setBusqueda] = useState("");
+  const [busquedaAplicada, setBusquedaAplicada] = useState("");
   const [pagina, setPagina] = useState(1);
   const [pageSize, setPageSize] = useState(5);
   const [datos, setDatos] = useState(paginaVacia);
@@ -208,12 +232,12 @@ export function MovimientosPage() {
 
   // Se desarman los filtros para que el efecto dependa de tres textos y no de un
   // objeto nuevo en cada render, que lo haria correr de mas.
-  const { tipo, desde, hasta, busqueda } = filtros;
+  const { tipo, desde, hasta } = filtros;
 
   useEffect(() => {
     let ignorar = false;
     const consulta = construirConsulta(
-      { tipo, desde, hasta },
+      { tipo, desde, hasta, busqueda: busquedaAplicada },
       pagina,
       pageSize,
     );
@@ -223,6 +247,7 @@ export function MovimientosPage() {
     async function pedirMovimientos({ mostrarCargando }) {
       if (mostrarCargando) {
         setCargando(true);
+        setError("");
       }
 
       try {
@@ -234,6 +259,13 @@ export function MovimientosPage() {
       } catch (err) {
         if (ignorar) return;
         setError(err.message);
+
+        // Se descarta el resultado del filtro anterior para no dejarlo en pantalla
+        // como si fuera el del filtro nuevo. El refresco automatico no lo hace: un
+        // error pasajero de fondo no tiene por que borrar lo que se esta leyendo.
+        if (mostrarCargando) {
+          setDatos(paginaVacia);
+        }
       } finally {
         if (!ignorar) {
           setCargando(false);
@@ -250,7 +282,15 @@ export function MovimientosPage() {
       ignorar = true;
       window.clearInterval(intervalo);
     };
-  }, [obtenerMovimientos, pagina, pageSize, tipo, desde, hasta]);
+  }, [
+    obtenerMovimientos,
+    pagina,
+    pageSize,
+    tipo,
+    desde,
+    hasta,
+    busquedaAplicada,
+  ]);
 
   // Cambiar cualquier filtro vuelve a la pagina 1: la pagina en la que estaba el
   // usuario puede no existir en el resultado filtrado.
@@ -259,8 +299,20 @@ export function MovimientosPage() {
     setPagina(1);
   }
 
+  // La busqueda recien viaja al backend cuando se envia el formulario, con Enter o
+  // con el boton. Mientras se tipea no se consulta nada.
+  function aplicarBusqueda(evento) {
+    evento.preventDefault();
+    setBusquedaAplicada(busqueda);
+    setPagina(1);
+  }
+
+  // Limpia tambien la busqueda ya enviada: si solo se vaciara la caja, el filtro
+  // seguiria aplicado y no habria forma de entender por que falta la mitad de la lista.
   function limpiarFiltros() {
     setFiltros(filtrosIniciales);
+    setBusqueda("");
+    setBusquedaAplicada("");
     setPagina(1);
   }
 
@@ -269,19 +321,17 @@ export function MovimientosPage() {
     setPagina(1);
   }
 
-  const filtrosAplicados = hayFiltrosAplicados(filtros);
-  const movimientosVisibles = datos.items.filter((movimiento) => {
-    const textoBusqueda = busqueda.trim().toLowerCase();
+  // Lo que esta filtrando de verdad. La busqueda cuenta por lo que se envio, no por
+  // lo que todavia se esta escribiendo en la caja.
+  const filtrosActivos = { tipo, desde, hasta, busqueda: busquedaAplicada };
+  const cantidadDeFiltros = contarFiltrosAplicados(filtrosActivos);
+  const filtrosAplicados = cantidadDeFiltros > 0;
 
-    if (!textoBusqueda) {
-      return true;
-    }
-
-    const descripcion = (movimiento.descripcion ?? '').toLowerCase();
-    const tipo = (movimiento.tipo ?? '').toLowerCase();
-
-    return descripcion.includes(textoBusqueda) || tipo.includes(textoBusqueda);
-  });
+  // En pantallas chicas los filtros viven detras de este boton. Con el panel cerrado,
+  // el numero es la unica pista de que la lista que se ve esta filtrada.
+  const etiquetaDelBotonDeFiltros = filtrosAplicados
+    ? `Filtros (${cantidadDeFiltros})`
+    : "Filtros";
 
   const mensajeSinResultados = filtrosAplicados
     ? "No hay movimientos que coincidan con los filtros."
@@ -330,11 +380,10 @@ export function MovimientosPage() {
           </Typography>
         </Box>
 
-        {error ? <Alert severity="error">{error}</Alert> : null}
-
         <Paper variant="outlined" sx={{ p: 2.5 }}>
           <Stack spacing={2}>
-            <Box sx={{ width: "100%" }}>
+            {/* Un form de verdad para que Enter busque sin tener que escuchar teclas. */}
+            <Box component="form" onSubmit={aplicarBusqueda} sx={{ width: "100%" }}>
               <Typography
                 variant="body2"
                 color="text.secondary"
@@ -342,14 +391,29 @@ export function MovimientosPage() {
               >
                 Buscar
               </Typography>
-              <TextField
-                fullWidth
-                placeholder="Buscar movimientos..."
-                size="small"
-                value={busqueda}
-                onChange={(event) => cambiarFiltro("busqueda", event.target.value)}
-                sx={estiloInputCompacto}
-              />
+              <Stack direction="row" spacing={1}>
+                <TextField
+                  fullWidth
+                  placeholder="Buscar por tipo de movimiento..."
+                  size="small"
+                  value={busqueda}
+                  onChange={(event) => setBusqueda(event.target.value)}
+                  sx={estiloInputCompacto}
+                />
+                <Button
+                  type="submit"
+                  variant="contained"
+                  sx={{
+                    borderRadius: 999,
+                    px: 3,
+                    fontWeight: 700,
+                    boxShadow: "none",
+                    "&:hover": { boxShadow: "none" },
+                  }}
+                >
+                  Buscar
+                </Button>
+              </Stack>
             </Box>
 
             {esPantallaPequena ? (
@@ -365,7 +429,9 @@ export function MovimientosPage() {
                     fontWeight: 700,
                   }}
                 >
-                  {filtrosAbiertos ? "Ocultar filtros" : "Filtros"}
+                  {filtrosAbiertos
+                    ? "Ocultar filtros"
+                    : etiquetaDelBotonDeFiltros}
                 </Button>
 
                 <Collapse in={filtrosAbiertos} unmountOnExit sx={{ mt: 2 }}>
@@ -522,57 +588,62 @@ export function MovimientosPage() {
         </Paper>
 
         <Paper variant="outlined" sx={{ p: 2 }}>
-          <Stack spacing={1.5}>
+          <Stack spacing={1.5} aria-busy={cargando}>
             <ContenidoDeLaLista
               cargando={cargando}
-              movimientos={movimientosVisibles}
+              error={error}
+              movimientos={datos.items}
               mensajeSinResultados={mensajeSinResultados}
             />
           </Stack>
         </Paper>
 
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={2}
-          sx={{ justifyContent: "space-between", alignItems: "center" }}
-        >
-          <Stack direction="row" spacing={1}>
-            <Button
-              variant="outlined"
-              disabled={pagina === 1 || cargando}
-              onClick={() => setPagina((valor) => valor - 1)}
-            >
-              Anterior
-            </Button>
-            <Button
-              variant="outlined"
-              disabled={pagina >= datos.totalPages || cargando}
-              onClick={() => setPagina((valor) => valor + 1)}
-            >
-              Siguiente
-            </Button>
-          </Stack>
+        {/* Sin resultados no hay nada que paginar, y un "Siguiente" habilitado sobre
+            una lista vacia solo confunde. */}
+        {datos.items.length > 0 ? (
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={2}
+            sx={{ justifyContent: "space-between", alignItems: "center" }}
+          >
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant="outlined"
+                disabled={pagina === 1 || cargando}
+                onClick={() => setPagina((valor) => valor - 1)}
+              >
+                Anterior
+              </Button>
+              <Button
+                variant="outlined"
+                disabled={pagina >= datos.totalPages || cargando}
+                onClick={() => setPagina((valor) => valor + 1)}
+              >
+                Siguiente
+              </Button>
+            </Stack>
 
-          <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-            <TextField
-              select
-              size="small"
-              label="Por página"
-              value={pageSize}
-              onChange={(event) => cambiarTamanioDePagina(event.target.value)}
-              sx={{ minWidth: 120 }}
-            >
-              <MenuItem value={5}>5</MenuItem>
-              <MenuItem value={10}>10</MenuItem>
-              <MenuItem value={20}>20</MenuItem>
-            </TextField>
+            <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+              <TextField
+                select
+                size="small"
+                label="Por página"
+                value={pageSize}
+                onChange={(event) => cambiarTamanioDePagina(event.target.value)}
+                sx={{ minWidth: 120 }}
+              >
+                <MenuItem value={5}>5</MenuItem>
+                <MenuItem value={10}>10</MenuItem>
+                <MenuItem value={20}>20</MenuItem>
+              </TextField>
 
-            <Typography color="text.secondary">
-              Página {pagina} de {datos.totalPages} · {datos.totalItems}{" "}
-              movimientos
-            </Typography>
+              <Typography color="text.secondary">
+                Página {pagina} de {datos.totalPages} · {datos.totalItems}{" "}
+                movimientos
+              </Typography>
+            </Stack>
           </Stack>
-        </Stack>
+        ) : null}
 
         <Box
           sx={{

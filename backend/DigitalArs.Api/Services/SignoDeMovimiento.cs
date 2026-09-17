@@ -62,6 +62,27 @@ public static class SignoDeMovimiento
         return [];
     }
 
+    // Los tipos cuyo nombre contiene lo que el usuario escribió en el buscador. Sale del
+    // mismo diccionario que el signo, así que un tipo nuevo se vuelve buscable con solo
+    // agregarlo ahí.
+    //
+    // Se llama únicamente con un texto que tiene contenido: quien consulta decide antes si
+    // hubo búsqueda o no. Devolver la lista vacía significa que ningún tipo coincide.
+    public static IReadOnlyList<string> TiposQueCoincidenCon(string busqueda)
+    {
+        var textoBuscado = TextoDeBusqueda.Normalizar(busqueda);
+
+        return SignoPorTipo.Keys
+            .Where(tipo => NombreBuscable(tipo).Contains(textoBuscado))
+            .ToArray();
+    }
+
+    // El nombre tal como lo lee el usuario, para poder compararlo con lo que escribe: en la
+    // base dice TRANSFERENCIA_ENVIADA y en pantalla dice "Transferencia enviada", así que el
+    // guion bajo pasa a ser un espacio antes de comparar.
+    private static string NombreBuscable(string tipoDeMovimiento) =>
+        TextoDeBusqueda.Normalizar(tipoDeMovimiento.Replace('_', ' '));
+
     // Un tipo que no está en la tabla devuelve Desconocido en vez de lanzar: un tipo nuevo
     // cargado en la base no puede llevarse puesto el historial entero del usuario.
     public static string DeTipo(string tipoDeMovimiento) =>

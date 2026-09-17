@@ -72,6 +72,15 @@ public class MovimientoRepository(DigitalArsDbContext context)
                 filtro.TiposIncluidos.Contains(movimiento.tipo_movimiento.descripcion));
         }
 
+        // A diferencia del filtro de arriba, acá la lista vacía sí filtra: significa que el
+        // texto buscado no coincidió con ningún tipo y no tiene que salir ningún movimiento.
+        // El "no filtres" de la búsqueda es null, no la lista vacía.
+        if (filtro.TiposDeLaBusqueda is IReadOnlyList<string> tiposBuscados)
+        {
+            consulta = consulta.Where(movimiento =>
+                tiposBuscados.Contains(movimiento.tipo_movimiento.descripcion));
+        }
+
         return consulta;
     }
 }
