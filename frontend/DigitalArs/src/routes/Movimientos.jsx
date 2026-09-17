@@ -33,11 +33,19 @@ const formatoPesos = new Intl.NumberFormat("es-AR", {
 
 const MILISEGUNDOS_ENTRE_REFRESCOS = 15000;
 
+// Un movimiento que el backend no sabe clasificar (signo DESCONOCIDO) se muestra sin
+// signo y en color de texto normal: no sabemos si suma o resta, asi que no lo afirmamos.
+function presentacionDelImporte(movimiento) {
+  if (movimiento.esCredito) return { prefijo: "+", color: "success.main" };
+  if (movimiento.esDebito) return { prefijo: "-", color: "error.main" };
+
+  return { prefijo: "", color: "text.primary" };
+}
+
 // Una fila del historial. La usan el preview del dashboard y la pantalla
 // completa, asi que el formato de los montos y las fechas es siempre el mismo.
 function FilaDeMovimiento({ movimiento }) {
-  const signo = movimiento.esCredito ? "+" : "-";
-  const color = movimiento.esCredito ? "success.main" : "error.main";
+  const { prefijo, color } = presentacionDelImporte(movimiento);
 
   return (
     <Box
@@ -80,7 +88,7 @@ function FilaDeMovimiento({ movimiento }) {
             lineHeight: 1.3,
           }}
         >
-          {signo}
+          {prefijo}
           {formatoPesos.format(Math.abs(movimiento.importe))}
         </Typography>
       </Box>

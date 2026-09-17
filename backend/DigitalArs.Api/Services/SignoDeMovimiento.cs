@@ -6,14 +6,35 @@ public static class SignoDeMovimiento
     public const string Credito = "CREDITO";
     public const string Debito = "DEBITO";
 
+    // Tercer valor: un tipo que existe en la base pero que este archivo todavía no
+    // clasifica. Es un string y no null para que MovimientoResponse.Signo siga siendo
+    // no-nullable, y el front lo muestra sin signo en vez de inventar uno.
+    public const string Desconocido = "DESCONOCIDO";
+
     // Se tienen que escribir igual que la columna descripcion de Tipo_Movimiento: la consulta filtra por ese texto.
-    private const string TipoDeposito = "DEPOSITO";
+    public const string TipoDeposito = "DEPOSITO";
     private const string TipoTransferenciaEnviada = "TRANSFERENCIA_ENVIADA";
     private const string TipoTransferenciaRecibida = "TRANSFERENCIA_RECIBIDA";
 
     private const string FiltroCredito = "credito";
     private const string FiltroDebito = "debito";
     private const string FiltroTodas = "todas";
+
+    // El signo de cada tipo de movimiento, en un solo lugar: de acá salen tanto el signo
+    // con el que se muestra una fila como los tipos que entran en cada filtro. Antes el
+    // criterio estaba escrito dos veces y nada garantizaba que dijeran lo mismo.
+    // Agregar un tipo nuevo a la base es agregar una línea acá y nada más.
+    //
+    // Ignora mayúsculas porque la consulta contra SQL Server tampoco las distingue: un
+    // 'Deposito' cargado así en la base entra igual en el filtro de créditos, y tiene que
+    // salir con el mismo signo que el filtro le asignó.
+    private static readonly Dictionary<string, string> SignoPorTipo =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            [TipoDeposito] = Credito,
+            [TipoTransferenciaRecibida] = Credito,
+            [TipoTransferenciaEnviada] = Debito,
+        };
 
     public static string ValoresAceptados =>
         $"{FiltroCredito}, {FiltroDebito} o {FiltroTodas}";
@@ -33,25 +54,29 @@ public static class SignoDeMovimiento
     public static IReadOnlyList<string> TiposDelFiltro(string? tipo)
     {
         if (EsIgual(tipo, FiltroCredito))
-            return [TipoDeposito, TipoTransferenciaRecibida];
+            return TiposConSigno(Credito);
 
         if (EsIgual(tipo, FiltroDebito))
-            return [TipoTransferenciaEnviada];
+            return TiposConSigno(Debito);
 
         return [];
     }
 
-    // Devuelve el signo correspondiente a un tipo de movimiento. Lanza si el tipo no tiene signo definido.
-    public static string DeTipo(string tipoDeMovimiento) => tipoDeMovimiento switch
-    {
-        TipoDeposito => Credito,
-        TipoTransferenciaRecibida => Credito,
-        TipoTransferenciaEnviada => Debito,
-        _ => throw new InvalidOperationException(
-            $"El tipo de movimiento '{tipoDeMovimiento}' no tiene signo definido.")
-    };
+    // Un tipo que no está en la tabla devuelve Desconocido en vez de lanzar: un tipo nuevo
+    // cargado en la base no puede llevarse puesto el historial entero del usuario.
+    public static string DeTipo(string tipoDeMovimiento) =>
+        SignoPorTipo.GetValueOrDefault(tipoDeMovimiento, Desconocido);
 
-    // Comprueba si un tipo de movimiento tiene signo definido.
+    // Se arma en cada llamada en vez de guardarse en dos campos estáticos: son tres
+    // entradas una vez por request, y un static readonly que depende de otro static
+    // readonly arrastra problemas de orden de inicialización que no valen la pena acá.
+    private static IReadOnlyList<string> TiposConSigno(string signo) =>
+        SignoPorTipo
+            .Where(par => par.Value == signo)
+            .Select(par => par.Key)
+            .ToArray();
+
+    // Compara sin distinguir mayúsculas: ?tipo=CREDITO y ?tipo=credito son lo mismo.
     private static bool EsIgual(string? tipo, string valorEsperado) =>
         string.Equals(tipo, valorEsperado, StringComparison.OrdinalIgnoreCase);
 }

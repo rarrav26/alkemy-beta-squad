@@ -97,7 +97,10 @@ export function normalizarMovimiento(movimiento) {
     tipoRaw: tipo,
     importe: Number(movimiento.importe),
     descripcion: movimiento.descripcion || tipoMovimientoMap[tipo] || 'Movimiento',
-    esCredito: movimiento.signo === 'CREDITO'
+    // Dos booleanos y no uno: un movimiento con signo DESCONOCIDO no es crédito ni
+    // débito, y con un solo flag caía del lado del débito y se pintaba en rojo.
+    esCredito: movimiento.signo === 'CREDITO',
+    esDebito: movimiento.signo === 'DEBITO'
   }
 }
 
