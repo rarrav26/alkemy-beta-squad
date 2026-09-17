@@ -1,4 +1,6 @@
 import { useContext, useEffect, useState } from "react";
+import ArrowDownwardRoundedIcon from "@mui/icons-material/ArrowDownwardRounded";
+import ArrowUpwardRoundedIcon from "@mui/icons-material/ArrowUpwardRounded";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import {
   Alert,
@@ -38,6 +40,9 @@ const MILISEGUNDOS_ENTRE_REFRESCOS = 15000;
 function FilaDeMovimiento({ movimiento }) {
   const signo = movimiento.esCredito ? "+" : "-";
   const color = movimiento.esCredito ? "success.main" : "error.main";
+  const IconoMovimiento = movimiento.esCredito
+    ? ArrowDownwardRoundedIcon
+    : ArrowUpwardRoundedIcon;
 
   return (
     <Box
@@ -54,14 +59,32 @@ function FilaDeMovimiento({ movimiento }) {
         backgroundColor: "background.paper",
       }}
     >
-      <Box sx={{ minWidth: 0, flex: 1 }}>
-        <Typography fontWeight={700} sx={{ lineHeight: 1.3 }}>
-          {movimiento.descripcion}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {formatearFecha(movimiento.fecha)}
-        </Typography>
-      </Box>
+      <Stack direction="row" spacing={1.5} sx={{ minWidth: 0, flex: 1, alignItems: "center" }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 34,
+            height: 34,
+            borderRadius: "50%",
+            backgroundColor: movimiento.esCredito ? "success.light" : "error.light",
+            color: movimiento.esCredito ? "success.dark" : "error.dark",
+            flexShrink: 0,
+          }}
+        >
+          <IconoMovimiento fontSize="small" />
+        </Box>
+
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Typography fontWeight={700} sx={{ lineHeight: 1.3 }}>
+            {movimiento.descripcion}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {formatearFecha(movimiento.fecha)}
+          </Typography>
+        </Box>
+      </Stack>
 
       <Box
         sx={{
