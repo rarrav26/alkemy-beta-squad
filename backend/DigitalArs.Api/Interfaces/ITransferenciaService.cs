@@ -9,4 +9,9 @@ public interface ITransferenciaService
         string identityUserId,
         TransferenciaDto dto,
         CancellationToken cancellationToken = default);
+
+    Task<Resultado<TransferenciaResponseDto>> TransferirAsync(
+        string identityUserId,
+        TransferenciaDto dto,
+        CancellationToken cancellationToken = default);
 }

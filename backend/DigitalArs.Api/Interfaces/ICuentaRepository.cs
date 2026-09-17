@@ -16,4 +16,9 @@ public interface ICuentaRepository
     Task<Cuenta?> GetByAliasOCvuAsync(
         string destino,
         CancellationToken cancellationToken = default);
+
+    Task<bool> DecrementarSaldoAsync(
+        int usuarioId,
+        decimal importe,
+        CancellationToken cancellationToken = default);
 }

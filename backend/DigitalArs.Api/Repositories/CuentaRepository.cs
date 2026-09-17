@@ -6,8 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DigitalArs.Api.Repositories;
 
-public class CuentaRepository(DigitalArsDbContext context)
-    : ICuentaRepository
+public class CuentaRepository(DigitalArsDbContext context) : ICuentaRepository
 {
     public Task<Cuenta?> GetByUsuarioIdAsync(
         int usuarioId,
@@ -25,9 +24,6 @@ public class CuentaRepository(DigitalArsDbContext context)
         decimal importe,
         CancellationToken cancellationToken = default)
     {
-        // Las condiciones viajan dentro del UPDATE y no como un chequeo previo: así dos
-        // depósitos simultáneos no pueden pasarse del tope entre los dos. Quien llama ya
-        // validó el importe con LimitesDeImporte.
         var filasActualizadas = await context.Cuentas
             .Where(cuenta =>
                 cuenta.usuario_id == usuarioId &&
@@ -42,9 +38,28 @@ public class CuentaRepository(DigitalArsDbContext context)
         return filasActualizadas == 1;
     }
 
+    public async Task<bool> DecrementarSaldoAsync(
+        int usuarioId,
+        decimal importe,
+        CancellationToken cancellationToken = default)
+    {
+        var filasActualizadas = await context.Cuentas
+            .Where(cuenta =>
+                cuenta.usuario_id == usuarioId &&
+                cuenta.usuario.is_active &&
+                cuenta.saldo >= importe)
+            .ExecuteUpdateAsync(
+                cambios => cambios.SetProperty(
+                    cuenta => cuenta.saldo,
+                    cuenta => cuenta.saldo - importe),
+                cancellationToken);
+
+        return filasActualizadas == 1;
+    }
+
     public Task<Cuenta?> GetByAliasOCvuAsync(
-     string destino,
-     CancellationToken cancellationToken = default)
+        string destino,
+        CancellationToken cancellationToken = default)
     {
         return context.Cuentas
             .Include(cuenta => cuenta.usuario)
@@ -53,5 +68,4 @@ public class CuentaRepository(DigitalArsDbContext context)
                 cuenta => cuenta.alias == destino || cuenta.cvu == destino,
                 cancellationToken);
     }
-
 }
