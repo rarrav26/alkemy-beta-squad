@@ -45,7 +45,19 @@ export default function Dashboard() {
         }
       } catch (error) {
         if (!controller.signal.aborted) {
-          setError(error.message)
+          const mensajeCrudo = (error.message || '').trim()
+          const frasesUnicas = [
+            ...new Set(
+              mensajeCrudo
+                .split('.')
+                .map(frase => frase.trim())
+                .filter(Boolean)
+            )
+          ]
+          const mensajeNormalizado =
+            frasesUnicas.length > 0 ? `${frasesUnicas.join('. ')}.` : mensajeCrudo
+
+          setError(mensajeNormalizado)
         }
       } finally {
         if (!controller.signal.aborted) {
@@ -74,9 +86,10 @@ export default function Dashboard() {
   function transferenciaRealizada(resultado) {
     setCuenta(actual => {
       if (!actual) return actual
-      const nuevoSaldo = resultado?.saldoActual !== undefined 
-        ? resultado.saldoActual 
-        : actual.saldo - (resultado?.importe || 0)
+      const nuevoSaldo =
+        resultado?.saldoActual !== undefined
+          ? resultado.saldoActual
+          : actual.saldo - (resultado?.importe || 0)
       return { ...actual, saldo: nuevoSaldo }
     })
     setMensajeExito(resultado?.message || 'Transferencia realizada con éxito.')

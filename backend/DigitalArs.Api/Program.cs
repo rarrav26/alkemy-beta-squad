@@ -173,7 +173,7 @@ async Task<bool> ElTokenSigueSiendoValido(TokenValidatedContext context)
     var stampDelToken = context.Principal?.FindFirstValue("security_stamp");
     if (stampDelToken != await users.GetSecurityStampAsync(user)) return false;
 
-    return await db.Usuarios.AnyAsync(u => u.identity_user_id == identityUserId && u.is_active);
+    return await db.Usuarios.AnyAsync(u => u.identity_user_id == identityUserId);
 }
 
 // TokenValidationParameters es lo que se comprueba del token en sí: que lo haya
