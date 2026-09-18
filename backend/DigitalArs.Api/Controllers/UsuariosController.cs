@@ -1,4 +1,5 @@
 using DigitalArs.Api.DTOs;
+using DigitalArs.Api.Errors;
 using DigitalArs.Api.Helpers.Domain;
 using DigitalArs.Api.Helpers.Results;
 using DigitalArs.Api.Interfaces;

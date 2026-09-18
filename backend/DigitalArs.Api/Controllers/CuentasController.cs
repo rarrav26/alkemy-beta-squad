@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using DigitalArs.Api.DTOs;
+using DigitalArs.Api.Errors;
 using DigitalArs.Api.Helpers.Results;
 using DigitalArs.Api.Interfaces;
 using Microsoft.AspNetCore.Authorization;
