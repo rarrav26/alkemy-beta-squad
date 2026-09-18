@@ -1,7 +1,7 @@
 using DigitalArs.Api.Data.Entities;
 using Microsoft.AspNetCore.Identity;
 
-namespace DigitalArs.Api.Services;
+namespace DigitalArs.Api.Helpers.Results;
 
 // Lo que devuelve el alta por dentro de AccountService: los registros creados o los errores,
 // nunca las dos cosas. Cuenta queda en null cuando el rol no lleva cuenta en pesos, que es el

@@ -2,6 +2,8 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using DigitalArs.Api.DTOs;
+using DigitalArs.Api.Helpers.Configuration;
+using DigitalArs.Api.Helpers.Domain;
 using DigitalArs.Api.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;

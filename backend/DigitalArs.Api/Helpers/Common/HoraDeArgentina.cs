@@ -1,4 +1,4 @@
-namespace DigitalArs.Api.Services;
+namespace DigitalArs.Api.Helpers.Common;
 
 // Traduce entre las dos formas en las que vive una fecha en este proyecto: en la
 // base siempre se guarda en UTC (DepositoService escribe DateTime.UtcNow) y el

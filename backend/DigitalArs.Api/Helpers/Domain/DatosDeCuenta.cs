@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace DigitalArs.Api.Services;
+namespace DigitalArs.Api.Helpers.Domain;
 
 // Arma los datos autogenerados de una cuenta nueva. Es lógica pura, sin base de datos:
 // comprobar que el alias sorteado esté libre le toca a AccountService.

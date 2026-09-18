@@ -1,4 +1,6 @@
-namespace DigitalArs.Api.Services;
+using DigitalArs.Api.Helpers.Common;
+
+namespace DigitalArs.Api.Helpers.Domain;
 
 /* Traduce entre lo que manda el front en ?tipo=, los tipos de movimiento que hay en la base y el signo con el que sale cada movimiento en la respuesta. La usan el DTO para validar la entrada y el servicio para armar la consulta y la respuesta, así la lista de valores aceptados vive en un solo lugar.*/
 public static class SignoDeMovimiento

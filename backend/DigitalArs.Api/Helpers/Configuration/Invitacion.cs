@@ -1,4 +1,4 @@
-namespace DigitalArs.Api.Services;
+namespace DigitalArs.Api.Helpers.Configuration;
 
 // Datos de la invitación con la que un usuario creado por el administrador define su primera
 // contraseña. Están acá y no en cada servicio porque los usan tanto quien genera el token

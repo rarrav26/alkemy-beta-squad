@@ -1,5 +1,5 @@
 using System.ComponentModel.DataAnnotations;
-namespace DigitalArs.Api.Services;
+namespace DigitalArs.Api.Helpers.Configuration;
 public class JwtOptions
 {
     [Required] public string Key { get; set; } = "";

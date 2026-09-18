@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 
-namespace DigitalArs.Api.Services;
+namespace DigitalArs.Api.Helpers.Common;
 
 // Convierte los errores que devuelve Identity en mensajes que se le pueden mostrar a la persona.
 public static class MensajesDeIdentity

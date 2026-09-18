@@ -1,4 +1,4 @@
-namespace DigitalArs.Api.Services;
+namespace DigitalArs.Api.Helpers.Results;
 
 // Lo que devuelve un servicio: o salió bien y trae la respuesta lista, o falló y trae el motivo.
 // Nunca las dos cosas. Errores solo se completa cuando hay una lista de mensajes para mostrar,

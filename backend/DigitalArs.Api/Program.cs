@@ -13,6 +13,7 @@ using System.Text;
 using System.Threading.RateLimiting;
 using DigitalArs.Api.Data.Context;
 using DigitalArs.Api.DTOs;
+using DigitalArs.Api.Helpers.Configuration;
 using DigitalArs.Api.Interfaces;
 using DigitalArs.Api.Middleware;
 using DigitalArs.Api.OpenApi;
