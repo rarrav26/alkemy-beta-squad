@@ -41,3 +41,8 @@ Thumbs.db
 .github/copilot-instructions.md
 docs/arquitectura.html
 docs/arquitectura.architecture.json
+
+# Capturas de pantalla de pruebas manuales (QA de cada HU). Se generan en la raiz,
+# son de un solo dev y pesan, asi que no van al repo. Los PNG que si son del proyecto
+# (database/Diagrama_ER.png, frontend/.../assets/hero.png) viven en subcarpetas y no los toca esta regla.
+/*.png
