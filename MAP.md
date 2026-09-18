@@ -87,8 +87,8 @@ Dentro de **backend/DigitalArs.Api/**:
 | Controllers/SetupController.cs             | Estado del alta inicial: informa si ya existe un administrador.      |
 | Controllers/TiposDeMovimientosController.cs | Catálogo de tipos de movimiento: listado y detalle por id.          |
 | Controllers/CuentasController.cs           | Consulta de la cuenta propia: alias, CVU y saldo.                    |
-| Controllers/MovimientosController.cs       | Depósitos sobre la cuenta propia.                                    |
-| Controllers/RespuestaDeError.cs            | Arma el ErrorResponse desde un Resultado, compartido por controllers.|
+| Controllers/MovimientosController.cs       | Depósitos e historial sobre la cuenta propia.                        |
+| Controllers/TransferenciasController.cs    | Resolución del destino y transferencia entre cuentas.                |
 | Data/Context/DigitalArsDbContext.cs        | Modelo de las tablas del negocio.                                    |
 | Data/Context/AuthDbContext.cs              | Modelo de las tablas Identity.                                       |
 | Data/Entities/Usuario.cs                   | Perfil del usuario de negocio.                                       |
@@ -111,20 +111,26 @@ Dentro de **backend/DigitalArs.Api/**:
 | DTOs/CuentaResponse.cs                     | Respuesta de la cuenta propia: id, alias, CVU y saldo.               |
 | DTOs/DepositoDto.cs                        | Importe a depositar, con su validación.                              |
 | DTOs/DepositoResponseDto.cs                | Respuesta del depósito: saldo actualizado y fecha argentina.         |
-| DTOs/ErrorResponse.cs                      | Forma única de los errores HTTP: code, message y errors.             |
 | DTOs/HistorialMovimientosDto.cs            | Filtros del historial que llegan por query string.                   |
 | DTOs/MovimientoResponse.cs                 | Una fila del historial, con su signo y la fecha en hora argentina.   |
 | DTOs/PaginaResponse.cs                     | Envoltorio común de cualquier listado paginado de la API.            |
+| DTOs/TransferenciaDto.cs                   | Destino (alias o CVU) e importe a transferir, con su validación.     |
+| DTOs/DestinoResponseDto.cs                 | Respuesta del destino resuelto: id, alias, CVU y titular.            |
+| DTOs/TransferenciaResponseDto.cs           | Respuesta de la transferencia: saldo actualizado y mensaje.          |
 | Interfaces/ITokenService.cs                | Contrato de generación del JWT.                                      |
 | Interfaces/IAuthService.cs                 | Contrato de login, primera contraseña y perfil de la sesión.         |
 | Interfaces/IAccountService.cs              | Contrato del alta, la invitación y el estado de un usuario.          |
 | Interfaces/ICuentaService.cs               | Contrato de la consulta de la cuenta propia.                         |
 | Interfaces/IDepositoService.cs             | Contrato del depósito.                                               |
 | Interfaces/IHistorialService.cs            | Contrato de la consulta del historial propio paginado.               |
+| Interfaces/ITransferenciaService.cs        | Contrato de la resolución del destino y de la transferencia.         |
 | Interfaces/IUsuarioRepository.cs           | Contrato de acceso a los perfiles de usuario.                        |
 | Interfaces/ITipoMovimientoRepository.cs    | Contrato de acceso al catálogo de tipos de movimiento.               |
 | Interfaces/ICuentaRepository.cs            | Contrato de acceso a las cuentas y a la acreditación de saldo.       |
-| Interfaces/IMovimientoRepository.cs        | Contrato de alta de movimientos.                                     |
+| Interfaces/IMovimientoRepository.cs        | Contrato de alta de movimientos y consulta paginada.                 |
+| Interfaces/FiltroDeMovimientos.cs          | Lo que el servicio le pide al repositorio para filtrar el historial. |
+| Interfaces/MovimientoLeido.cs              | Una fila tal como la devuelve el repositorio, con la fecha en UTC.   |
+| Interfaces/PaginaDeMovimientos.cs          | Lo que devuelve el repositorio: las filas y el total con los filtros.|
 | Repositories/UsuarioRepository.cs          | Consultas de perfiles sobre DigitalArsDbContext.                     |
 | Repositories/TipoMovimientoRepository.cs   | Consultas del catálogo sobre DigitalArsDbContext.                    |
 | Repositories/CuentaRepository.cs           | Consulta de la cuenta y acreditación atómica del saldo.              |
@@ -134,19 +140,23 @@ Dentro de **backend/DigitalArs.Api/**:
 | Services/CuentaService.cs                  | Resuelve la cuenta del usuario logueado y arma su respuesta.         |
 | Services/DepositoService.cs                | Reglas del depósito: valida, acredita y registra el movimiento.      |
 | Services/HistorialService.cs               | Resuelve la cuenta del token y arma la página del historial.         |
-| Services/SignoDeMovimiento.cs              | Traduce el filtro ?tipo= al signo del movimiento (CREDITO/DEBITO).   |
-| Services/HoraDeArgentina.cs                | Convierte entre el UTC de la base y el huso -03:00 del front.        |
-| Services/LimitesDeImporte.cs               | Regla única del importe de un movimiento, sin base de datos.         |
-| Services/Resultado.cs                      | Lo que devuelve un servicio: la respuesta lista o el motivo.         |
-| Services/MotivoDeRechazo.cs                | Los motivos de negocio por los que un servicio rechaza.              |
-| Services/Invitacion.cs                     | Propósito y duración de la invitación, compartidos.                  |
-| Services/RolPrincipal.cs                   | Regla única del rol que se informa al frontend.                      |
-| Services/MensajesDeIdentity.cs             | Traduce los errores de Identity a mensajes mostrables.               |
-| Services/ResultadoDeAlta.cs                | Resultado interno del alta: los registros creados o los errores.     |
-| Services/DatosDeCuenta.cs                  | Sorteo del alias y armado del CVU, sin base de datos.                |
+| Services/TransferenciaService.cs           | Reglas de la transferencia: valida el destino y mueve el saldo.      |
 | Services/JwtTokenService.cs                | Generación y firma de JWT.                                           |
-| Services/JwtOptions.cs                     | Opciones y valores predeterminados del JWT.                          |
-| Middleware/GlobalExceptionHandler.cs       | Convierte una excepción no controlada en un 500 con ErrorResponse.   |
+| Helpers/Domain/SignoDeMovimiento.cs        | Traduce el filtro ?tipo= al signo del movimiento (CREDITO/DEBITO).   |
+| Helpers/Domain/LimitesDeImporte.cs         | Regla única del importe de un movimiento, sin base de datos.         |
+| Helpers/Domain/DatosDeCuenta.cs            | Sorteo del alias y armado del CVU, sin base de datos.                |
+| Helpers/Domain/RolPrincipal.cs             | Regla única del rol que se informa al frontend.                      |
+| Helpers/Common/HoraDeArgentina.cs          | Convierte entre el UTC de la base y el huso -03:00 del front.        |
+| Helpers/Common/TextoDeBusqueda.cs          | Normaliza texto (minúsculas, sin acentos) para poder compararlo.     |
+| Helpers/Common/MensajesDeIdentity.cs       | Traduce los errores de Identity a mensajes mostrables.               |
+| Helpers/Results/Resultado.cs               | Lo que devuelve un servicio: la respuesta lista o el motivo.         |
+| Helpers/Results/MotivoDeRechazo.cs         | Los motivos de negocio por los que un servicio rechaza.              |
+| Helpers/Results/ResultadoDeAlta.cs         | Resultado interno del alta: los registros creados o los errores.     |
+| Helpers/Configuration/JwtOptions.cs        | Opciones y valores predeterminados del JWT.                          |
+| Helpers/Configuration/Invitacion.cs        | Propósito y duración de la invitación, compartidos.                  |
+| Errors/ErrorResponse.cs                    | Forma única de los errores HTTP: code, message y errors.             |
+| Errors/RespuestaDeError.cs                 | Arma el ErrorResponse desde un Resultado, compartido por controllers.|
+| Errors/GlobalExceptionHandler.cs           | Convierte una excepción no controlada en un 500 con ErrorResponse.   |
 | OpenApi/BearerSecuritySchemeTransformer.cs | Documentación de autenticación en Swagger.                           |
 | Properties/launchSettings.json             | Perfiles, puertos y entorno de desarrollo.                           |
 | Tests/AuthenticationChecks/                | Ejecutable de verificaciones del backend.                            |
@@ -388,7 +398,7 @@ Ejemplo de respuesta; el vencimiento real se calcula al emitir:
 
 **Interfaces/ITokenService.cs** define el contrato.  
 **Services/JwtTokenService.cs** lo implementa.  
-**Services/JwtOptions.cs** define su configuración.
+**Helpers/Configuration/JwtOptions.cs** define su configuración.
 
 CrearToken lee roles desde Identity, construye claims, calcula el vencimiento y firma con HS256 y Jwt:Key.
 
