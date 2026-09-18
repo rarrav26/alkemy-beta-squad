@@ -106,6 +106,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
 builder.Services.AddScoped<ICuentaService, CuentaService>();
 builder.Services.AddScoped<IDepositoService, DepositoService>();
+builder.Services.AddScoped<ITransferenciaService, TransferenciaService>();
 builder.Services.AddScoped<IHistorialService, HistorialService>();
 
 // -----------------------------------------------------------------------------
@@ -160,7 +161,7 @@ async Task<bool> ElTokenSigueSiendoValido(TokenValidatedContext context)
     var stampDelToken = context.Principal?.FindFirstValue("security_stamp");
     if (stampDelToken != await users.GetSecurityStampAsync(user)) return false;
 
-    return await db.Usuarios.AnyAsync(u => u.identity_user_id == identityUserId && u.is_active);
+    return await db.Usuarios.AnyAsync(u => u.identity_user_id == identityUserId);
 }
 
 // TokenValidationParameters es lo que se comprueba del token en sí: que lo haya

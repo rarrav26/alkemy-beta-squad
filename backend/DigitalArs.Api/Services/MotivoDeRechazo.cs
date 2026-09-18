@@ -3,7 +3,8 @@ namespace DigitalArs.Api.Services;
 // El servicio indica qué ocurrió.
 // El controller decide el código HTTP y el mensaje de respuesta.
 public enum MotivoDeRechazo
-{
+{   
+    MismaCuenta,
     CredencialesInvalidas,
     UsuarioDesactivado,
     FaltaDefinirPassword,
@@ -12,8 +13,9 @@ public enum MotivoDeRechazo
     NoEncontrado,
     NoPuedeRecibirInvitacion,
     NoSePudoActualizar,
-
     CuentaNoEncontrada,
     SaldoMaximoSuperado,
-    TipoMovimientoNoConfigurado
+    SaldoInsuficiente,
+    TipoMovimientoNoConfigurado,
+    DestinoNoEncontrado
 }

@@ -71,7 +71,10 @@ function errorDeRespuesta({ status, data }) {
 function mensajePara(status, data) {
   if (status === 429)
     return 'Demasiados intentos. Esperá un minuto y volvé a intentar.'
+  if (typeof data === 'string') return data
   if (data?.message) return data.message
+  if (data?.detail) return data.detail
+  if (data?.title) return data.title
   if (status === 401) return 'Tu sesión venció. Volvé a ingresar.'
   if (status === 403) return 'No tenés permiso para realizar esta acción.'
   if (status >= 500) return 'El servidor no pudo completar la solicitud.'

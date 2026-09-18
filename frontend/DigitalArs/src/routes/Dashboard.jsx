@@ -50,7 +50,19 @@ export default function Dashboard() {
         }
       } catch (error) {
         if (!controller.signal.aborted) {
-          setError(error.message);
+          const mensajeCrudo = (error.message || '').trim()
+          const frasesUnicas = [
+            ...new Set(
+              mensajeCrudo
+                .split('.')
+                .map(frase => frase.trim())
+                .filter(Boolean)
+            )
+          ]
+          const mensajeNormalizado =
+            frasesUnicas.length > 0 ? `${frasesUnicas.join('. ')}.` : mensajeCrudo
+
+          setError(mensajeNormalizado)
         }
       } finally {
         if (!controller.signal.aborted) {
@@ -71,6 +83,19 @@ export default function Dashboard() {
 
     setMensajeExito(resultado.message);
   }
+
+  function transferenciaRealizada(resultado) {
+    setCuenta(actual => {
+      if (!actual) return actual
+      const nuevoSaldo =
+        resultado?.saldoActual !== undefined
+          ? resultado.saldoActual
+          : actual.saldo - (resultado?.importe || 0)
+      return { ...actual, saldo: nuevoSaldo }
+    })
+    setMensajeExito(resultado?.message || 'Transferencia realizada con éxito.')
+  }
+
   return (
     <Box sx={{ maxWidth: 900, mx: "auto", p: { xs: 3, md: 6 } }}>
       <Typography variant="overline" color="primary">
@@ -135,6 +160,7 @@ export default function Dashboard() {
                       {formatoPesos.format(cuenta.saldo)}
                     </Typography>
                   </Box>
+
                   {mensajeExito && (
                     <Alert
                       severity="success"
@@ -143,16 +169,29 @@ export default function Dashboard() {
                       {mensajeExito}
                     </Alert>
                   )}
-                  <Button
-                    variant="contained"
-                    sx={{ alignSelf: "flex-start" }}
-                    onClick={() => {
-                      setMensajeExito("");
-                      setDepositoAbierto(true);
-                    }}
-                  >
-                    Ingresar dinero
-                  </Button>
+
+                  <Stack direction='row' spacing={2}>
+                    <Button
+                      variant='contained'
+                      onClick={() => {
+                        setMensajeExito('')
+                        setDepositoAbierto(true)
+                      }}
+                    >
+                      Ingresar dinero
+                    </Button>
+
+                    <Button
+                      variant='outlined'
+                      onClick={() => {
+                        setMensajeExito('')
+                        setTransferenciaAbierta(true)
+                      }}
+                    >
+                      Transferir dinero
+                    </Button>
+                  </Stack>
+
                   <Box>
                     <Typography color="text.secondary">Alias</Typography>
                     <Typography sx={{ overflowWrap: "anywhere" }}>
@@ -172,14 +211,21 @@ export default function Dashboard() {
           )}
         </Stack>
       </Paper>
-      {!esAdministrador && cuenta && <MovimientosPreview />}
 
       {!esAdministrador && cuenta && (
-        <DepositoModal
-          open={depositoAbierto}
-          onClose={() => setDepositoAbierto(false)}
-          onDepositoRealizado={depositoRealizado}
-        />
+        <>
+          <DepositoModal
+            open={depositoAbierto}
+            onClose={() => setDepositoAbierto(false)}
+            onDepositoRealizado={depositoRealizado}
+          />
+          <TransferenciaModal
+            open={transferenciaAbierta}
+            onClose={() => setTransferenciaAbierta(false)}
+            saldoDisponible={cuenta.saldo}
+            onTransferenciaRealizada={transferenciaRealizada}
+          />
+        </>
       )}
     </Box>
   );
