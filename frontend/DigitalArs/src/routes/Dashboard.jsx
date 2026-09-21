@@ -13,7 +13,9 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/authContext";
 import AuthForm, { ProfileFields } from "../components/Auth/AuthForm";
 import DepositoModal from "../components/Cuentas/DepositoModal";
+import TransferenciaModal from "../components/Cuentas/TransferenciaModal";
 import { MovimientosPreview } from "./Movimientos";
+import { getSessionUser } from "./dashboardUtils";
 
 const formatoPesos = new Intl.NumberFormat("es-AR", {
   style: "currency",
@@ -22,14 +24,16 @@ const formatoPesos = new Intl.NumberFormat("es-AR", {
 
 export default function Dashboard() {
   const { session, obtenerMiCuenta } = useAuth();
+  const usuario = getSessionUser(session);
   const [cuenta, setCuenta] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [intento, setIntento] = useState(0);
   const [depositoAbierto, setDepositoAbierto] = useState(false);
+  const [transferenciaAbierta, setTransferenciaAbierta] = useState(false);
   const [mensajeExito, setMensajeExito] = useState("");
 
-  const esAdministrador = session.user.role === "Administrador";
+  const esAdministrador = !!usuario && usuario.role === "Administrador"; 
 
   useEffect(() => {
     // El administrador usa el panel de gestión.
@@ -103,7 +107,7 @@ export default function Dashboard() {
       </Typography>
 
       <Typography component="h1" variant="h3" fontWeight={700}>
-        Hola, {session.user.nombre}
+        Hola, {usuario?.nombre ?? "usuario"}
       </Typography>
 
       <Typography color="text.secondary" sx={{ mt: 1, mb: 4 }}>
@@ -112,8 +116,8 @@ export default function Dashboard() {
 
       <Paper variant="outlined" sx={{ p: 3 }}>
         <Stack spacing={2} alignItems="flex-start">
-          <Chip label={session.user.role} />
-          <Typography>{session.user.email}</Typography>
+          <Chip label={usuario?.role ?? "Usuario"} />
+          <Typography>{usuario?.email ?? "Sin correo disponible"}</Typography>
 
           {esAdministrador ? (
             <>
@@ -211,7 +215,7 @@ export default function Dashboard() {
           )}
         </Stack>
       </Paper>
-
+      {!esAdministrador && cuenta && <MovimientosPreview />}
       {!esAdministrador && cuenta && (
         <>
           <DepositoModal

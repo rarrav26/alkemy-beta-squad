@@ -12,7 +12,8 @@ public class AccountService(
     AuthDbContext auth,
     DigitalArsDbContext db,
     UserManager<IdentityUser> users,
-    IUsuarioRepository usuarios) : IAccountService
+    IUsuarioRepository usuarios,
+    ICuentaRepository cuentas) : IAccountService
 {
     private const int IntentosParaGenerarAlias = 10;
 
@@ -85,6 +86,60 @@ public class AccountService(
 
     public async Task<bool> ExisteAdministradorAsync() =>
         (await users.GetUsersInRoleAsync(RolPrincipal.Administrador)).Count > 0;
+
+    public async Task<Resultado<UsuarioResponse>> ObtenerPorIdAsync(
+        int usuarioId, CancellationToken cancellationToken = default)
+    {
+        var perfil = await usuarios.GetByIdAsync(usuarioId, cancellationToken);
+        if (perfil is null)
+            return Resultado<UsuarioResponse>.Fallo(MotivoDeRechazo.NoEncontrado, "No se encontró el usuario.");
+
+        var cuenta = await cuentas.GetByUsuarioIdAsync(perfil.id, cancellationToken);
+
+        var respuesta = new UsuarioResponse(
+            UsuarioId: perfil.id,
+            Nombre: perfil.nombre,
+            Apellido: perfil.apellido,
+            TipoDocumento: perfil.tipo_documento,
+            NroDocumento: perfil.nro_documento,
+            Email: perfil.email,
+            IsActive: perfil.is_active,
+            Cuenta: cuenta is null ? null : new CuentaResponse(
+                Id: cuenta.id,
+                Alias: cuenta.alias,
+                Cvu: cuenta.cvu,
+                Saldo: cuenta.saldo)
+        );
+
+        return Resultado<UsuarioResponse>.Exito(respuesta);
+    }
+
+    public async Task<Resultado<UsuarioResponse>> ObtenerPorIdentityUserIdAsync(
+        string identityUserId, CancellationToken cancellationToken = default)
+    {
+        var perfil = await usuarios.GetByIdentityUserIdAsync(identityUserId, cancellationToken);
+        if (perfil is null)
+            return Resultado<UsuarioResponse>.Fallo(MotivoDeRechazo.NoEncontrado, "No se encontró el usuario.");
+
+        var cuenta = await cuentas.GetByUsuarioIdAsync(perfil.id, cancellationToken);
+
+        var respuesta = new UsuarioResponse(
+            UsuarioId: perfil.id,
+            Nombre: perfil.nombre,
+            Apellido: perfil.apellido,
+            TipoDocumento: perfil.tipo_documento,
+            NroDocumento: perfil.nro_documento,
+            Email: perfil.email,
+            IsActive: perfil.is_active,
+            Cuenta: cuenta is null ? null : new CuentaResponse(
+                Id: cuenta.id,
+                Alias: cuenta.alias,
+                Cvu: cuenta.cvu,
+                Saldo: cuenta.saldo)
+        );
+
+        return Resultado<UsuarioResponse>.Exito(respuesta);
+    }
 
     // Se revoca primero y se guarda después: si el guardado del perfil falla, los tokens viejos
     // ya dejaron de valer y no vuelven a servir cuando se reactive al usuario.

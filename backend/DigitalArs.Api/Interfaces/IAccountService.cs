@@ -14,6 +14,12 @@ public interface IAccountService
     Task<Resultado<InvitacionResponse>> ReemitirInvitacionAsync(
         int usuarioId, CancellationToken cancellationToken = default);
 
+    Task<Resultado<UsuarioResponse>> ObtenerPorIdAsync(
+        int usuarioId, CancellationToken cancellationToken = default);
+
+    Task<Resultado<UsuarioResponse>> ObtenerPorIdentityUserIdAsync(
+        string identityUserId, CancellationToken cancellationToken = default);
+
     // Null cuando el cambio se guardó: el endpoint responde sin cuerpo, así que no hay nada
     // que devolver más que el motivo del rechazo cuando lo hay.
     Task<MotivoDeRechazo?> CambiarEstadoAsync(

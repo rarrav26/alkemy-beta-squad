@@ -4,11 +4,12 @@ import { useAuth } from '../../context/authContext'
 import { InitialPasswordPage, LoginPage, RegisterPage } from '../../routes/AuthPages'
 import Dashboard, { NewUserPage } from '../../routes/Dashboard'
 import { MovimientosPage } from '../../routes/Movimientos'
+import PerfilPage from '../../routes/Perfil'
 
 function Protected({ children, admin = false }) {
   const { session } = useAuth()
   if (!session) return <Navigate to="/login" replace />
-  if (admin && session.user.role !== 'Administrador') return <Navigate to="/dashboard" replace />
+  if (admin && session.user?.role !== 'Administrador') return <Navigate to="/dashboard" replace />
   return children
 }
 export default function Main() {
@@ -27,6 +28,7 @@ export default function Main() {
     <Route path="/register" element={<RegisterPage />} />
     <Route path="/primera-password" element={<InitialPasswordPage />} />
     <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+    <Route path="/perfil" element={<Protected><PerfilPage /></Protected>} />
     <Route path="/movimientos" element={<Protected><MovimientosPage /></Protected>} />
     <Route path="/usuarios/nuevo" element={<Protected admin><NewUserPage /></Protected>} />
     <Route path="*" element={<Navigate to="/" replace />} />

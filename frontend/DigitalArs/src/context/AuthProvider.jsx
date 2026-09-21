@@ -119,6 +119,11 @@ export default function AuthProvider({ children }) {
     [authenticatedRequest]
   )
 
+  const obtenerMiPerfil = useCallback(
+    signal => authenticatedRequest('/api/Usuarios/me', { signal }),
+    [authenticatedRequest]
+  )
+
   // consulta lleva page y pageSize, y opcionalmente los filtros tipo, desde y
   // hasta. Se manda tal cual viene: quien llama decide qué filtros aplica.
   const obtenerMovimientos = useCallback(
@@ -157,6 +162,7 @@ export default function AuthProvider({ children }) {
         logout,
         retry,
         obtenerMiCuenta,
+        obtenerMiPerfil,
         obtenerMovimientos,
         ingresarDinero
       }}

@@ -12,6 +12,7 @@ export default function ResponsiveAppBar() {
       <Box sx={{ flexGrow: 1 }} />
       {ready && !connectionError && session && <>
         <Button color="inherit" component={Link} to="/dashboard">Mi cuenta</Button>
+        <Button color="inherit" component={Link} to="/perfil">Perfil</Button>
         <Button color="inherit" onClick={logout}>Cerrar sesión</Button>
       </>}
       <ChangeTheme />
