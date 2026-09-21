@@ -5,7 +5,6 @@ import {
   Button,
   Card,
   CardContent,
-  Chip,
   CircularProgress,
   Divider,
   Stack,
@@ -54,11 +53,11 @@ function InfoCard({ label, value, alignRight = false, darkMode = true }) {
           >
             {label}
           </Typography>
-          <Box
+          <Typography
+            variant="body1"
             sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: alignRight ? 'flex-end' : 'flex-start',
+              fontWeight: 500,
+              textAlign: alignRight ? 'right' : 'left',
               overflowWrap: 'anywhere',
               wordBreak: 'break-word',
               color: darkMode ? '#f5f5f5' : '#111827',
@@ -66,21 +65,8 @@ function InfoCard({ label, value, alignRight = false, darkMode = true }) {
               lineHeight: 1.4
             }}
           >
-            {typeof value === 'string' || typeof value === 'number' ? (
-              <Typography
-                variant="body1"
-                sx={{
-                  fontWeight: 500,
-                  textAlign: alignRight ? 'right' : 'left',
-                  color: 'inherit'
-                }}
-              >
-                {value}
-              </Typography>
-            ) : (
-              value ?? '-'
-            )}
-          </Box>
+            {value ?? '-'}
+          </Typography>
         </Box>
       </CardContent>
     </Card>
@@ -137,7 +123,7 @@ export default function PerfilPage() {
   if (cargando) {
     return (
       <Box sx={{ maxWidth: 900, mx: 'auto', p: 4, display: 'grid', placeItems: 'center' }}>
-        <Stack sx={{ alignItems: 'center' }} spacing={2}>
+        <Stack alignItems="center" spacing={2}>
           <CircularProgress />
           <Typography>Cargando tu perfil…</Typography>
         </Stack>
@@ -163,6 +149,7 @@ export default function PerfilPage() {
   }
 
   const saldo = perfil?.cuenta?.saldo ?? 0
+  const mostrarUsuarioActivo = esAdmin && typeof perfil?.isActive === 'boolean'
   const mostrarSaldo = esAdmin
 
   return (
@@ -192,19 +179,14 @@ export default function PerfilPage() {
           <InfoCard label="Tipo de documento" value={perfil?.tipoDocumento ?? '-'} alignRight darkMode={darkMode} />
           <InfoCard label="Número de documento" value={perfil?.nroDocumento ?? '-'} alignRight darkMode={darkMode} />
           <InfoCard label="Email" value={perfil?.email ?? '-'} alignRight darkMode={darkMode} />
-          <InfoCard
-            label="Estado"
-            value={
-              <Chip
-                label={perfil?.isActive ? 'Activo' : 'Inactivo'}
-                color={perfil?.isActive ? 'success' : 'default'}
-                size="small"
-                variant="outlined"
-              />
-            }
-            alignRight
-            darkMode={darkMode}
-          />
+          {mostrarUsuarioActivo && (
+            <InfoCard
+              label="Usuario activo"
+              value={perfil?.isActive ? 'Sí' : 'No'}
+              alignRight
+              darkMode={darkMode}
+            />
+          )}
         </Box>
 
         <Divider sx={{ borderColor: darkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)' }} />
