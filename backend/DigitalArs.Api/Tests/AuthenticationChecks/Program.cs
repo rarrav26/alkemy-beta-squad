@@ -86,29 +86,38 @@ Reject(handler.WriteToken(expired), parameters, "Rechaza JWT vencido");
 Reject(invitation, parameters, "Invitación no puede usarse como JWT");
 
 // Criterio 1 (HU-010): el destino de una transferencia se resuelve desde un único campo,
-// aceptando un alias (3 palabras separadas por punto) o un CVU (22 dígitos). El formato se
-// valida antes de tocar la base, con DatosDeCuenta como única fuente de verdad.
-Check(DatosDeCuenta.EsDestinoValido("auto.perro.gato"), "Acepta alias de 3 palabras");
-Check(DatosDeCuenta.EsDestinoValido(DatosDeCuenta.SortearAlias()), "Acepta un alias generado por el sistema");
-Check(DatosDeCuenta.EsDestinoValido("0000003100000012345678"), "Acepta CVU de 22 dígitos");
-Check(DatosDeCuenta.EsDestinoValido(DatosDeCuenta.CvuPara(42)), "Acepta un CVU generado por el sistema");
-Check(!DatosDeCuenta.EsDestinoValido("auto.perro"), "Rechaza alias de solo 2 palabras");
-Check(!DatosDeCuenta.EsDestinoValido("auto.perro.gato.sol"), "Rechaza alias de 4 palabras");
-Check(!DatosDeCuenta.EsDestinoValido("autoperrogato"), "Rechaza alias sin puntos");
-Check(!DatosDeCuenta.EsDestinoValido("00000031000000123456"), "Rechaza CVU de menos de 22 dígitos");
-Check(!DatosDeCuenta.EsDestinoValido("000000310000001234567X"), "Rechaza CVU con caracteres no numéricos");
-Check(!DatosDeCuenta.EsDestinoValido(""), "Rechaza destino vacío");
-Check(!DatosDeCuenta.EsDestinoValido(null), "Rechaza destino nulo");
+// aceptando un alias o un CVU (22 dígitos). El formato se valida antes de tocar la base, con
+// DatosDeCuenta como única fuente de verdad.
+// El alias tiene DOS formatos válidos y conviene no confundirlos: el AUTOGENERADO al crear la
+// cuenta son 3 palabras separadas por punto, y el PERSONALIZADO que el usuario elige al editar
+// es solo letras. Como destino sirven los dos, porque en la base conviven.
 
-// El formato del alias es uno solo para todo el sistema: el que se genera al crear la cuenta,
-// el que un usuario puede elegir al editarlo, y el que se acepta como destino de una
-// transferencia. Antes convivían dos reglas incompatibles y un alias editado quedaba
-// inalcanzable por alias, así que estas comprobaciones fijan que no vuelva a pasar.
-Check(DatosDeCuenta.EsAliasValido("admin.alkemy.fuerte"), "Acepta un alias elegido por el usuario");
-Check(!DatosDeCuenta.EsAliasValido("adminalkemyfuerte"), "Rechaza el alias de una sola palabra que permitía la regla vieja");
-Check(DatosDeCuenta.NormalizarAlias("  Auto.Perro.Gato  ") == "auto.perro.gato", "Normaliza recortando espacios y pasando a minúsculas");
-Check(DatosDeCuenta.EsAliasValido(DatosDeCuenta.NormalizarAlias("Auto.Perro.Gato")), "Acepta mayúsculas una vez normalizado");
-Check("a.b.c".Length == DatosDeCuenta.LargoMinimoAlias, "El largo mínimo declarado coincide con el alias más corto posible");
+// --- Alias autogenerado: 3 palabras con punto ---
+Check(DatosDeCuenta.EsAliasGeneradoValido("auto.perro.gato"), "Alias generado: acepta 3 palabras con punto");
+Check(DatosDeCuenta.EsAliasGeneradoValido(DatosDeCuenta.SortearAlias()), "Alias generado: acepta lo que produce SortearAlias");
+Check(!DatosDeCuenta.EsAliasGeneradoValido("mariagonzalez"), "Alias generado: rechaza una sola palabra");
+Check(!DatosDeCuenta.EsAliasGeneradoValido("auto.perro"), "Alias generado: rechaza 2 palabras");
+
+// --- Alias personalizado: solo letras ---
+Check(DatosDeCuenta.EsAliasPersonalizadoValido("mariagonzalez"), "Alias personalizado: acepta solo letras");
+Check(!DatosDeCuenta.EsAliasPersonalizadoValido("auto.perro.gato"), "Alias personalizado: rechaza puntos");
+Check(!DatosDeCuenta.EsAliasPersonalizadoValido("maria123"), "Alias personalizado: rechaza números");
+Check(!DatosDeCuenta.EsAliasPersonalizadoValido("maria gonzalez"), "Alias personalizado: rechaza espacios");
+Check(!DatosDeCuenta.EsAliasPersonalizadoValido("ab"), "Alias personalizado: rechaza menos del largo mínimo");
+Check(!DatosDeCuenta.EsAliasPersonalizadoValido(new string('a', DatosDeCuenta.LargoMaximoAlias + 1)), "Alias personalizado: rechaza pasarse del largo máximo");
+Check(DatosDeCuenta.EsAliasPersonalizadoValido(DatosDeCuenta.NormalizarAlias("MariaGonzalez")), "Alias personalizado: acepta mayúsculas una vez normalizado");
+Check(DatosDeCuenta.NormalizarAlias("  MariaGonzalez  ") == "mariagonzalez", "Normaliza recortando espacios y pasando a minúsculas");
+
+// --- Como destino de transferencia valen AMBOS formatos ---
+Check(DatosDeCuenta.EsDestinoValido("auto.perro.gato"), "Destino: acepta el alias autogenerado");
+Check(DatosDeCuenta.EsDestinoValido("mariagonzalez"), "Destino: acepta el alias personalizado");
+Check(DatosDeCuenta.EsDestinoValido("0000003100000012345678"), "Destino: acepta CVU de 22 dígitos");
+Check(DatosDeCuenta.EsDestinoValido(DatosDeCuenta.CvuPara(42)), "Destino: acepta un CVU generado por el sistema");
+Check(!DatosDeCuenta.EsDestinoValido("auto.perro"), "Destino: rechaza un alias de 2 palabras");
+Check(!DatosDeCuenta.EsDestinoValido("00000031000000123456"), "Destino: rechaza CVU de menos de 22 dígitos");
+Check(!DatosDeCuenta.EsDestinoValido("000000310000001234567X"), "Destino: rechaza CVU con caracteres no numéricos");
+Check(!DatosDeCuenta.EsDestinoValido(""), "Destino: rechaza vacío");
+Check(!DatosDeCuenta.EsDestinoValido(null), "Destino: rechaza nulo");
 
 Console.WriteLine("Todas las verificaciones pasaron.");
 

@@ -18,7 +18,10 @@ public class TransferenciaService(
         TransferenciaDto dto,
         CancellationToken cancellationToken = default)
     {
-        var destino = (dto.Destino ?? "").Trim();
+        // Se normaliza igual que al guardar un alias: los alias se almacenan en minúsculas, y la
+        // búsqueda por alias o CVU compara texto exacto, así que sin esto escribir
+        // "MariaGonzalez" no encontraría la cuenta y el usuario leería "no existe".
+        var destino = DatosDeCuenta.NormalizarAlias(dto.Destino);
 
         if (dto.Importe is not decimal importe)
         {
@@ -104,7 +107,10 @@ public class TransferenciaService(
         TransferenciaDto dto,
         CancellationToken cancellationToken = default)
     {
-        var destino = (dto.Destino ?? "").Trim();
+        // Se normaliza igual que al guardar un alias: los alias se almacenan en minúsculas, y la
+        // búsqueda por alias o CVU compara texto exacto, así que sin esto escribir
+        // "MariaGonzalez" no encontraría la cuenta y el usuario leería "no existe".
+        var destino = DatosDeCuenta.NormalizarAlias(dto.Destino);
 
         if (dto.Importe is not decimal importe)
             return Resultado<TransferenciaResponseDto>.Fallo(MotivoDeRechazo.DatosInvalidos, "El importe es obligatorio.");

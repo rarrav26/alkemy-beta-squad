@@ -15,10 +15,15 @@ import { useAuth } from '../context/authContext'
 import { buildAliasPayload, buildProfilePayload } from './perfilUtils'
 import { esAdministrador } from './rolesUtils'
 
-// Espejo de DatosDeCuenta.PatronAlias en el backend: tres palabras separadas por puntos.
+// Espejo de DatosDeCuenta.PatronAliasPersonalizado en el backend: el alias que el usuario
+// elige es SOLO LETRAS. El formato de tres palabras separadas por punto corresponde únicamente
+// al alias autogenerado al crear la cuenta, y no se acepta en la edición.
 // Se valida en el front solo para avisar antes de llamar a la API; la regla que manda sigue
 // siendo la del backend.
-const FORMATO_ALIAS = /^[a-z]+\.[a-z]+\.[a-z]+$/
+const FORMATO_ALIAS = /^[a-z]+$/
+const LARGO_MINIMO_ALIAS = 3
+const LARGO_MAXIMO_ALIAS = 50
+const AYUDA_ALIAS = 'Solo letras, sin espacios ni números. Por ejemplo: mariagonzalez'
 
 const formatoPesos = new Intl.NumberFormat('es-AR', {
   style: 'currency',
@@ -221,8 +226,8 @@ export default function PerfilPage() {
   const guardarAlias = async event => {
     event.preventDefault()
 
-    // Misma regla que el backend (DatosDeCuenta): tres palabras separadas por puntos. Se
-    // valida acá para avisar junto al campo, sin ir hasta la API para un error de tipeo.
+    // Misma regla que el backend (DatosDeCuenta): solo letras. Se valida acá para avisar
+    // junto al campo, sin ir hasta la API para un error de tipeo.
     const aliasTrim = alias.trim().toLowerCase()
 
     if (!aliasTrim) {
@@ -231,7 +236,12 @@ export default function PerfilPage() {
     }
 
     if (!FORMATO_ALIAS.test(aliasTrim)) {
-      setErrorAlias('Tres palabras separadas por puntos, por ejemplo auto.perro.gato')
+      setErrorAlias(AYUDA_ALIAS)
+      return
+    }
+
+    if (aliasTrim.length < LARGO_MINIMO_ALIAS || aliasTrim.length > LARGO_MAXIMO_ALIAS) {
+      setErrorAlias(`El alias debe tener entre ${LARGO_MINIMO_ALIAS} y ${LARGO_MAXIMO_ALIAS} letras.`)
       return
     }
 
@@ -426,7 +436,7 @@ export default function PerfilPage() {
                     fullWidth
                     variant="outlined"
                     error={Boolean(errorAlias)}
-                    helperText={errorAlias || 'Tres palabras separadas por puntos, por ejemplo auto.perro.gato'}
+                    helperText={errorAlias || AYUDA_ALIAS}
                   />
                   <Stack direction="row" spacing={2} sx={{ justifyContent: 'flex-end' }}>
                     <Button

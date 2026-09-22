@@ -271,17 +271,16 @@ public class AccountService(
                 "Tu usuario no tiene una cuenta asociada, así que no hay alias para modificar."
             });
 
-        // El formato del alias lo define DatosDeCuenta, que es el mismo lugar que genera los
-        // alias automáticos y el que valida el destino de una transferencia. Tenerlo en un
-        // solo lugar evita lo que pasaba antes: acá se exigía una sola palabra sin puntos
-        // mientras transferencias exigía tres con puntos, así que un alias editado quedaba
-        // inalcanzable por alias.
+        // El alias que elige el usuario es solo letras. El formato de tres palabras con puntos
+        // es el del alias AUTOGENERADO al crear la cuenta, y no se acepta en la edición.
+        // La regla vive en DatosDeCuenta, que es también quien genera los alias y quien valida
+        // el destino de una transferencia, así que las tres no pueden desincronizarse.
         var aliasTrim = DatosDeCuenta.NormalizarAlias(newAlias);
 
-        if (!DatosDeCuenta.EsAliasValido(aliasTrim))
+        if (!DatosDeCuenta.EsAliasPersonalizadoValido(aliasTrim))
             return Resultado<CuentaResponse>.Fallo(MotivoDeRechazo.DatosInvalidos, new[]
             {
-                "El alias debe ser tres palabras separadas por puntos (ejemplo: auto.perro.gato)."
+                $"El alias solo puede contener letras, sin espacios ni números, y debe tener entre {DatosDeCuenta.LargoMinimoAlias} y {DatosDeCuenta.LargoMaximoAlias} caracteres."
             });
 
         // Unicidad: buscar por alias (GetByAliasOCvuAsync también busca CVU)
