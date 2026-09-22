@@ -12,8 +12,8 @@ import {
   Typography
 } from '@mui/material'
 import { useAuth } from '../context/authContext'
-import { getSessionUser } from './dashboardUtils'
 import { buildAliasPayload, buildProfilePayload } from './perfilUtils'
+import { esAdministrador } from './rolesUtils'
 
 // Espejo de DatosDeCuenta.PatronAlias en el backend: tres palabras separadas por puntos.
 // Se valida en el front solo para avisar antes de llamar a la API; la regla que manda sigue
@@ -95,8 +95,7 @@ function InfoCard({ label, value, alignRight = false }) {
 
 export default function PerfilPage() {
   const { obtenerMiPerfil, actualizarMiPerfil, actualizarAliasCuenta, session } = useAuth()
-  const usuario = getSessionUser(session)
-  const esAdmin = usuario?.role === 'Administrador'
+  const esAdmin = esAdministrador(session)
   const [perfil, setPerfil] = useState(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')

@@ -14,6 +14,7 @@ import {
 import MenuIcon from '@mui/icons-material/Menu'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/authContext'
+import { esAdministrador } from '../../routes/rolesUtils'
 import ChangeTheme from './ChangeTheme'
 
 export default function ResponsiveAppBar() {
@@ -27,11 +28,7 @@ export default function ResponsiveAppBar() {
   const abrirMenu = event => setAnclaMenu(event.currentTarget)
   const cerrarMenu = () => setAnclaMenu(null)
 
-  const user = session?.user || session?.usuario || session
-  const esAdmin =
-    user?.role === 'Administrador' ||
-    user?.rol === 'Administrador' ||
-    user?.Role === 'Administrador'
+  const esAdmin = esAdministrador(session)
 
   // La navegación exige que la sesión esté VERIFICADA, no solo presente. El encabezado se
   // dibuja fuera de las rutas, así que sin este control un usuario desactivado alcanzaba a ver

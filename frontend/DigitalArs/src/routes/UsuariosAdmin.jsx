@@ -37,7 +37,6 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined';
 import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
 import { useAuth } from '../context/authContext';
-import { Navigate } from 'react-router-dom';
 import { obtenerUsuariosAdmin, cambiarEstadoUsuarioAdmin } from '../context/api';
 import EditarUsuarioModal from '../components/Admin/EditarUsuarioModal';
 
@@ -194,18 +193,6 @@ export default function UsuariosAdmin() {
 
     return () => clearTimeout(temporizador);
   }, [busqueda]);
-
-  // El rol se lee después de declarar los hooks: si se devolviera antes, un render con la
-  // sesión todavía sin cargar ejecutaría menos hooks que el siguiente y React lo rechaza.
-  const user = session?.user || session?.usuario || session;
-  const esAdmin =
-    user?.role === 'Administrador' ||
-    user?.rol === 'Administrador' ||
-    user?.Role === 'Administrador';
-
-  if (!esAdmin) {
-    return <Navigate to="/" replace />;
-  }
 
   const handlePageChange = (event, valor) => {
     setPagina(valor);
