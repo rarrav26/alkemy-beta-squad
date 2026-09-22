@@ -96,13 +96,20 @@ src/
 | `/login` | Público | Inicio de sesión. |
 | `/register` | Público | Registro de un usuario común. |
 | `/primera-password` | Con invitación | Definir la primera contraseña. |
-| `/dashboard` | Autenticado | Punto de entrada tras iniciar sesión. |
+| `/dashboard` | Autenticado | Punto de entrada tras iniciar sesión; muestra una vista por rol. |
+| `/perfil` | Autenticado | Datos personales; el alias solo aparece si hay billetera. |
+| `/movimientos` | Usuario | Historial de la billetera. El administrador no tiene una. |
 | `/usuarios/nuevo` | Administrador | Alta de usuario, devuelve la invitación. |
+| `/admin/usuarios` | Administrador | Listado, edición y activación de usuarios. |
 | `/setup` | — | Redirige a `/login`; quedó por compatibilidad. |
 | cualquier otra | — | Redirige a `/`. |
 
 La protección de rutas organiza la navegación. **La autorización real la hace la API**: un
 usuario sin rol Administrador que llegue a `/usuarios/nuevo` igual recibe 403 del backend.
+
+Cada ruta declara el rol que pide con `<Protected rol={...}>` en `Main.jsx`. Quien no lo tiene
+vuelve a `/dashboard`. El rol se lee siempre con `src/routes/rolesUtils.js`: es el único lugar
+que sabe cómo viene en la sesión, así que ningún componente lo compara a mano.
 
 ## Cómo funciona la sesión
 

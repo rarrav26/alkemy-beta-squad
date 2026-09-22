@@ -641,7 +641,8 @@ Dentro de **frontend/DigitalArs/**:
 | src/components/Auth/AuthForm.jsx           | Formulario común, carga, errores y campos compartidos. |
 | src/routes/AuthPages.jsx                   | LoginPage, RegisterPage e InitialPasswordPage.         |
 | src/routes/Dashboard.jsx                   | Dashboard y NewUserPage con invitación.                |
-| src/components/Main/Main.jsx               | Rutas y protección de navegación.                      |
+| src/components/Main/Main.jsx               | Rutas y protección de navegación por rol.              |
+| src/routes/rolesUtils.js                   | Único lugar que lee el rol de la sesión.               |
 | src/components/Header/Header.jsx           | Envuelve a ResponsiveAppBar.                           |
 | src/components/Header/ResponsiveAppBar.jsx | Navegación y cierre de sesión.                         |
 | src/components/Header/ChangeTheme.jsx      | Cambia el tema.                                        |
@@ -660,6 +661,10 @@ Al vencer el token, un temporizador borra la sesión. Un 401 en authenticatedReq
 **Logout elimina la copia local**, no incorpora revocación individual del JWT en el servidor. Una copia del token podría seguir siendo válida hasta vencer o cambiar el stamp.
 
 La protección de rutas de React organiza la interfaz. La autorización real la hace la API.
+
+Cada ruta declara el rol que pide: `/movimientos` es solo para Usuario (el administrador no tiene billetera), `/admin/usuarios` y `/usuarios/nuevo` son solo para Administrador, y `/dashboard` y `/perfil` son para los dos. Quien no tiene el rol vuelve a `/dashboard`.
+
+Un usuario desactivado no llega a ninguna pantalla protegida: el login le responde 403 `USER_INACTIVE` con el motivo, y si ya tenía la sesión abierta, su próxima llamada a la API recibe 401 y la sesión se cierra.
 
 routes/Home.jsx y routes/ProductId.jsx quedaron del template original y ninguna ruta los importa: son archivos muertos. El antiguo components/Home/Login.jsx se eliminó: era una segunda pantalla de login que tampoco se usaba. La pantalla real es LoginPage, en routes/AuthPages.jsx. Se retiraron del flujo las llamadas de ejemplo a DummyJSON.
 
