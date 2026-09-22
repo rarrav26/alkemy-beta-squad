@@ -20,6 +20,12 @@ public interface IAccountService
     Task<Resultado<UsuarioResponse>> ObtenerPorIdentityUserIdAsync(
         string identityUserId, CancellationToken cancellationToken = default);
 
+    Task<Resultado<UsuarioResponse>> UpdateProfileAsync(
+        string identityUserId, DTOs.UpdateProfileDto dto, CancellationToken cancellationToken = default);
+
+    Task<bool> ValidatePasswordAsync(
+        string identityUserId, string password, CancellationToken cancellationToken = default);
+
     // Null cuando el cambio se guardó: el endpoint responde sin cuerpo, así que no hay nada
     // que devolver más que el motivo del rechazo cuando lo hay.
     Task<MotivoDeRechazo?> CambiarEstadoAsync(

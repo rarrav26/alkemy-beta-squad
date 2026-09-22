@@ -114,6 +114,85 @@ public class AccountService(
         return Resultado<UsuarioResponse>.Exito(respuesta);
     }
 
+    public async Task<Resultado<UsuarioResponse>> UpdateProfileAsync(
+        string identityUserId, DTOs.UpdateProfileDto dto, CancellationToken cancellationToken = default)
+    {
+        // Obtener perfil
+        var perfil = await usuarios.GetByIdentityUserIdAsync(identityUserId, cancellationToken);
+        if (perfil is null)
+            return Resultado<UsuarioResponse>.Fallo(MotivoDeRechazo.NoEncontrado, "No se encontró el usuario.");
+
+        // Si email cambia, validar unicidad en Identity
+        var emailLower = dto.Email.Trim();
+        var emailChanged = !string.Equals(perfil.email, emailLower, StringComparison.OrdinalIgnoreCase);
+        if (emailChanged)
+        {
+            var existenteIdentity = await users.FindByEmailAsync(emailLower);
+            if (existenteIdentity is not null && existenteIdentity.Id != identityUserId)
+                return Resultado<UsuarioResponse>.Fallo(MotivoDeRechazo.DatosInvalidos, new[] { "El email ya está en uso." });
+
+            // también chequear en tabla usuarios por si hay otro perfil con mismo email
+            var otroPerfil = await db.Usuarios.AsNoTracking().SingleOrDefaultAsync(u => u.email == emailLower, cancellationToken);
+            if (otroPerfil is not null && otroPerfil.identity_user_id != identityUserId)
+                return Resultado<UsuarioResponse>.Fallo(MotivoDeRechazo.DatosInvalidos, new[] { "El email ya está en uso." });
+        }
+
+        // Si el email cambia, actualizamos también IdentityUser cuando corresponda.
+        if (emailChanged && perfil.identity_user_id is not null)
+        {
+            var usuarioIdentity = await users.FindByIdAsync(perfil.identity_user_id);
+            if (usuarioIdentity is null)
+                return Resultado<UsuarioResponse>.Fallo(MotivoDeRechazo.NoEncontrado, "No se encontró el usuario de identidad.");
+
+            // Re-autenticación: exigir contraseña actual para cambiar el email
+            if (string.IsNullOrWhiteSpace(dto.CurrentPassword))
+                return Resultado<UsuarioResponse>.Fallo(MotivoDeRechazo.DatosInvalidos, new[] { "Se requiere la contraseña actual para cambiar el email." });
+
+            var passwordValido = await users.CheckPasswordAsync(usuarioIdentity, dto.CurrentPassword);
+            if (!passwordValido)
+                return Resultado<UsuarioResponse>.Fallo(MotivoDeRechazo.DatosInvalidos, new[] { "Contraseña actual incorrecta." });
+
+            usuarioIdentity.Email = emailLower;
+            usuarioIdentity.UserName = emailLower;
+            var actualizado = await users.UpdateAsync(usuarioIdentity);
+            if (!actualizado.Succeeded)
+                return Resultado<UsuarioResponse>.Fallo(MotivoDeRechazo.NoSePudoActualizar, new[] { "No se pudo actualizar el email." });
+        }
+
+        // Actualizar perfil en la tabla de negocio
+        var actualizadoPerfil = await usuarios.UpdateProfileAsync(perfil.id, dto.Nombre.Trim(), dto.Apellido.Trim(), emailLower, cancellationToken);
+        if (!actualizadoPerfil)
+            return Resultado<UsuarioResponse>.Fallo(MotivoDeRechazo.NoSePudoActualizar, new[] { "No se pudo actualizar el perfil." });
+
+        // Devolver perfil actualizado
+        var perfilNuevo = await usuarios.GetByIdAsync(perfil.id, cancellationToken);
+        var cuenta = await cuentas.GetByUsuarioIdAsync(perfil.id, cancellationToken);
+
+        var respuesta = new UsuarioResponse(
+            UsuarioId: perfilNuevo!.id,
+            Nombre: perfilNuevo.nombre,
+            Apellido: perfilNuevo.apellido,
+            TipoDocumento: perfilNuevo.tipo_documento,
+            NroDocumento: perfilNuevo.nro_documento,
+            Email: perfilNuevo.email,
+            IsActive: perfilNuevo.is_active,
+            Cuenta: cuenta is null ? null : new CuentaResponse(cuenta.id, cuenta.alias, cuenta.cvu, cuenta.saldo)
+        );
+
+        return Resultado<UsuarioResponse>.Exito(respuesta);
+    }
+
+    public async Task<bool> ValidatePasswordAsync(string identityUserId, string password, CancellationToken cancellationToken = default)
+    {
+        var perfil = await usuarios.GetByIdentityUserIdAsync(identityUserId, cancellationToken);
+        if (perfil is null || perfil.identity_user_id is null) return false;
+
+        var usuarioIdentity = await users.FindByIdAsync(perfil.identity_user_id);
+        if (usuarioIdentity is null) return false;
+
+        return await users.CheckPasswordAsync(usuarioIdentity, password);
+    }
+
     public async Task<Resultado<UsuarioResponse>> ObtenerPorIdentityUserIdAsync(
         string identityUserId, CancellationToken cancellationToken = default)
     {

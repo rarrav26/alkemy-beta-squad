@@ -92,4 +92,43 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
             ? NotFound()
             : StatusCode(StatusCodes.Status500InternalServerError);
     }
+
+    [HttpPatch("me")]
+    [ProducesResponseType<UsuarioResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> UpdateMe([FromBody] UpdateProfileDto dto, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(new ErrorResponse { Message = "Datos inválidos.", Errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToArray() });
+
+        var identityUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrWhiteSpace(identityUserId)) return Unauthorized();
+
+        // Si el email cambió, el frontend debe enviar CurrentPassword; chequearlo aquí.
+        var resultado = await accounts.UpdateProfileAsync(identityUserId, dto, cancellationToken);
+        if (resultado.Exitoso) return Ok(resultado.Valor);
+
+        return resultado.Motivo switch
+        {
+            MotivoDeRechazo.NoEncontrado => NotFound(),
+            MotivoDeRechazo.DatosInvalidos => BadRequest(new ErrorResponse { Message = "Error de validación.", Errors = resultado.Errores }),
+            MotivoDeRechazo.NoSePudoActualizar => StatusCode(StatusCodes.Status500InternalServerError, new ErrorResponse { Message = "No se pudo actualizar el perfil." }),
+            _ => StatusCode(StatusCodes.Status500InternalServerError)
+        };
+    }
+
+    [HttpPost("me/validate-password")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ValidatePassword([FromBody] ValidatePasswordDto dto, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid) return BadRequest(new ErrorResponse { Message = "Password inválida." });
+
+        var identityUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrWhiteSpace(identityUserId)) return Unauthorized();
+
+        var valido = await accounts.ValidatePasswordAsync(identityUserId, dto.Password, cancellationToken);
+        return valido ? Ok() : Unauthorized(new ErrorResponse { Message = "Contraseña incorrecta." });
+    }
 }
