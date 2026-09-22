@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace DigitalArs.Api.DTOs;
+namespace DigitalArs.Api.Errors;
 
 // Los campos nulos no se serializan a propósito: así el JSON sigue siendo idéntico al que
 // devolvían los objetos anónimos. Un error sin código no incluye la clave "code", en vez de

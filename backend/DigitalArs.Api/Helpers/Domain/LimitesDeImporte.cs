@@ -1,4 +1,4 @@
-namespace DigitalArs.Api.Services;
+namespace DigitalArs.Api.Helpers.Domain;
 
 // Regla única del importe de un movimiento, sin base de datos. La usan el DTO para
 // validar la entrada y el servicio para aplicarla como regla de negocio. El repositorio

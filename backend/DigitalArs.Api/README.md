@@ -112,11 +112,36 @@ DTOs/             lo que cada operación acepta y devuelve; nunca se expone una 
 Interfaces/       contratos, tanto de repositorios como de servicios
 Services/         las reglas de negocio (login, alta, invitaciones, JWT)
 Repositories/     acceso a datos vía DbContext
-Middleware/       GlobalExceptionHandler: convierte una excepción no controlada en un 500 con ErrorResponse
+Helpers/          lo compartido que no depende de una petición HTTP:
+  Domain/           reglas de negocio puras: importes, alias/CVU, signos, roles
+  Common/           utilidades técnicas: fechas, normalización de texto, mensajes de Identity
+  Results/          Resultado<T> y MotivoDeRechazo: el contrato servicio → controller
+  Configuration/    opciones y constantes de configuración: JWT e invitación
+Errors/           la capa de errores, junta en un solo lugar: ErrorResponse (la forma),
+                  RespuestaDeError (la arma desde un Resultado) y GlobalExceptionHandler
+                  (convierte una excepción no controlada en un 500 con esa misma forma)
 OpenApi/          documentación del esquema Bearer en Swagger
 Data/Context/     DigitalArsDbContext (generado por scaffolding) y AuthDbContext (Identity)
 Data/Entities/    entidades (generadas por scaffolding)
 ```
+
+### Cada carpeta contiene una sola clase de archivo
+
+Esta regla es la que mantiene el proyecto navegable, y ya se rompió una vez: `Services/`
+llegó a tener 19 archivos de los cuales solo 7 eran servicios.
+
+- En `Services/` va **solo una clase que se registra en `Program.cs`** y recibe sus
+  dependencias por constructor. Si la clase es `static`, si no tiene dependencias, o si
+  no se registra en el contenedor, **no es un servicio**: va en `Helpers/`.
+- En `Controllers/` va **solo un `<Recurso>Controller`**. Un helper compartido entre
+  controllers no va ahí.
+- Antes de crear un archivo nuevo, preguntate **qué es**, no quién lo usa. Una regla de
+  negocio pura que usan un DTO y un repositorio va en `Helpers/Domain/`, aunque el
+  servicio también la use.
+
+Por qué importa: cuando una regla pura vive en `Services/`, un repositorio que la necesita
+termina haciendo `using ...Services`, y **la capa de datos pasa a depender de la de
+negocio**, al revés del flujo que describe la sección de abajo.
 
 Flujo de una lectura simple: `Controller` → `Interface` → `Repository` → `DbContext`.
 Flujo cuando hay reglas de por medio: `Controller` → `Interface` → `Service` → `Repository` / `UserManager`.
@@ -232,7 +257,7 @@ movimiento guardado a las `2026-09-15T01:00Z` es el 14 a las 22:00 en Argentina 
 entra en `?hasta=2026-09-14`.
 
 `signo` no es una columna de la base: se deriva del tipo
-(`Services/SignoDeMovimiento.cs`). `DEPOSITO` y `TRANSFERENCIA_RECIBIDA` son
+(`Helpers/Domain/SignoDeMovimiento.cs`). `DEPOSITO` y `TRANSFERENCIA_RECIBIDA` son
 `CREDITO`, `TRANSFERENCIA_ENVIADA` es `DEBITO`. Por eso `?tipo=credito` se
 traduce a un `IN` sobre los tipos que suman, y no a un filtro en memoria.
 
@@ -242,13 +267,13 @@ sin signo en vez de romper el historial entero con un 500. Es un texto y no `nul
 a propósito, así `signo` nunca falta en la respuesta. El movimiento se lista igual
 en `?tipo=todas`, pero queda afuera de `?tipo=credito` y de `?tipo=debito`, porque
 no se sabe para qué lado suma. Clasificarlo es agregar una línea al diccionario de
-`Services/SignoDeMovimiento.cs`, nada más.
+`Helpers/Domain/SignoDeMovimiento.cs`, nada más.
 
 `busqueda` filtra por el **nombre del tipo de movimiento**, no por importe ni por
 fecha: es el buscador de la pantalla de historial, y lo que compara es la
 `descripcion` de `Tipo_Movimiento`. Ignora mayúsculas y acentos, así que `depósito`,
 `deposito` y `DEPÓSITO` traen lo mismo. Normalizar los dos lados
-(`Services/TextoDeBusqueda.cs`) hace falta porque la collation de la base es
+(`Helpers/Common/TextoDeBusqueda.cs`) hace falta porque la collation de la base es
 `Modern_Spanish_CI_AS`: ignora las mayúsculas pero **sí distingue los acentos**, y
 sin eso el `depósito` que escribe el usuario no encontraría el `DEPOSITO` guardado.
 
@@ -289,7 +314,7 @@ Respuesta 200:
 
 `fecha` viaja en hora argentina con el huso incluido. Es la forma única de toda la
 API: el depósito devuelve su `fecha` igual. En la base se guarda siempre UTC y la
-conversión a -03:00 vive en un solo lugar (`Services/HoraDeArgentina.cs`).
+conversión a -03:00 vive en un solo lugar (`Helpers/Common/HoraDeArgentina.cs`).
 
 El front igual tiene que fijar el huso al formatear (`timeZone:
 'America/Argentina/Buenos_Aires'`): `Intl.DateTimeFormat` usa el del navegador, y

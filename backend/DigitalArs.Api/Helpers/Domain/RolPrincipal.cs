@@ -1,4 +1,4 @@
-namespace DigitalArs.Api.Services;
+namespace DigitalArs.Api.Helpers.Domain;
 
 // Un usuario puede tener más de un rol; al frontend se le informa el de mayor alcance.
 // La regla vive en un solo lugar para que el login y /api/auth/me nunca informen roles

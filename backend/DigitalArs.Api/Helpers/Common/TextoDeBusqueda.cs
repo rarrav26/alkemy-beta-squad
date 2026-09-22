@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text;
 
-namespace DigitalArs.Api.Services;
+namespace DigitalArs.Api.Helpers.Common;
 
 /* Deja un texto listo para comparar: en minúsculas, sin acentos y sin espacios de sobra.
    Hace falta porque la base usa la collation Modern_Spanish_CI_AS, que ignora las mayúsculas

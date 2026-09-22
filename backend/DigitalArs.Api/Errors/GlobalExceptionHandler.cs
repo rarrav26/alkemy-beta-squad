@@ -1,7 +1,6 @@
-using DigitalArs.Api.DTOs;
 using Microsoft.AspNetCore.Diagnostics;
 
-namespace DigitalArs.Api.Middleware;
+namespace DigitalArs.Api.Errors;
 
 // Único lugar que atrapa excepciones no controladas, para que la respuesta siempre tenga
 // la misma forma (ErrorResponse) que usan a mano el resto de los controllers.
