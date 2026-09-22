@@ -8,14 +8,17 @@ namespace DigitalArs.Api.DTOs;
 // que alguien pueda olvidar. Tampoco pide la contraseña del administrador.
 public class AdminUpdateUsuarioDto
 {
+    /// <example>Ana</example>
     [Required]
     [StringLength(100, MinimumLength = 1)]
     public string Nombre { get; set; } = null!;
 
+    /// <example>Perez</example>
     [Required]
     [StringLength(100, MinimumLength = 1)]
     public string Apellido { get; set; } = null!;
 
+    /// <example>ana.perez@ejemplo.com</example>
     [Required]
     [EmailAddress]
     [StringLength(256)]

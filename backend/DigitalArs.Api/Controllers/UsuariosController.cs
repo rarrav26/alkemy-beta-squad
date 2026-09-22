@@ -24,7 +24,7 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
     // administradores: que el frontend esconda la pantalla no es un control de acceso.
     [HttpGet]
     [Authorize(Roles = RolPrincipal.Administrador)]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType<PaginaResponse<UsuarioAdminItemDto>>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetAll(
@@ -176,7 +176,7 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
 
     [HttpPatch("me")]
     [ProducesResponseType<UsuarioResponse>(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> UpdateMe([FromBody] UpdateProfileDto dto, CancellationToken cancellationToken)
     {

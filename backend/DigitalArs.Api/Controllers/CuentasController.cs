@@ -60,9 +60,9 @@ public class CuentasController(ICuentaService cuentas, IAccountService accounts)
 
     [HttpPatch("me/alias")]
     [ProducesResponseType<CuentaResponse>(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateAlias([FromBody] UpdateAliasDto dto, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)

@@ -464,7 +464,7 @@ En UsuariosController el rol se declara **en cada acción**, no en la clase, por
 | Token válido sin rol requerido | 403                              |
 | Token válido con permiso       | Respuesta normal de la operación |
 
-Ese 401 y ese 403 los genera el framework **sin cuerpo JSON**. El frontend lo resuelve con su propio mensaje (`mensajePara` en `api.js`), y como la respuesta no trae `code`, un 403 por rol no cierra la sesión: solo lo hace el 403 con `USER_INACTIVE`.
+Ese 401 y ese 403 los genera el framework **sin cuerpo JSON**. El frontend lo resuelve con su propio mensaje (`mensajePara` en `api.js`), y como la respuesta no trae `code`, un 403 por rol no cierra la sesión: solo lo hace el 403 con `USER_INACTIVE` o `UsuarioDesactivado` (el mismo caso con los dos formatos de `code` que usa la API).
 
 Los roles del JWT reflejan el momento de emisión. Si se agrega una función para cambiar roles, debe coordinarse con revocación o renovación: modificar la tabla de roles no actualiza el token entregado.
 
@@ -623,7 +623,7 @@ Los endpoints de cuenta, movimientos y transferencias no reciben el identificado
 
 Los endpoints de billetera no exigen el rol Usuario, solo estar logueado. El administrador no tiene cuenta (el seed no se la crea), así que si los llama recibe 404.
 
-Todos los errores que arma la API comparten la forma `ErrorResponse` (`code`, `message`, `errors`), incluidos los 400 de validación de DTO. La excepción son el 401 y el 403 que genera el framework al autenticar y autorizar, que salen sin cuerpo (ver la sección 9). `Program.cs` reemplaza con `InvalidModelStateResponseFactory` el ValidationProblemDetails que `[ApiController]` devolvería por su cuenta. Si el cuerpo no se puede deserializar el mensaje es genérico a propósito, porque el texto que arma el framework nombra los tipos internos del DTO.
+Todos los errores que arma la API comparten la forma `ErrorResponse` (`code`, `message`, `errors`), incluidos los 400 de validación de DTO. La excepción son el 401 y el 403 que genera el framework al autenticar y autorizar, que salen sin cuerpo (ver la sección 9). `Program.cs` reemplaza con `InvalidModelStateResponseFactory` el ValidationProblemDetails que `[ApiController]` devolvería por su cuenta. Si el cuerpo no se puede deserializar el mensaje es genérico a propósito, porque el texto que arma el framework nombra los tipos internos del DTO. El `code` tiene dos formatos (`USER_INACTIVE` escrito a mano, `UsuarioDesactivado` copiado del enum); la tabla completa, con qué endpoint devuelve cada uno y qué respuestas salen sin cuerpo, está en la sección "Códigos de error" del README del backend.
 
 La política auth limita a 20 solicitudes por IP/minuto donde se aplica, como AuthController. No es un límite global de toda la API. El exceso devuelve 429.
 

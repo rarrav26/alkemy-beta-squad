@@ -5,9 +5,13 @@ namespace DigitalArs.Api.DTOs;
 
 public class TransferenciaDto : IValidatableObject
 {
+    /// <summary>Alias (auto.perro.gato o mariagonzalez) o CVU de 22 dígitos de la cuenta destino.</summary>
+    /// <example>auto.perro.gato</example>
     [Required(ErrorMessage = "El alias o CVU de destino es obligatorio.")]
     public string? Destino { get; set; }
 
+    /// <summary>Mayor a cero, con 2 decimales como máximo y no mayor al saldo disponible.</summary>
+    /// <example>1500</example>
     [Required(ErrorMessage = "El importe es obligatorio.")]
     public decimal? Importe { get; set; }
 

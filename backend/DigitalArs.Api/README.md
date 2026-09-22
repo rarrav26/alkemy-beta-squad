@@ -221,19 +221,19 @@ La contraseña debe tener al menos ocho caracteres, mayúscula, minúscula, núm
 | GET /api/usuarios | Administrador | 200: listado paginado de usuarios regulares, con ?page, ?pageSize y ?busqueda |
 | GET /api/usuarios/{id} | Administrador | 200: detalle del usuario, o 404 si no existe |
 | PATCH /api/usuarios/{id} | Administrador | 200: edita nombre, apellido y email; no toca documento ni saldo |
-| POST /api/usuarios | Administrador | Crea sin contraseña; devuelve invitationToken y requiresPasswordSetup |
+| POST /api/usuarios | Administrador | 201: crea sin contraseña; devuelve usuarioId, invitationToken, requiresPasswordSetup y expiresInSeconds |
 | POST /api/usuarios/{id}/invitation | Administrador | Renueva invitación e invalida la anterior |
-| PATCH /api/usuarios/{id}/active | Administrador | Activa/desactiva con { "isActive": false } |
+| PATCH /api/usuarios/{id}/active | Administrador | 204 sin cuerpo: activa/desactiva con { "isActive": false }; 404 si no existe |
 | GET /api/tiposdemovimientos | JWT | 200: catálogo completo de tipos de movimiento |
 | GET /api/tiposdemovimientos/{id} | JWT | 200: un tipo, o 404 si no existe |
 | GET /api/usuarios/me | JWT | 200: perfil propio con su cuenta, si tiene |
 | PATCH /api/usuarios/me | JWT | 200: edita nombre, apellido y email propios; si cambia el email pide `currentPassword` |
 | GET /api/cuentas/me | JWT | 200: id, alias, CVU y saldo de la cuenta propia; 404 si no tiene |
-| PATCH /api/cuentas/me/alias | JWT | 200: cambia el alias propio con { "alias": "auto.perro.gato" }; 409 si ya existe |
+| PATCH /api/cuentas/me/alias | JWT | 200: cambia el alias propio con { "alias": "mariagonzalez" } (solo letras, 3 a 50; el formato con puntos es solo el autogenerado); 400 si el formato no sirve; 409 si ya existe |
 | POST /api/movimientos/depositos | JWT | 200: acredita { "importe": 500 } y devuelve el saldo actualizado y la fecha en hora argentina |
 | GET /api/movimientos | JWT | 200: historial propio paginado, con filtros de fecha y tipo y búsqueda por nombre de tipo |
-| POST /api/transferencias/resolver-destino | JWT | 200: valida { "destino", "importe" } y devuelve id, alias, CVU y titular del destino |
-| POST /api/transferencias | JWT | 200: transfiere a otra cuenta activa y devuelve el saldo actualizado |
+| POST /api/transferencias/resolver-destino | JWT | 200: valida { "destino", "importe" } y devuelve id, alias, CVU y titular del destino; `importe` es obligatorio y si no alcanza el saldo responde 409 |
+| POST /api/transferencias | JWT | 200: transfiere a otra cuenta activa y devuelve saldoActual y message |
 | GET /api/setup/status | Público | Informa si la instalación ya tiene administrador |
 
 Un usuario sin rol Administrador que llame a un endpoint de Administrador recibe 403 sin cuerpo
@@ -354,11 +354,63 @@ En la práctica un usuario desactivado ve un `401` y no el `403`: `Program.cs`
 revalida `is_active` contra la base en cada request y descarta el token antes de
 que llegue al servicio. La rama `403` queda como red de seguridad.
 
-Todos los errores usan la misma forma, `ErrorResponse`: `{ "code", "message", "errors" }`,
+Todo error que trae cuerpo usa la misma forma, `ErrorResponse`: `{ "code", "message", "errors" }`,
 donde `code` y `errors` se omiten cuando no aplican. Eso incluye los 400 de validación de
 DTO, que salen con `code` VALIDATION_ERROR: `Program.cs` reemplaza el ValidationProblemDetails
 que `[ApiController]` devolvería por su cuenta. Cuando el cuerpo no se puede deserializar
 el mensaje es genérico a propósito, porque el texto del framework nombra los tipos internos.
+
+### Códigos de error
+
+El `code` tiene **dos formatos**, según quién arma el error. Hay que tenerlo en cuenta al
+comparar en el front o en una prueba de Apidog.
+
+Escritos a mano, en MAYÚSCULAS (Auth, Usuarios y el manejador global):
+
+| code | Status | Cuándo |
+|---|---|---|
+| VALIDATION_ERROR | 400 | Cualquier DTO inválido, en cualquier endpoint |
+| INVALID_CREDENTIALS | 401 | Login: email o contraseña incorrectos, o cuenta bloqueada |
+| USER_INACTIVE | 403 | Login o primera contraseña de un usuario desactivado; `GET`/`PATCH /api/usuarios/me` y `PATCH /api/cuentas/me/alias` |
+| PASSWORD_SETUP_REQUIRED | 409 | Login de una cuenta creada por el administrador que todavía no definió contraseña |
+| INVALID_INVITATION | 400 | Primera contraseña con invitación inválida, vencida o ya usada |
+| INTERNAL_ERROR | 500 | Cualquier excepción no controlada (`GlobalExceptionHandler`) |
+
+Nombre del motivo, en PascalCase (Cuentas, Movimientos y Transferencias, vía
+`RespuestaDeError.Desde`, que copia el nombre de `MotivoDeRechazo`):
+
+| code | Status | Cuándo |
+|---|---|---|
+| MismaCuenta | 400 | Transferencia a la cuenta propia |
+| UsuarioDesactivado | 400 | Transferencia a una cuenta cuyo titular está desactivado |
+| UsuarioDesactivado | 403 | `GET /api/cuentas/me`, historial o depósito de un usuario desactivado (red de seguridad, ver arriba) |
+| CuentaNoEncontrada | 404 | El usuario no tiene cuenta (por ejemplo, el administrador) |
+| DestinoNoEncontrado | 404 | Ninguna cuenta con ese alias o CVU |
+| SaldoInsuficiente | 409 | La transferencia o el `resolver-destino` superan el saldo |
+| SaldoMaximoSuperado | 409 | El depósito deja la cuenta por encima del saldo máximo |
+| NoSePudoActualizar | 409 | El depósito no se pudo acreditar |
+| TipoMovimientoNoConfigurado | 500 | Falta el tipo DEPOSITO en la base |
+
+Por eso un usuario desactivado puede llegar como `USER_INACTIVE` o como `UsuarioDesactivado`, y
+el front acepta los dos.
+
+Salen **sin `code`**, solo con `message` y a veces `errors`: los 400 del registro (email o
+documento repetidos, contraseña rechazada por Identity) y del alta administrativa, los 400 de
+`PATCH /api/usuarios/me` y `PATCH /api/usuarios/{id}`, los 404/409 de `PATCH /api/cuentas/me/alias`
+y los 400/409 de invitación y estado en `UsuariosController`.
+
+Salen **sin cuerpo**: el 401 de los endpoints protegidos (token ausente, inválido, vencido o de un
+usuario desactivado; el único 401 con cuerpo es el `INVALID_CREDENTIALS` del login), el 403 por
+falta de rol, el 429 del límite de solicitudes y los 404 de `UsuariosController` y de
+`GET /api/tiposdemovimientos/{id}`.
+
+### Ejemplos en Swagger
+
+Cada cuerpo de request trae un ejemplo en Swagger (botón **Try it out**). Salen de los
+comentarios `/// <example>` de las propiedades de cada DTO: `GenerateDocumentationFile` en el
+`.csproj` hace que `Microsoft.AspNetCore.OpenApi` los publique. Un DTO nuevo tiene que llevar los
+suyos, con valores que pasen su propia validación. Un ejemplo que parece número pero es texto
+(un DNI) va entre comillas: `/// <example>"12345678"</example>`.
 
 Todos los endpoints nuevos quedan protegidos por defecto salvo los marcados AllowAnonymous.
 Las invitaciones duran 24 horas y se consumen al definir la contraseña.
@@ -433,6 +485,10 @@ JWT con identidad/rol, firma, emisor, audiencia y vencimiento, y el largo mínim
 `MovimientosChecks` (15 verificaciones) prueba reglas puras, sin base: la normalización de la
 búsqueda del historial y el signo de cada tipo de movimiento.
 Ninguno reemplaza una prueba de integración con SQL Server.
+
+La prueba de integración contra la API levantada y SQL Server es la colección de Apidog de
+`docs/apidog/`: recorre registro, login, perfil, depósito, transferencia, historial y
+administración con 55 aserciones. Ver `docs/apidog/README.md`.
 
 Prueba manual con SQL Server: registrar un usuario, iniciar sesión, probar test-protegido con/sin JWT;
 crear un invitado desde un administrador, comprobar que no inicia sesión antes de definir password,

@@ -10,6 +10,8 @@ public class UpdateAliasDto
     // acá. El patrón sale de DatosDeCuenta para no repetir la regla en dos lugares.
     // Se admiten mayúsculas porque el servicio normaliza a minúsculas antes de guardar; si se
     // rechazaran acá, escribir "MariaGonzalez" fallaría antes de llegar a esa normalización.
+    /// <summary>Solo letras, entre 3 y 50. Se guarda en minúsculas.</summary>
+    /// <example>mariagonzalez</example>
     [Required]
     [StringLength(DatosDeCuenta.LargoMaximoAlias, MinimumLength = DatosDeCuenta.LargoMinimoAlias)]
     [RegularExpression(

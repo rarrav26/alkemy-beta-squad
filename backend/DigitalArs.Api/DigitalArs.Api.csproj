@@ -6,6 +6,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>DigitalArs.Api-local-development</UserSecretsId>
     <DefaultItemExcludes>$(DefaultItemExcludes);Tests/**</DefaultItemExcludes>
+    <!-- Microsoft.AspNetCore.OpenApi lee los comentarios /// (summary, example) y los publica en Swagger. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Sin esto, cada miembro público sin comentario /// tira un warning CS1591. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
