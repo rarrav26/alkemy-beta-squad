@@ -122,6 +122,16 @@ public class AccountService(
         if (perfil is null)
             return Resultado<UsuarioResponse>.Fallo(MotivoDeRechazo.NoEncontrado, "No se encontró el usuario.");
 
+        // El estado se revalida en el momento de la operación, no alcanza con el login: el JWT
+        // es stateless y sigue siendo válido hasta que expire, así que un usuario desactivado
+        // DESPUÉS de haber iniciado sesión llega hasta acá con un token legítimo. Sin este
+        // control podría cambiar su email, que es su identidad de acceso.
+        if (!perfil.is_active)
+            return Resultado<UsuarioResponse>.Fallo(MotivoDeRechazo.UsuarioDesactivado, new[]
+            {
+                "Tu usuario está desactivado. Contactá al administrador."
+            });
+
         // Si email cambia, validar unicidad en Identity
         var emailLower = dto.Email.Trim();
         var emailChanged = !string.Equals(perfil.email, emailLower, StringComparison.OrdinalIgnoreCase);
@@ -182,16 +192,93 @@ public class AccountService(
         return Resultado<UsuarioResponse>.Exito(respuesta);
     }
 
+    public async Task<Resultado<UsuarioResponse>> ActualizarComoAdminAsync(
+        int usuarioId, AdminUpdateUsuarioDto dto, CancellationToken cancellationToken = default)
+    {
+        var perfil = await usuarios.GetByIdAsync(usuarioId, cancellationToken);
+        if (perfil is null)
+            return Resultado<UsuarioResponse>.Fallo(MotivoDeRechazo.NoEncontrado, "No se encontró el usuario.");
+
+        var emailNuevo = dto.Email.Trim();
+        var emailCambio = !string.Equals(perfil.email, emailNuevo, StringComparison.OrdinalIgnoreCase);
+
+        // Unicidad del email: se controla en Identity y en la tabla de negocio, porque un
+        // email puede existir en una sola de las dos si un alta quedó a medias.
+        if (emailCambio)
+        {
+            var existenteIdentity = await users.FindByEmailAsync(emailNuevo);
+            if (existenteIdentity is not null && existenteIdentity.Id != perfil.identity_user_id)
+                return Resultado<UsuarioResponse>.Fallo(MotivoDeRechazo.DatosInvalidos, new[] { "El email ya está en uso." });
+
+            var otroPerfil = await db.Usuarios.AsNoTracking()
+                .SingleOrDefaultAsync(u => u.email == emailNuevo, cancellationToken);
+            if (otroPerfil is not null && otroPerfil.id != perfil.id)
+                return Resultado<UsuarioResponse>.Fallo(MotivoDeRechazo.DatosInvalidos, new[] { "El email ya está en uso." });
+        }
+
+        // El email es también la identidad con la que se inicia sesión, así que cambiarlo en
+        // la tabla de negocio sin cambiarlo en Identity dejaría al usuario sin poder entrar.
+        if (emailCambio && perfil.identity_user_id is not null)
+        {
+            var usuarioIdentity = await users.FindByIdAsync(perfil.identity_user_id);
+            if (usuarioIdentity is null)
+                return Resultado<UsuarioResponse>.Fallo(MotivoDeRechazo.NoEncontrado, "No se encontró el usuario de identidad.");
+
+            usuarioIdentity.Email = emailNuevo;
+            usuarioIdentity.UserName = emailNuevo;
+
+            var actualizadoIdentity = await users.UpdateAsync(usuarioIdentity);
+            if (!actualizadoIdentity.Succeeded)
+                return Resultado<UsuarioResponse>.Fallo(MotivoDeRechazo.NoSePudoActualizar, new[] { "No se pudo actualizar el email." });
+        }
+
+        var actualizadoPerfil = await usuarios.UpdateProfileAsync(
+            perfil.id, dto.Nombre.Trim(), dto.Apellido.Trim(), emailNuevo, cancellationToken);
+
+        if (!actualizadoPerfil)
+            return Resultado<UsuarioResponse>.Fallo(MotivoDeRechazo.NoSePudoActualizar, new[] { "No se pudo actualizar el usuario." });
+
+        return await ObtenerPorIdAsync(perfil.id, cancellationToken);
+    }
+
     public async Task<Resultado<CuentaResponse>> UpdateAliasAsync(
         string identityUserId, string newAlias, CancellationToken cancellationToken = default)
     {
         var perfil = await usuarios.GetByIdentityUserIdAsync(identityUserId, cancellationToken);
         if (perfil is null) return Resultado<CuentaResponse>.Fallo(MotivoDeRechazo.NoEncontrado, "No se encontró el usuario.");
 
-        var aliasTrim = newAlias.Trim();
-        // Formato: solo letras
-        if (!System.Text.RegularExpressions.Regex.IsMatch(aliasTrim, "^[A-Za-z]+$"))
-            return Resultado<CuentaResponse>.Fallo(MotivoDeRechazo.DatosInvalidos, new[] { "Formato de alias inválido. Sólo se permiten letras." });
+        // Mismo motivo que en UpdateProfileAsync: el token sobrevive a la desactivación, así
+        // que el estado se comprueba acá, en el momento de operar. El alias es cómo otros
+        // usuarios le transfieren, así que un desactivado no debería poder cambiarlo.
+        if (!perfil.is_active)
+            return Resultado<CuentaResponse>.Fallo(MotivoDeRechazo.UsuarioDesactivado, new[]
+            {
+                "Tu usuario está desactivado. Contactá al administrador."
+            });
+
+        // No todo usuario tiene cuenta: el administrador inicial se siembra por SQL sin una, y
+        // las cuentas se crean al registrarse. Sin este control, el alias se validaba entero y
+        // el UPDATE terminaba afectando cero filas, así que el usuario leía "no se pudo
+        // actualizar el alias" sin saber que el problema era no tener cuenta.
+        var cuentaActual = await cuentas.GetByUsuarioIdAsync(perfil.id, cancellationToken);
+        if (cuentaActual is null)
+            return Resultado<CuentaResponse>.Fallo(MotivoDeRechazo.CuentaNoEncontrada, new[]
+            {
+                "Tu usuario no tiene una cuenta asociada, así que no hay alias para modificar."
+            });
+
+        // El formato del alias lo define DatosDeCuenta, que es el mismo lugar que genera los
+        // alias automáticos y el que valida el destino de una transferencia. Tenerlo en un
+        // solo lugar evita lo que pasaba antes: acá se exigía una sola palabra sin puntos
+        // mientras transferencias exigía tres con puntos, así que un alias editado quedaba
+        // inalcanzable por alias.
+        var aliasTrim = DatosDeCuenta.NormalizarAlias(newAlias);
+
+        if (!DatosDeCuenta.EsAliasValido(aliasTrim))
+            return Resultado<CuentaResponse>.Fallo(MotivoDeRechazo.DatosInvalidos, new[]
+            {
+                "El alias debe ser tres palabras separadas por puntos (ejemplo: auto.perro.gato)."
+            });
 
         // Unicidad: buscar por alias (GetByAliasOCvuAsync también busca CVU)
         var existente = await cuentas.GetByAliasOCvuAsync(aliasTrim, cancellationToken);
@@ -217,6 +304,16 @@ public class AccountService(
         if (perfil is null)
             return Resultado<UsuarioResponse>.Fallo(MotivoDeRechazo.NoEncontrado, "No se encontró el usuario.");
 
+        // Este es el "yo" del usuario autenticado, así que también se cierra a un desactivado:
+        // de lo contrario podía seguir recorriendo la app con un token emitido antes de la baja.
+        // ObtenerPorIdAsync NO lleva este control a propósito: la usa el administrador, que
+        // necesita justamente poder leer los datos de un usuario desactivado.
+        if (!perfil.is_active)
+            return Resultado<UsuarioResponse>.Fallo(MotivoDeRechazo.UsuarioDesactivado, new[]
+            {
+                "Tu usuario está desactivado. Contactá al administrador."
+            });
+
         var cuenta = await cuentas.GetByUsuarioIdAsync(perfil.id, cancellationToken);
 
         var respuesta = new UsuarioResponse(
@@ -240,6 +337,7 @@ public class AccountService(
     public async Task<PaginaResponse<UsuarioAdminItemDto>> ObtenerUsuariosPaginadosAsync(
     int page,
     int pageSize,
+    string? busqueda = null,
     CancellationToken cancellationToken = default)
     {
         page = page < 1 ? 1 : page;
@@ -257,6 +355,20 @@ public class AccountService(
         if (adminIdentityIds.Count > 0)
         {
             query = query.Where(u => u.identity_user_id == null || !adminIdentityIds.Contains(u.identity_user_id));
+        }
+
+        // 3. Búsqueda libre sobre nombre, apellido y email. Se aplica ANTES de contar, para que
+        //    la paginación describa el resultado filtrado y no el total de usuarios. El término
+        //    se compara en minúsculas para no depender del collation de la base.
+        var termino = (busqueda ?? "").Trim().ToLower();
+
+        if (termino.Length > 0)
+        {
+            query = query.Where(u =>
+                u.nombre.ToLower().Contains(termino) ||
+                u.apellido.ToLower().Contains(termino) ||
+                u.email.ToLower().Contains(termino) ||
+                u.nro_documento.Contains(termino));
         }
 
         var totalItems = await query.CountAsync(cancellationToken);

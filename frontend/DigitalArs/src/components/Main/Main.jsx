@@ -7,13 +7,26 @@ import { MovimientosPage } from '../../routes/Movimientos'
 import PerfilPage from '../../routes/Perfil'
 import UsuariosAdmin from '../../routes/UsuariosAdmin'
 
+// Una ruta protegida no dibuja NADA hasta que el provider confirme contra el servidor que la
+// sesión sigue valiendo. Antes se renderizaba con lo que había en sessionStorage y la baja del
+// usuario se descubría después, cuando alguna llamada devolvía 403: se alcanzaba a ver el
+// dashboard y recién entonces lo expulsaba.
 function Protected({ children, admin = false }) {
-  const { session } = useAuth()
+  const { session, sesionVerificada } = useAuth()
+
   if (!session) return <Navigate to="/login" replace />
-  
+
+  if (!sesionVerificada) {
+    return (
+      <Box sx={{ display: 'grid', placeItems: 'center', minHeight: '60vh' }}>
+        <CircularProgress aria-label="Verificando tu sesión" />
+      </Box>
+    )
+  }
+
   const rol = session?.user?.role || session?.user?.rol || session?.role
   if (admin && rol !== 'Administrador') return <Navigate to="/dashboard" replace />
-  
+
   return children
 }
 

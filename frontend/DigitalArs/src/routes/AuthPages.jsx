@@ -4,7 +4,7 @@ import { useAuth } from '../context/authContext'
 import AuthForm, { PasswordFields, ProfileFields } from '../components/Auth/AuthForm'
 
 export function LoginPage() {
-  const { login, session } = useAuth()
+  const { login, session, motivoDeCierre } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -22,7 +22,7 @@ export function LoginPage() {
 
   if (session) return <Navigate to="/dashboard" replace />
   return <AuthForm title="¡Hola de nuevo!" description="Ingresá para administrar tu cuenta."
-    submitLabel="Ingresar" success={location.state?.message}
+    submitLabel="Ingresar" success={location.state?.message} aviso={motivoDeCierre}
     onSubmit={ingresar}
     footer={<Stack spacing={1}>
       <Button component={Link} to="/register">Crear una cuenta</Button>

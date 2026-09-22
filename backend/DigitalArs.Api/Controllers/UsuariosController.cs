@@ -14,14 +14,19 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
     private const string MensajeNoPuedeRecibirInvitacion =
         "El usuario debe estar activo y sin contraseña definida.";
 
+    // El listado expone email y documento de todos los usuarios, así que es solo para
+    // administradores: que el frontend esconda la pantalla no es un control de acceso.
     [HttpGet]
+    [Authorize(Roles = RolPrincipal.Administrador)]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetAll(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10,
+        [FromQuery] string? busqueda = null,
         CancellationToken cancellationToken = default)
     {
-        var resultado = await accounts.ObtenerUsuariosPaginadosAsync(page, pageSize, cancellationToken);
+        var resultado = await accounts.ObtenerUsuariosPaginadosAsync(page, pageSize, busqueda, cancellationToken);
         return Ok(resultado);
     }
 
@@ -86,6 +91,39 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
             : StatusCode(StatusCodes.Status500InternalServerError);
     }
 
+    // Edición de OTRO usuario por parte de un administrador. El endpoint de abajo, "me", es
+    // el que usa cada usuario sobre su propio perfil y ese sí pide la contraseña actual.
+    [HttpPatch("{id:int}")]
+    [Authorize(Roles = RolPrincipal.Administrador)]
+    [ProducesResponseType<UsuarioResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateComoAdmin(
+        int id, [FromBody] AdminUpdateUsuarioDto dto, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(new ErrorResponse
+            {
+                Message = "Datos inválidos.",
+                Errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToArray()
+            });
+
+        var resultado = await accounts.ActualizarComoAdminAsync(id, dto, cancellationToken);
+        if (resultado.Exitoso) return Ok(resultado.Valor);
+
+        return resultado.Motivo switch
+        {
+            MotivoDeRechazo.NoEncontrado => NotFound(),
+            MotivoDeRechazo.DatosInvalidos =>
+                BadRequest(new ErrorResponse { Message = "Error de validación.", Errors = resultado.Errores }),
+            MotivoDeRechazo.NoSePudoActualizar => StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new ErrorResponse { Message = "No se pudo actualizar el usuario." }),
+            _ => StatusCode(StatusCodes.Status500InternalServerError)
+        };
+    }
+
     [HttpGet("me")]
     [ProducesResponseType<UsuarioResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -107,6 +145,13 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
 
         var resultado = await accounts.ObtenerPorIdentityUserIdAsync(identityUserId, cancellationToken);
         if (resultado.Exitoso) return Ok(resultado.Valor);
+
+        if (resultado.Motivo == MotivoDeRechazo.UsuarioDesactivado)
+            return StatusCode(StatusCodes.Status403Forbidden, new ErrorResponse
+            {
+                Code = "USER_INACTIVE",
+                Message = resultado.Errores?.FirstOrDefault() ?? "Tu usuario está desactivado."
+            });
 
         return resultado.Motivo == MotivoDeRechazo.NoEncontrado
             ? NotFound()
@@ -135,6 +180,10 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
         return resultado.Motivo switch
         {
             MotivoDeRechazo.NoEncontrado => NotFound(),
+            // Autenticado pero sin permiso para operar: 403, igual que el login de un
+            // usuario desactivado. Sin esta rama caía en el 500 genérico.
+            MotivoDeRechazo.UsuarioDesactivado => StatusCode(StatusCodes.Status403Forbidden,
+                new ErrorResponse { Code = "USER_INACTIVE", Message = resultado.Errores?.FirstOrDefault() ?? "Tu usuario está desactivado." }),
             MotivoDeRechazo.DatosInvalidos => BadRequest(new ErrorResponse { Message = "Error de validación.", Errors = resultado.Errores }),
             MotivoDeRechazo.NoSePudoActualizar => StatusCode(StatusCodes.Status500InternalServerError, new ErrorResponse { Message = "No se pudo actualizar el perfil." }),
             _ => StatusCode(StatusCodes.Status500InternalServerError)

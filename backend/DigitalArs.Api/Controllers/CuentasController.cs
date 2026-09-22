@@ -76,7 +76,10 @@ public class CuentasController(ICuentaService cuentas, IAccountService accounts)
         return resultado.Motivo switch
         {
             MotivoDeRechazo.DatosInvalidos => Conflict(new ErrorResponse { Message = resultado.Errores?.FirstOrDefault() ?? "Alias inválido o duplicado." }),
-            MotivoDeRechazo.CuentaNoEncontrada => NotFound(new ErrorResponse { Message = "Cuenta no encontrada." }),
+            // Autenticado pero sin permiso para operar. Sin esta rama caía en el 500 genérico.
+            MotivoDeRechazo.UsuarioDesactivado => StatusCode(StatusCodes.Status403Forbidden,
+                new ErrorResponse { Code = "USER_INACTIVE", Message = resultado.Errores?.FirstOrDefault() ?? "Tu usuario está desactivado." }),
+            MotivoDeRechazo.CuentaNoEncontrada => NotFound(new ErrorResponse { Message = resultado.Errores?.FirstOrDefault() ?? "Cuenta no encontrada." }),
             _ => StatusCode(StatusCodes.Status500InternalServerError, new ErrorResponse { Message = "No se pudo actualizar el alias." })
         };
     }
