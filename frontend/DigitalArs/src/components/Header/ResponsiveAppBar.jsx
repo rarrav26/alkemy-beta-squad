@@ -5,16 +5,52 @@ import ChangeTheme from './ChangeTheme'
 
 export default function ResponsiveAppBar() {
   const { session, logout, ready, connectionError } = useAuth()
-  return <AppBar position="static" elevation={0}><Container maxWidth="lg">
-    <Toolbar disableGutters sx={{ gap: 1, flexWrap: 'wrap' }}>
-      <Typography component={Link} to="/" variant="h6"
-        sx={{ fontWeight: 800, color: 'inherit', textDecoration: 'none' }}>DigitalArs</Typography>
-      <Box sx={{ flexGrow: 1 }} />
-      {ready && !connectionError && session && <>
-        <Button color="inherit" component={Link} to="/dashboard">Mi cuenta</Button>
-        <Button color="inherit" onClick={logout}>Cerrar sesión</Button>
-      </>}
-      <ChangeTheme />
-    </Toolbar>
-  </Container></AppBar>
+
+  const user = session?.user || session?.usuario || session
+  const esAdmin = 
+    user?.role === 'Administrador' || 
+    user?.rol === 'Administrador' ||
+    user?.Role === 'Administrador'
+
+  return (
+    <AppBar position="static" elevation={0}>
+      <Container maxWidth="lg">
+        <Toolbar disableGutters sx={{ gap: 1, flexWrap: 'wrap' }}>
+          <Typography
+            component={Link}
+            to="/"
+            variant="h6"
+            sx={{ fontWeight: 800, color: 'inherit', textDecoration: 'none' }}
+          >
+            DigitalArs
+          </Typography>
+
+          <Box sx={{ flexGrow: 1 }} />
+
+          {ready && !connectionError && session && (
+            <>
+              <Button color="inherit" component={Link} to="/dashboard">
+                Mi cuenta
+              </Button>
+
+              {esAdmin && (
+                <Button color="inherit" component={Link} to="/admin/usuarios">
+                  Ver usuarios
+                </Button>
+              )}
+
+              <Button color="inherit" component={Link} to="/perfil">
+                Perfil
+              </Button>
+              <Button color="inherit" onClick={logout}>
+                Cerrar sesión
+              </Button>
+            </>
+          )}
+
+          <ChangeTheme />
+        </Toolbar>
+      </Container>
+    </AppBar>
+  )
 }

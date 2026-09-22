@@ -86,6 +86,49 @@ public class AccountService(
     public async Task<bool> ExisteAdministradorAsync() =>
         (await users.GetUsersInRoleAsync(RolPrincipal.Administrador)).Count > 0;
 
+    public async Task<PaginaResponse<UsuarioAdminItemDto>> ObtenerUsuariosPaginadosAsync(
+    int page,
+    int pageSize,
+    CancellationToken cancellationToken = default)
+    {
+        page = page < 1 ? 1 : page;
+        pageSize = pageSize < 1 ? 10 : pageSize;
+
+        // 1. Obtenemos los IDs de Identity que tienen rol Administrador
+        var admins = await users.GetUsersInRoleAsync(RolPrincipal.Administrador);
+        var adminIdentityIds = admins.Select(a => a.Id).ToList();
+
+        // 2. Armamos la consulta filtrando al admin por email y por ID de Identity
+        var query = db.Usuarios
+            .AsNoTracking()
+            .Where(u => u.email != "admin@digitalars.com");
+
+        if (adminIdentityIds.Count > 0)
+        {
+            query = query.Where(u => u.identity_user_id == null || !adminIdentityIds.Contains(u.identity_user_id));
+        }
+
+        var totalItems = await query.CountAsync(cancellationToken);
+        var totalPages = (int)Math.Ceiling(totalItems / (double)pageSize);
+
+        var items = await query
+            .OrderBy(u => u.id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(u => new UsuarioAdminItemDto(
+                u.id,
+                u.nombre,
+                u.apellido,
+                u.email,
+                u.tipo_documento,
+                u.nro_documento,
+                u.is_active
+            ))
+            .ToListAsync(cancellationToken);
+
+        return new PaginaResponse<UsuarioAdminItemDto>(items, page, pageSize, totalItems, totalPages);
+    }
+
     // Se revoca primero y se guarda después: si el guardado del perfil falla, los tokens viejos
     // ya dejaron de valer y no vuelven a servir cuando se reactive al usuario.
     private async Task<bool> RevocarSesionesAsync(Usuario perfil)

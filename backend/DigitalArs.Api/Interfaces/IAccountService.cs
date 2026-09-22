@@ -20,4 +20,9 @@ public interface IAccountService
         int usuarioId, bool activo, CancellationToken cancellationToken = default);
 
     Task<bool> ExisteAdministradorAsync();
+
+    Task<PaginaResponse<UsuarioAdminItemDto>> ObtenerUsuariosPaginadosAsync(
+    int page,
+    int pageSize,
+    CancellationToken cancellationToken = default);
 }

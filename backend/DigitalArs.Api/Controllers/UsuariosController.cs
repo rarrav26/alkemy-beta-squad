@@ -13,6 +13,19 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
     private const string MensajeNoPuedeRecibirInvitacion =
         "El usuario debe estar activo y sin contraseña definida.";
 
+    // AGREGAR ESTE MÉTODO GET
+    [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAll(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        CancellationToken cancellationToken = default)
+    {
+        // Si tu servicio IAccountService ya tiene un método para listar usuarios:
+        var resultado = await accounts.ObtenerUsuariosPaginadosAsync(page, pageSize, cancellationToken);
+        return Ok(resultado);
+    }
+
     [HttpPost]
     [ProducesResponseType<UsuarioCreadoResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
@@ -49,7 +62,6 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
         return ErrorDeGestion(motivo.Value, "No se pudo actualizar el usuario.");
     }
 
-    // El texto del conflicto lo pone cada endpoint porque nombra la operación que falló.
     private IActionResult ErrorDeGestion(MotivoDeRechazo motivo, string mensajeDeConflicto) => motivo switch
     {
         MotivoDeRechazo.NoEncontrado => NotFound(),

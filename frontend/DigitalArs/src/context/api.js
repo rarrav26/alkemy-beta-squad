@@ -80,3 +80,38 @@ function mensajePara(status, data) {
   if (status >= 500) return 'El servidor no pudo completar la solicitud.'
   return 'Revisá los datos ingresados.'
 }
+export async function obtenerUsuariosAdmin({ token, page = 1, pageSize = 10, signal } = {}) {
+  return apiRequest('/api/Usuarios', {
+    method: 'GET',
+    token,
+    params: { page, pageSize },
+    signal
+  })
+}
+export async function obtenerMiPerfil({ token, signal } = {}) {
+  // 1. Obtenemos los datos personales desde /api/Auth/me
+  const usuario = await apiRequest('/api/Auth/me', {
+    method: 'GET',
+    token,
+    signal
+  })
+
+  // 2. Intentamos obtener los datos de la cuenta (CVU, alias, saldo)
+  // Si es un admin sin cuenta o da 404, devolvemos null en cuenta sin romper
+  let cuenta = null
+  try {
+    cuenta = await apiRequest('/api/Cuentas/me', {
+      method: 'GET',
+      token,
+      signal
+    })
+  } catch (error) {
+    // Si no tiene cuenta bancaria (404), ignoramos el error
+    cuenta = null
+  }
+
+  return {
+    ...usuario,
+    cuenta
+  }
+}
