@@ -161,7 +161,9 @@ async Task<bool> ElTokenSigueSiendoValido(TokenValidatedContext context)
     var stampDelToken = context.Principal?.FindFirstValue("security_stamp");
     if (stampDelToken != await users.GetSecurityStampAsync(user)) return false;
 
-    return await db.Usuarios.AnyAsync(u => u.identity_user_id == identityUserId);
+    // Desactivar a alguien rota su stamp, pero si la baja se hace directo en la base eso no
+    // pasa: por eso el estado se vuelve a mirar acá, en cada petición.
+    return await db.Usuarios.AnyAsync(u => u.identity_user_id == identityUserId && u.is_active);
 }
 
 // TokenValidationParameters es lo que se comprueba del token en sí: que lo haya
