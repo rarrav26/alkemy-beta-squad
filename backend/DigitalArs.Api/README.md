@@ -110,7 +110,8 @@ hardcodeada dentro del `DbContext`.
 Controllers/      endpoints HTTP: reciben el request y traducen el resultado a un status
 DTOs/             lo que cada operación acepta y devuelve; nunca se expone una entidad
 Interfaces/       contratos, tanto de repositorios como de servicios
-Services/         las reglas de negocio (login, alta, invitaciones, JWT)
+Services/         las reglas de negocio (login, alta, invitaciones, JWT, cuenta, depósito,
+                  historial y transferencia)
 Repositories/     acceso a datos vía DbContext
 Helpers/          lo compartido que no depende de una petición HTTP:
   Domain/           reglas de negocio puras: importes, alias/CVU, signos, roles
@@ -225,15 +226,23 @@ La contraseña debe tener al menos ocho caracteres, mayúscula, minúscula, núm
 | PATCH /api/usuarios/{id}/active | Administrador | Activa/desactiva con { "isActive": false } |
 | GET /api/tiposdemovimientos | JWT | 200: catálogo completo de tipos de movimiento |
 | GET /api/tiposdemovimientos/{id} | JWT | 200: un tipo, o 404 si no existe |
+| GET /api/usuarios/me | JWT | 200: perfil propio con su cuenta, si tiene |
+| PATCH /api/usuarios/me | JWT | 200: edita nombre, apellido y email propios; si cambia el email pide `currentPassword` |
 | GET /api/cuentas/me | JWT | 200: id, alias, CVU y saldo de la cuenta propia; 404 si no tiene |
+| PATCH /api/cuentas/me/alias | JWT | 200: cambia el alias propio con { "alias": "auto.perro.gato" }; 409 si ya existe |
 | POST /api/movimientos/depositos | JWT | 200: acredita { "importe": 500 } y devuelve el saldo actualizado y la fecha en hora argentina |
 | GET /api/movimientos | JWT | 200: historial propio paginado, con filtros de fecha y tipo y búsqueda por nombre de tipo |
+| POST /api/transferencias/resolver-destino | JWT | 200: valida { "destino", "importe" } y devuelve id, alias, CVU y titular del destino |
+| POST /api/transferencias | JWT | 200: transfiere a otra cuenta activa y devuelve el saldo actualizado |
 | GET /api/setup/status | Público | Informa si la instalación ya tiene administrador |
 
 Un usuario sin rol Administrador que llame a un endpoint de Administrador recibe 403 sin cuerpo
 JSON, que es la respuesta por defecto del framework. En `UsuariosController` el rol va en cada
 acción, porque los endpoints `me` son de cualquier usuario logueado: un endpoint de
 administración nuevo tiene que llevar su `[Authorize(Roles = RolPrincipal.Administrador)]`.
+
+Los endpoints de billetera (cuenta, movimientos y transferencias) piden solo JWT, no el rol
+Usuario. El administrador no tiene cuenta, así que si los llama recibe 404.
 
 ### GET /api/movimientos — historial paginado
 
@@ -415,12 +424,15 @@ No hay refresh tokens; al vencer el JWT se debe iniciar sesión nuevamente.
 ```powershell
 dotnet build
 dotnet run --project Tests/AuthenticationChecks/AuthenticationChecks.csproj
+dotnet run --project Tests/MovimientosChecks/MovimientosChecks.csproj
 ```
 
-El ejecutable de verificación usa Identity real y un almacén en memoria exclusivamente para pruebas:
+`AuthenticationChecks` (36 verificaciones) usa Identity real y un almacén en memoria exclusivamente para pruebas:
 hash, contraseña correcta/incorrecta, invitación adulterada, ajena, vencida, revocada y reutilizada,
-y JWT con identidad/rol, firma, emisor, audiencia y vencimiento.
-No reemplaza una prueba de integración con SQL Server.
+JWT con identidad/rol, firma, emisor, audiencia y vencimiento, y el largo mínimo del alias.
+`MovimientosChecks` (15 verificaciones) prueba reglas puras, sin base: la normalización de la
+búsqueda del historial y el signo de cada tipo de movimiento.
+Ninguno reemplaza una prueba de integración con SQL Server.
 
 Prueba manual con SQL Server: registrar un usuario, iniciar sesión, probar test-protegido con/sin JWT;
 crear un invitado desde un administrador, comprobar que no inicia sesión antes de definir password,
