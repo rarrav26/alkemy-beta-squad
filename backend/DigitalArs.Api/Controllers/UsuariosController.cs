@@ -118,17 +118,6 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
         };
     }
 
-    [HttpPost("me/validate-password")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> ValidatePassword([FromBody] ValidatePasswordDto dto, CancellationToken cancellationToken)
-    {
-        if (!ModelState.IsValid) return BadRequest(new ErrorResponse { Message = "Password inválida." });
 
-        var identityUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrWhiteSpace(identityUserId)) return Unauthorized();
 
-        var valido = await accounts.ValidatePasswordAsync(identityUserId, dto.Password, cancellationToken);
-        return valido ? Ok() : Unauthorized(new ErrorResponse { Message = "Contraseña incorrecta." });
-    }
 }

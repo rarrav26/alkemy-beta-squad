@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { getSessionUser } from '../src/routes/dashboardUtils.js'
-import { buildProfilePayload } from '../src/routes/perfilUtils.js'
+import { buildProfilePayload, buildAliasPayload } from '../src/routes/perfilUtils.js'
 
 test('getSessionUser devuelve null cuando no hay sesión', () => {
   assert.equal(getSessionUser(null), null)
@@ -29,4 +29,8 @@ test('buildProfilePayload incluye currentPassword solo cuando cambia el email', 
       currentPassword: 'Secreto123'
     }
   )
+})
+
+test('buildAliasPayload devuelve el alias enviado sin espacios extra', () => {
+  assert.deepEqual(buildAliasPayload('  miAlias123  '), { alias: 'miAlias123' })
 })

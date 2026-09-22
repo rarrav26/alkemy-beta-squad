@@ -68,4 +68,14 @@ public class CuentaRepository(DigitalArsDbContext context) : ICuentaRepository
                 cuenta => cuenta.alias == destino || cuenta.cvu == destino,
                 cancellationToken);
     }
+
+    public async Task<bool> UpdateAliasAsync(int usuarioId, string newAlias, CancellationToken cancellationToken = default)
+    {
+        var cuenta = await context.Cuentas.SingleOrDefaultAsync(c => c.usuario_id == usuarioId, cancellationToken);
+        if (cuenta is null) return false;
+
+        cuenta.alias = newAlias;
+        await context.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 }

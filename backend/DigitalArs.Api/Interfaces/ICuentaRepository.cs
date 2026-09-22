@@ -21,4 +21,6 @@ public interface ICuentaRepository
         int usuarioId,
         decimal importe,
         CancellationToken cancellationToken = default);
+
+    Task<bool> UpdateAliasAsync(int usuarioId, string newAlias, CancellationToken cancellationToken = default);
 }

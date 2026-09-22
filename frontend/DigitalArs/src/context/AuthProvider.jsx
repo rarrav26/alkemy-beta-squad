@@ -119,6 +119,15 @@ export default function AuthProvider({ children }) {
     [authenticatedRequest]
   )
 
+  const actualizarAliasCuenta = useCallback(
+    alias =>
+      authenticatedRequest('/api/Cuentas/me/alias', {
+        method: 'PATCH',
+        body: { alias }
+      }),
+    [authenticatedRequest]
+  )
+
   const obtenerMiPerfil = useCallback(
     signal => authenticatedRequest('/api/Usuarios/me', { signal }),
     [authenticatedRequest]
@@ -171,6 +180,7 @@ export default function AuthProvider({ children }) {
         logout,
         retry,
         obtenerMiCuenta,
+        actualizarAliasCuenta,
         obtenerMiPerfil,
         actualizarMiPerfil,
         obtenerMovimientos,
