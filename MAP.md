@@ -439,7 +439,9 @@ El security stamp no es una contraseña ni la clave JWT: cambia al realizar dete
 
 ### Autorización
 
-UsuariosController tiene Authorize(Roles = "Administrador"). Las rutas públicas declaran AllowAnonymous. La política general exige autenticación.
+La política general (FallbackPolicy) exige estar autenticado. Las rutas públicas declaran AllowAnonymous.
+
+En UsuariosController el rol se declara **en cada acción**, no en la clase, porque los endpoints `me` son de cualquier usuario logueado. Cada endpoint de administración lleva `[Authorize(Roles = RolPrincipal.Administrador)]`. Si a uno nuevo le falta, la FallbackPolicy solo pide estar logueado y cualquier usuario podría usarlo.
 
 | Caso                           | Respuesta habitual               |
 | ------------------------------ | -------------------------------- |
@@ -447,6 +449,8 @@ UsuariosController tiene Authorize(Roles = "Administrador"). Las rutas públicas
 | Token inválido o vencido       | 401                              |
 | Token válido sin rol requerido | 403                              |
 | Token válido con permiso       | Respuesta normal de la operación |
+
+Ese 401 y ese 403 los genera el framework **sin cuerpo JSON**. El frontend lo resuelve con su propio mensaje (`mensajePara` en `api.js`), y como la respuesta no trae `code`, un 403 por rol no cierra la sesión: solo lo hace el 403 con `USER_INACTIVE`.
 
 Los roles del JWT reflejan el momento de emisión. Si se agrega una función para cambiar roles, debe coordinarse con revocación o renovación: modificar la tabla de roles no actualiza el token entregado.
 
@@ -579,6 +583,9 @@ Las instancias que emiten y validan tokens necesitan una configuración de firma
 | POST /api/auth/initial-password    | Exige invitación válida | 200: contraseña definida y JWT.          |
 | GET /api/auth/me                   | Autenticado             | Perfil y rol consultado en la base.      |
 | GET /api/auth/test-protegido       | Autenticado             | 200: confirma acceso, no lista usuarios. |
+| GET /api/usuarios                  | Administrador           | 200: listado paginado de usuarios regulares, con búsqueda. |
+| GET /api/usuarios/{id}             | Administrador           | 200: detalle de un usuario, o 404.       |
+| PATCH /api/usuarios/{id}           | Administrador           | 200: edita nombre, apellido y email.     |
 | POST /api/usuarios                 | Administrador           | 201: alta con invitación.                |
 | POST /api/usuarios/{id}/invitation | Administrador           | 200: renovación.                         |
 | PATCH /api/usuarios/{id}/active    | Administrador           | 204: cambio de estado.                   |
@@ -589,11 +596,11 @@ Las instancias que emiten y validan tokens necesitan una configuración de firma
 | GET /api/movimientos               | Autenticado             | 200: historial propio paginado, leído de la tabla Movimientos. |
 | GET /api/setup/status              | Público                 | Estado de existencia del administrador.  |
 
-No existe GET /api/usuarios para listar usuarios en esta entrega.
+Un usuario sin rol Administrador que llame a cualquiera de los endpoints de Administrador recibe 403.
 
 Los dos endpoints de cuenta y depósito no reciben ningún identificador: resuelven la cuenta desde el claim del token. Por eso no hay forma de pedir el saldo de otra persona, ni siquiera cambiando un parámetro.
 
-Todos los errores comparten la forma `ErrorResponse` (`code`, `message`, `errors`), incluidos los 400 de validación de DTO: `Program.cs` reemplaza con `InvalidModelStateResponseFactory` el ValidationProblemDetails que `[ApiController]` devolvería por su cuenta. Si el cuerpo no se puede deserializar el mensaje es genérico a propósito, porque el texto que arma el framework nombra los tipos internos del DTO.
+Todos los errores que arma la API comparten la forma `ErrorResponse` (`code`, `message`, `errors`), incluidos los 400 de validación de DTO. La excepción son el 401 y el 403 que genera el framework al autenticar y autorizar, que salen sin cuerpo (ver la sección 9). `Program.cs` reemplaza con `InvalidModelStateResponseFactory` el ValidationProblemDetails que `[ApiController]` devolvería por su cuenta. Si el cuerpo no se puede deserializar el mensaje es genérico a propósito, porque el texto que arma el framework nombra los tipos internos del DTO.
 
 La política auth limita a 20 solicitudes por IP/minuto donde se aplica, como AuthController. No es un límite global de toda la API. El exceso devuelve 429.
 
@@ -830,7 +837,6 @@ Cambiar `@AdminHash` en Seed(v.003).sql después de crear al administrador no ca
 
 No están implementados en esta entrega:
 
-- Listado de usuarios.
 - Interfaz para todas las operaciones administrativas de la API.
 - Refresh tokens.
 - Recuperación de contraseña de cuentas que ya tienen una.

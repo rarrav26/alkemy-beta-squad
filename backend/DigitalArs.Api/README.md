@@ -217,6 +217,9 @@ La contraseña debe tener al menos ocho caracteres, mayúscula, minúscula, núm
 | POST /api/auth/initial-password | Invitación válida | Define primera contraseña y devuelve JWT |
 | GET /api/auth/me | JWT | 200: perfil y rol consultados en la base, no en el token |
 | GET /api/auth/test-protegido | JWT | 200 autorizado, 401 sin token válido |
+| GET /api/usuarios | Administrador | 200: listado paginado de usuarios regulares, con ?page, ?pageSize y ?busqueda |
+| GET /api/usuarios/{id} | Administrador | 200: detalle del usuario, o 404 si no existe |
+| PATCH /api/usuarios/{id} | Administrador | 200: edita nombre, apellido y email; no toca documento ni saldo |
 | POST /api/usuarios | Administrador | Crea sin contraseña; devuelve invitationToken y requiresPasswordSetup |
 | POST /api/usuarios/{id}/invitation | Administrador | Renueva invitación e invalida la anterior |
 | PATCH /api/usuarios/{id}/active | Administrador | Activa/desactiva con { "isActive": false } |
@@ -227,7 +230,10 @@ La contraseña debe tener al menos ocho caracteres, mayúscula, minúscula, núm
 | GET /api/movimientos | JWT | 200: historial propio paginado, con filtros de fecha y tipo y búsqueda por nombre de tipo |
 | GET /api/setup/status | Público | Informa si la instalación ya tiene administrador |
 
-No existe GET /api/usuarios para listar usuarios en esta entrega.
+Un usuario sin rol Administrador que llame a un endpoint de Administrador recibe 403 sin cuerpo
+JSON, que es la respuesta por defecto del framework. En `UsuariosController` el rol va en cada
+acción, porque los endpoints `me` son de cualquier usuario logueado: un endpoint de
+administración nuevo tiene que llevar su `[Authorize(Roles = RolPrincipal.Administrador)]`.
 
 ### GET /api/movimientos — historial paginado
 
