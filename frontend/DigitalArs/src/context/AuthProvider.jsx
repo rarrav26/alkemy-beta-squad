@@ -151,12 +151,11 @@ export default function AuthProvider({ children }) {
   )
 
   // Comprueba contra el servidor que la sesión todavía sirve, ANTES de dibujar una pantalla
-  // protegida. Hace falta porque el JWT es stateless: si al usuario lo desactivan mientras
-  // tiene la sesión abierta, el token sigue siendo válido y sin esta consulta la app dibujaba
-  // el dashboard y recién lo expulsaba cuando alguna llamada devolvía 403.
-  // Se sondea /api/Usuarios/me y no /api/auth/me porque el primero distingue los dos casos:
-  // 403 USER_INACTIVE si está desactivado, 401 si el token ya no sirve. /api/auth/me responde
-  // 401 en ambos, y entonces no se podría explicar al usuario por qué lo sacaron.
+  // protegida. Lo que hay en sessionStorage puede ser viejo: al usuario lo pueden haber
+  // desactivado mientras tenía la sesión abierta.
+  // La API responde 401 tanto a un token vencido como al de un usuario desactivado, así que el
+  // mensaje no puede decir "venció": al volver a ingresar, el login le explica si está dado de
+  // baja. La rama del 403 USER_INACTIVE queda por si algún endpoint lo informa así.
   const verificarSesionActiva = useCallback(
     async signal => {
       if (!session?.token) return false
@@ -173,7 +172,7 @@ export default function AuthProvider({ children }) {
         }
 
         if (error.status === 401) {
-          logout('Tu sesión venció. Volvé a ingresar.')
+          logout('Tu sesión se cerró. Volvé a ingresar.')
           return false
         }
 
@@ -221,6 +220,26 @@ export default function AuthProvider({ children }) {
       authenticatedRequest('/api/movimientos/depositos', {
         method: 'POST',
         body: { importe }
+      }),
+    [authenticatedRequest]
+  )
+
+  // Se manda importe 1 porque el backend valida este paso con el mismo DTO que la
+  // transferencia, que exige un importe mayor a cero. El importe real va en transferir.
+  const resolverDestinoDeTransferencia = useCallback(
+    destino =>
+      authenticatedRequest('/api/Transferencias/resolver-destino', {
+        method: 'POST',
+        body: { destino, importe: 1 }
+      }),
+    [authenticatedRequest]
+  )
+
+  const transferir = useCallback(
+    (destino, importe) =>
+      authenticatedRequest('/api/Transferencias', {
+        method: 'POST',
+        body: { destino, importe }
       }),
     [authenticatedRequest]
   )
@@ -276,7 +295,9 @@ export default function AuthProvider({ children }) {
         obtenerMiPerfil,
         actualizarMiPerfil,
         obtenerMovimientos,
-        ingresarDinero
+        ingresarDinero,
+        resolverDestinoDeTransferencia,
+        transferir
       }}
     >
       {children}
