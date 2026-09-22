@@ -14,14 +14,40 @@ function readSession() {
   }
 }
 
+// Un usuario desactivado no debe poder seguir usando la app. Como el JWT es stateless, sigue
+// siendo válido hasta que expire: quien ya tenía la sesión abierta cuando lo desactivaron
+// llegaba al dashboard y podía recorrer perfil y movimientos, viendo solo un cartel de error
+// dentro de una tarjeta. Cualquier respuesta que informe la baja corta la sesión acá mismo,
+// que es el equivalente del lado del cliente a invalidar la sesión en el servidor.
+// Se aceptan las dos grafías del código porque el login lo escribe a mano ('USER_INACTIVE')
+// y el resto de los endpoints lo derivan del nombre del enum ('UsuarioDesactivado').
+function esUsuarioDesactivado(error) {
+  return error?.status === 403 &&
+    (error?.code === 'USER_INACTIVE' || error?.code === 'UsuarioDesactivado')
+}
+
 export default function AuthProvider({ children }) {
   const [session, setSession] = useState(readSession)
   const [ready, setReady] = useState(false)
   const [connectionError, setConnectionError] = useState('')
   const [attempt, setAttempt] = useState(0)
+  // Por qué se cerró la sesión sola. Sin esto, un usuario desactivado en medio de su sesión
+  // aparecía de golpe en el login sin ninguna explicación.
+  const [motivoDeCierre, setMotivoDeCierre] = useState('')
 
-  const logout = useCallback(() => {
+  // Token cuya validez ya se confirmó contra el servidor. Se guarda el token y no un booleano
+  // para que, al cambiar de cuenta, la verificación vuelva a correr en vez de darse por hecha.
+  const [tokenVerificado, setTokenVerificado] = useState(null)
+
+  // Mientras no esté verificada, la app no debe mostrar NADA de sesión iniciada: ni el
+  // contenido de las rutas ni la navegación del encabezado. Si no, un usuario desactivado
+  // alcanzaba a ver la barra con "Mi cuenta / Perfil" antes de que lo sacaran.
+  const sesionVerificada = Boolean(session?.token) && tokenVerificado === session.token
+
+  const logout = useCallback((motivo = '') => {
     sessionStorage.removeItem(storageKey)
+    setMotivoDeCierre(typeof motivo === 'string' ? motivo : '')
+    setTokenVerificado(null)
     setSession(null)
   }, [])
 
@@ -77,6 +103,7 @@ export default function AuthProvider({ children }) {
     const user = await apiRequest('/api/auth/me', { token: result.token })
     const value = { token: result.token, expiresAt: result.expiresAt, user }
     sessionStorage.setItem(storageKey, JSON.stringify(value))
+    setMotivoDeCierre('')
     setSession(value)
   }
   async function login(data) {
@@ -108,7 +135,11 @@ export default function AuthProvider({ children }) {
           token: session.token
         })
       } catch (error) {
-        if (error.status === 401) logout()
+        if (esUsuarioDesactivado(error)) {
+          logout('Tu usuario fue desactivado. Contactá al administrador para regularizar la situación.')
+        } else if (error.status === 401) {
+          logout()
+        }
         throw error
       }
     },
@@ -116,6 +147,64 @@ export default function AuthProvider({ children }) {
   )
   const obtenerMiCuenta = useCallback(
     signal => authenticatedRequest('/api/cuentas/me', { signal }),
+    [authenticatedRequest]
+  )
+
+  // Comprueba contra el servidor que la sesión todavía sirve, ANTES de dibujar una pantalla
+  // protegida. Hace falta porque el JWT es stateless: si al usuario lo desactivan mientras
+  // tiene la sesión abierta, el token sigue siendo válido y sin esta consulta la app dibujaba
+  // el dashboard y recién lo expulsaba cuando alguna llamada devolvía 403.
+  // Se sondea /api/Usuarios/me y no /api/auth/me porque el primero distingue los dos casos:
+  // 403 USER_INACTIVE si está desactivado, 401 si el token ya no sirve. /api/auth/me responde
+  // 401 en ambos, y entonces no se podría explicar al usuario por qué lo sacaron.
+  const verificarSesionActiva = useCallback(
+    async signal => {
+      if (!session?.token) return false
+
+      try {
+        await apiRequest('/api/Usuarios/me', { token: session.token, signal })
+        return true
+      } catch (error) {
+        if (error.name === 'AbortError') throw error
+
+        if (esUsuarioDesactivado(error)) {
+          logout('Tu usuario fue desactivado. Contactá al administrador para regularizar la situación.')
+          return false
+        }
+
+        if (error.status === 401) {
+          logout('Tu sesión venció. Volvé a ingresar.')
+          return false
+        }
+
+        // Un problema de red no debería cerrar la sesión: se deja pasar y que la pantalla
+        // muestre su propio error de carga.
+        return true
+      }
+    },
+    [session, logout]
+  )
+
+  const actualizarAliasCuenta = useCallback(
+    alias =>
+      authenticatedRequest('/api/Cuentas/me/alias', {
+        method: 'PATCH',
+        body: { alias }
+      }),
+    [authenticatedRequest]
+  )
+
+  const obtenerMiPerfil = useCallback(
+    signal => authenticatedRequest('/api/Usuarios/me', { signal }),
+    [authenticatedRequest]
+  )
+
+  const actualizarMiPerfil = useCallback(
+    data =>
+      authenticatedRequest('/api/Usuarios/me', {
+        method: 'PATCH',
+        body: data
+      }),
     [authenticatedRequest]
   )
 
@@ -144,12 +233,37 @@ export default function AuthProvider({ children }) {
     setAttempt(value => value + 1)
   }
 
+  // Verificación central de la sesión: corre cada vez que cambia el token. Hasta que termine,
+  // sesionVerificada es false y la app no muestra nada de sesión iniciada.
+  useEffect(() => {
+    if (!session?.token) return
+
+    const controller = new AbortController()
+    const token = session.token
+
+    async function verificar() {
+      try {
+        const valida = await verificarSesionActiva(controller.signal)
+        if (controller.signal.aborted) return
+        if (valida) setTokenVerificado(token)
+      } catch {
+        // Cancelación al desmontar o al cambiar de sesión: no hay nada que hacer.
+      }
+    }
+
+    verificar()
+
+    return () => controller.abort()
+  }, [session, verificarSesionActiva])
+
   return (
     <AuthContext.Provider
       value={{
         session,
         ready,
         connectionError,
+        motivoDeCierre,
+        sesionVerificada,
         login,
         register,
         initialPassword,
@@ -157,6 +271,10 @@ export default function AuthProvider({ children }) {
         logout,
         retry,
         obtenerMiCuenta,
+        verificarSesionActiva,
+        actualizarAliasCuenta,
+        obtenerMiPerfil,
+        actualizarMiPerfil,
         obtenerMovimientos,
         ingresarDinero
       }}

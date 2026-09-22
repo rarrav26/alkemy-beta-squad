@@ -99,6 +99,16 @@ Check(!DatosDeCuenta.EsDestinoValido("000000310000001234567X"), "Rechaza CVU con
 Check(!DatosDeCuenta.EsDestinoValido(""), "Rechaza destino vacío");
 Check(!DatosDeCuenta.EsDestinoValido(null), "Rechaza destino nulo");
 
+// El formato del alias es uno solo para todo el sistema: el que se genera al crear la cuenta,
+// el que un usuario puede elegir al editarlo, y el que se acepta como destino de una
+// transferencia. Antes convivían dos reglas incompatibles y un alias editado quedaba
+// inalcanzable por alias, así que estas comprobaciones fijan que no vuelva a pasar.
+Check(DatosDeCuenta.EsAliasValido("admin.alkemy.fuerte"), "Acepta un alias elegido por el usuario");
+Check(!DatosDeCuenta.EsAliasValido("adminalkemyfuerte"), "Rechaza el alias de una sola palabra que permitía la regla vieja");
+Check(DatosDeCuenta.NormalizarAlias("  Auto.Perro.Gato  ") == "auto.perro.gato", "Normaliza recortando espacios y pasando a minúsculas");
+Check(DatosDeCuenta.EsAliasValido(DatosDeCuenta.NormalizarAlias("Auto.Perro.Gato")), "Acepta mayúsculas una vez normalizado");
+Check("a.b.c".Length == DatosDeCuenta.LargoMinimoAlias, "El largo mínimo declarado coincide con el alias más corto posible");
+
 Console.WriteLine("Todas las verificaciones pasaron.");
 
 Task<string> CrearInvitacion(IdentityUser usuario) =>
@@ -146,6 +156,18 @@ sealed class PerfilesEnMemoria : IUsuarioRepository
         if (perfil is null) return Task.FromResult(false);
 
         perfil.is_active = activo;
+        return Task.FromResult(true);
+    }
+
+    public Task<bool> UpdateProfileAsync(
+        int id, string nombre, string apellido, string email, CancellationToken c = default)
+    {
+        var perfil = items.FirstOrDefault(u => u.id == id);
+        if (perfil is null) return Task.FromResult(false);
+
+        perfil.nombre = nombre;
+        perfil.apellido = apellido;
+        perfil.email = email;
         return Task.FromResult(true);
     }
 }

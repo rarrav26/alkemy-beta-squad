@@ -23,8 +23,18 @@ public static class DatosDeCuenta
     // Formato de destino de una transferencia. Se define acá, al lado de los generadores,
     // para que validación y generación no se desincronicen nunca.
     // Alias: 3 palabras simples (minúsculas) separadas por punto -> auto.perro.gato
+    // Son const para poder usarse también en los atributos de validación de los DTOs, que
+    // exigen una constante de compilación. La variante que no distingue mayúsculas es la que
+    // va en el DTO: el servicio normaliza a minúsculas antes de validar, así escribir
+    // "Auto.Perro.Gato" se acepta y se guarda como "auto.perro.gato".
+    public const string PatronAlias = @"^[a-z]+\.[a-z]+\.[a-z]+$";
+    public const string PatronAliasSinDistinguirMayusculas = @"^[A-Za-z]+\.[A-Za-z]+\.[A-Za-z]+$";
+
+    // El alias más corto posible es a.b.c: tres palabras de una letra más dos puntos.
+    public const int LargoMinimoAlias = 5;
+
     private static readonly Regex FormatoAlias =
-        new(@"^[a-z]+\.[a-z]+\.[a-z]+$", RegexOptions.Compiled);
+        new(PatronAlias, RegexOptions.Compiled);
 
     // CVU: exactamente 22 dígitos -> 0000003100000012345678
     private static readonly Regex FormatoCvu =
@@ -43,6 +53,10 @@ public static class DatosDeCuenta
 
     public static bool EsAliasValido(string? destino) =>
         destino is not null && FormatoAlias.IsMatch(destino);
+
+    // Deja el alias en la forma en que se guarda: sin espacios alrededor y en minúsculas.
+    public static string NormalizarAlias(string? alias) =>
+        (alias ?? "").Trim().ToLowerInvariant();
 
     public static bool EsCvuValido(string? destino) =>
         destino is not null && FormatoCvu.IsMatch(destino);

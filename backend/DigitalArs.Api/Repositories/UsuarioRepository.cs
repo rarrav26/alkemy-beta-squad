@@ -25,4 +25,17 @@ public class UsuarioRepository(DigitalArsDbContext context) : IUsuarioRepository
         await context.SaveChangesAsync(cancellationToken);
         return true;
     }
+
+    public async Task<bool> UpdateProfileAsync(int id, string nombre, string apellido, string email, CancellationToken cancellationToken = default)
+    {
+        var perfil = await context.Usuarios.SingleOrDefaultAsync(usuario => usuario.id == id, cancellationToken);
+        if (perfil is null) return false;
+
+        perfil.nombre = nombre;
+        perfil.apellido = apellido;
+        perfil.email = email;
+
+        await context.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 }
