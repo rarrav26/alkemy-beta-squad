@@ -73,6 +73,7 @@ var principal = handler.ValidateToken(response.Token, parameters, out _);
 Check(principal.FindFirstValue(ClaimTypes.NameIdentifier) == user.Id &&
       principal.FindFirstValue("usuarioId") == "42" && principal.IsInRole("Usuario"), "JWT contiene identidad, perfil y rol");
 Check(principal.FindFirstValue("security_stamp") == user.SecurityStamp, "JWT permite revocar acceso por stamp");
+Check(!principal.IsInRole(RolPrincipal.Administrador), "Un JWT de Usuario no trae el rol Administrador");
 var badIssuer = parameters.Clone(); badIssuer.ValidIssuer = "another";
 Reject(response.Token, badIssuer, "Rechaza emisor incorrecto");
 var badAudience = parameters.Clone(); badAudience.ValidAudience = "another";
