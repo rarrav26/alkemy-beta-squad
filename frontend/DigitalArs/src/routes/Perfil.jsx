@@ -15,7 +15,7 @@ import {
 import { useAuth } from '../context/authContext'
 import { ElementosGlobales } from '../context/ElementosGlobales'
 import { getSessionUser } from './dashboardUtils'
-import { buildProfilePayload } from './perfilUtils'
+import { buildAliasPayload, buildProfilePayload } from './perfilUtils'
 
 const formatoPesos = new Intl.NumberFormat('es-AR', {
   style: 'currency',
@@ -90,7 +90,7 @@ function InfoCard({ label, value, alignRight = false, darkMode = true }) {
 }
 
 export default function PerfilPage() {
-  const { obtenerMiPerfil, actualizarMiPerfil, session } = useAuth()
+  const { obtenerMiPerfil, actualizarMiPerfil, actualizarAliasCuenta, session } = useAuth()
   const { darkMode } = useContext(ElementosGlobales)
   const usuario = getSessionUser(session)
   const esAdmin = usuario?.role === 'Administrador'
@@ -100,6 +100,8 @@ export default function PerfilPage() {
   const [exito, setExito] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [editando, setEditando] = useState(false)
+  const [editandoAlias, setEditandoAlias] = useState(false)
+  const [alias, setAlias] = useState('')
   const [formulario, setFormulario] = useState({ nombre: '', apellido: '', email: '', currentPassword: '' })
   const [intento, setIntento] = useState(0)
 
@@ -116,6 +118,7 @@ export default function PerfilPage() {
         const datos = await obtenerMiPerfil(controller.signal)
         if (!controller.signal.aborted) {
           setPerfil(datos)
+          setAlias(datos?.cuenta?.alias ?? '')
           setFormulario({
             nombre: datos?.nombre ?? '',
             apellido: datos?.apellido ?? '',
@@ -200,6 +203,36 @@ export default function PerfilPage() {
       setEditando(false)
     } catch (error) {
       setError(error.message || 'No se pudo guardar tu perfil.')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  const guardarAlias = async event => {
+    event.preventDefault()
+
+    const aliasTrim = alias.trim()
+    if (!aliasTrim) {
+      setError('El alias no puede estar vacío.')
+      return
+    }
+
+    setGuardando(true)
+    setError('')
+    setExito('')
+
+    try {
+      const payload = buildAliasPayload(aliasTrim)
+      const actualizado = await actualizarAliasCuenta(payload.alias)
+      setPerfil(actual => ({
+        ...actual,
+        cuenta: { ...actual?.cuenta, alias: actualizado?.alias ?? payload.alias }
+      }))
+      setAlias(actualizado?.alias ?? payload.alias)
+      setExito('Tu alias se actualizó correctamente.')
+      setEditandoAlias(false)
+    } catch (error) {
+      setError(error.message || 'No se pudo guardar el alias.')
     } finally {
       setGuardando(false)
     }
@@ -339,7 +372,41 @@ export default function PerfilPage() {
             Cuenta
           </Typography>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr' }, gap: 1, width: '100%' }}>
-            <InfoCard label="Alias" value={perfil?.cuenta?.alias ?? '-'} alignRight darkMode={darkMode} />
+            {!editandoAlias ? (
+              <>
+                <InfoCard label="Alias" value={perfil?.cuenta?.alias ?? '-'} alignRight darkMode={darkMode} />
+                <Button variant="contained" onClick={() => setEditandoAlias(true)} sx={{ alignSelf: 'flex-start' }}>
+                  Editar alias
+                </Button>
+              </>
+            ) : (
+              <Box component="form" onSubmit={guardarAlias} sx={{ display: 'grid', gap: 2 }}>
+                <TextField
+                  label="Alias"
+                  name="alias"
+                  value={alias}
+                  onChange={event => setAlias(event.target.value)}
+                  fullWidth
+                  variant="outlined"
+                />
+                <Stack direction="row" spacing={2} justifyContent="flex-end">
+                  <Button
+                    variant="outlined"
+                    onClick={() => {
+                      setEditandoAlias(false)
+                      setAlias(perfil?.cuenta?.alias ?? '')
+                      setError('')
+                      setExito('')
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button type="submit" variant="contained" disabled={guardando}>
+                    {guardando ? 'Guardando...' : 'Guardar alias'}
+                  </Button>
+                </Stack>
+              </Box>
+            )}
             <InfoCard
               label="CVU"
               value={perfil?.cuenta?.cvu ?? '-'}

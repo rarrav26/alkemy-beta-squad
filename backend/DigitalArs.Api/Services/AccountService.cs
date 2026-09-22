@@ -182,16 +182,33 @@ public class AccountService(
         return Resultado<UsuarioResponse>.Exito(respuesta);
     }
 
-    public async Task<bool> ValidatePasswordAsync(string identityUserId, string password, CancellationToken cancellationToken = default)
+    public async Task<Resultado<CuentaResponse>> UpdateAliasAsync(
+        string identityUserId, string newAlias, CancellationToken cancellationToken = default)
     {
         var perfil = await usuarios.GetByIdentityUserIdAsync(identityUserId, cancellationToken);
-        if (perfil is null || perfil.identity_user_id is null) return false;
+        if (perfil is null) return Resultado<CuentaResponse>.Fallo(MotivoDeRechazo.NoEncontrado, "No se encontró el usuario.");
 
-        var usuarioIdentity = await users.FindByIdAsync(perfil.identity_user_id);
-        if (usuarioIdentity is null) return false;
+        var aliasTrim = newAlias.Trim();
+        // Formato: solo letras
+        if (!System.Text.RegularExpressions.Regex.IsMatch(aliasTrim, "^[A-Za-z]+$"))
+            return Resultado<CuentaResponse>.Fallo(MotivoDeRechazo.DatosInvalidos, new[] { "Formato de alias inválido. Sólo se permiten letras." });
 
-        return await users.CheckPasswordAsync(usuarioIdentity, password);
+        // Unicidad: buscar por alias (GetByAliasOCvuAsync también busca CVU)
+        var existente = await cuentas.GetByAliasOCvuAsync(aliasTrim, cancellationToken);
+        if (existente is not null && existente.usuario_id != perfil.id)
+            return Resultado<CuentaResponse>.Fallo(MotivoDeRechazo.DatosInvalidos, new[] { "El alias ya está en uso." });
+
+        var ok = await cuentas.UpdateAliasAsync(perfil.id, aliasTrim, cancellationToken);
+        if (!ok) return Resultado<CuentaResponse>.Fallo(MotivoDeRechazo.NoSePudoActualizar, new[] { "No se pudo actualizar el alias." });
+
+        var cuenta = await cuentas.GetByUsuarioIdAsync(perfil.id, cancellationToken);
+        if (cuenta is null) return Resultado<CuentaResponse>.Fallo(MotivoDeRechazo.CuentaNoEncontrada, "No se encontró la cuenta.");
+
+        var respuesta = new CuentaResponse(cuenta.id, cuenta.alias, cuenta.cvu, cuenta.saldo);
+        return Resultado<CuentaResponse>.Exito(respuesta);
     }
+
+
 
     public async Task<Resultado<UsuarioResponse>> ObtenerPorIdentityUserIdAsync(
         string identityUserId, CancellationToken cancellationToken = default)

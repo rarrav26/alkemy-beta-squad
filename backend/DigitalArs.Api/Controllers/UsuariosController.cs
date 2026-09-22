@@ -1,9 +1,9 @@
-using System.Security.Claims;
 using DigitalArs.Api.DTOs;
 using DigitalArs.Api.Interfaces;
 using DigitalArs.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace DigitalArs.Api.Controllers;
 
@@ -92,7 +92,6 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Me(CancellationToken cancellationToken)
     {
-        // Resuelve el claim probando NameIdentifier, sub, id y nameid
         var identityUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                              ?? User.FindFirst("sub")?.Value
                              ?? User.FindFirst("id")?.Value
@@ -100,14 +99,12 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
 
         if (string.IsNullOrWhiteSpace(identityUserId)) return Unauthorized();
 
-        // Si el token traía el ID numérico de dbo.Usuarios (ej: 1 o 5), busca por ID directo
         if (int.TryParse(identityUserId, out var usuarioId))
         {
             var resPorId = await accounts.ObtenerPorIdAsync(usuarioId, cancellationToken);
             if (resPorId.Exitoso) return Ok(resPorId.Valor);
         }
 
-        // Si era el GUID de Identity, busca por identity_user_id
         var resultado = await accounts.ObtenerPorIdentityUserIdAsync(identityUserId, cancellationToken);
         if (resultado.Exitoso) return Ok(resultado.Valor);
 
@@ -142,23 +139,5 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
             MotivoDeRechazo.NoSePudoActualizar => StatusCode(StatusCodes.Status500InternalServerError, new ErrorResponse { Message = "No se pudo actualizar el perfil." }),
             _ => StatusCode(StatusCodes.Status500InternalServerError)
         };
-    }
-
-    [HttpPost("me/validate-password")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> ValidatePassword([FromBody] ValidatePasswordDto dto, CancellationToken cancellationToken)
-    {
-        if (!ModelState.IsValid) return BadRequest(new ErrorResponse { Message = "Password inválida." });
-
-        var identityUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                             ?? User.FindFirst("sub")?.Value
-                             ?? User.FindFirst("id")?.Value
-                             ?? User.FindFirst("nameid")?.Value;
-
-        if (string.IsNullOrWhiteSpace(identityUserId)) return Unauthorized();
-
-        var valido = await accounts.ValidatePasswordAsync(identityUserId, dto.Password, cancellationToken);
-        return valido ? Ok() : Unauthorized(new ErrorResponse { Message = "Contraseña incorrecta." });
     }
 }

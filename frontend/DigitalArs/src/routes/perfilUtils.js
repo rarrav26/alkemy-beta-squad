@@ -13,3 +13,9 @@ export function buildProfilePayload(formData, currentEmail, currentPassword = ''
 
   return payload
 }
+
+export function buildAliasPayload(alias) {
+  return {
+    alias: alias.trim()
+  }
+}
