@@ -42,7 +42,6 @@ export default function ResponsiveAppBar() {
               <Button color="inherit" component={Link} to="/perfil">
                 Perfil
               </Button>
-              <Button color="inherit" component={Link} to="/perfil">Perfil</Button>
         <Button color="inherit" onClick={logout}>
                 Cerrar sesión
               </Button>

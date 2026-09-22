@@ -14,7 +14,6 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
     private const string MensajeNoPuedeRecibirInvitacion =
         "El usuario debe estar activo y sin contraseña definida.";
 
-    // AGREGAR ESTE MÉTODO GET
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(
@@ -22,7 +21,6 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
         [FromQuery] int pageSize = 10,
         CancellationToken cancellationToken = default)
     {
-        // Si tu servicio IAccountService ya tiene un método para listar usuarios:
         var resultado = await accounts.ObtenerUsuariosPaginadosAsync(page, pageSize, cancellationToken);
         return Ok(resultado);
     }
@@ -94,9 +92,22 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Me(CancellationToken cancellationToken)
     {
-        var identityUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        // Resuelve el claim probando NameIdentifier, sub, id y nameid
+        var identityUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                             ?? User.FindFirst("sub")?.Value
+                             ?? User.FindFirst("id")?.Value
+                             ?? User.FindFirst("nameid")?.Value;
+
         if (string.IsNullOrWhiteSpace(identityUserId)) return Unauthorized();
 
+        // Si el token traía el ID numérico de dbo.Usuarios (ej: 1 o 5), busca por ID directo
+        if (int.TryParse(identityUserId, out var usuarioId))
+        {
+            var resPorId = await accounts.ObtenerPorIdAsync(usuarioId, cancellationToken);
+            if (resPorId.Exitoso) return Ok(resPorId.Valor);
+        }
+
+        // Si era el GUID de Identity, busca por identity_user_id
         var resultado = await accounts.ObtenerPorIdentityUserIdAsync(identityUserId, cancellationToken);
         if (resultado.Exitoso) return Ok(resultado.Valor);
 
@@ -114,10 +125,13 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
         if (!ModelState.IsValid)
             return BadRequest(new ErrorResponse { Message = "Datos inválidos.", Errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToArray() });
 
-        var identityUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var identityUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                             ?? User.FindFirst("sub")?.Value
+                             ?? User.FindFirst("id")?.Value
+                             ?? User.FindFirst("nameid")?.Value;
+
         if (string.IsNullOrWhiteSpace(identityUserId)) return Unauthorized();
 
-        // Si el email cambió, el frontend debe enviar CurrentPassword; chequearlo aquí.
         var resultado = await accounts.UpdateProfileAsync(identityUserId, dto, cancellationToken);
         if (resultado.Exitoso) return Ok(resultado.Valor);
 
@@ -137,7 +151,11 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
     {
         if (!ModelState.IsValid) return BadRequest(new ErrorResponse { Message = "Password inválida." });
 
-        var identityUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var identityUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                             ?? User.FindFirst("sub")?.Value
+                             ?? User.FindFirst("id")?.Value
+                             ?? User.FindFirst("nameid")?.Value;
+
         if (string.IsNullOrWhiteSpace(identityUserId)) return Unauthorized();
 
         var valido = await accounts.ValidatePasswordAsync(identityUserId, dto.Password, cancellationToken);
