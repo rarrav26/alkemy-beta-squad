@@ -9,6 +9,10 @@ using System.Security.Claims;
 
 namespace DigitalArs.Api.Controllers;
 
+// El rol va en cada acción y no en la clase porque los endpoints "me" son de cualquier usuario
+// logueado. Cada endpoint nuevo de administración tiene que llevar su
+// [Authorize(Roles = RolPrincipal.Administrador)]: sin él, la FallbackPolicy de Program.cs
+// solo exige estar logueado y cualquier usuario podría usarlo.
 [ApiController, Route("api/[controller]")]
 [Authorize]
 public class UsuariosController(IAccountService accounts) : ControllerBase
@@ -21,6 +25,7 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
     [HttpGet]
     [Authorize(Roles = RolPrincipal.Administrador)]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetAll(
         [FromQuery] int page = 1,
@@ -36,6 +41,8 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
     [Authorize(Roles = RolPrincipal.Administrador)]
     [ProducesResponseType<UsuarioCreadoResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Create(PerfilUsuarioDto dto)
     {
         var resultado = await accounts.CrearConInvitacionAsync(dto);
@@ -50,6 +57,8 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> ReissueInvitation(int id, CancellationToken cancellationToken)
     {
         var resultado = await accounts.ReemitirInvitacionAsync(id, cancellationToken);
@@ -63,6 +72,8 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> SetActive(int id, EstadoActivoDto dto, CancellationToken cancellationToken)
     {
         var motivo = await accounts.CambiarEstadoAsync(id, dto.IsActive!.Value, cancellationToken);
@@ -83,6 +94,8 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
     [Authorize(Roles = RolPrincipal.Administrador)]
     [ProducesResponseType<UsuarioResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
     {
         var resultado = await accounts.ObtenerPorIdAsync(id, cancellationToken);
@@ -99,6 +112,7 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
     [Authorize(Roles = RolPrincipal.Administrador)]
     [ProducesResponseType<UsuarioResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateComoAdmin(
