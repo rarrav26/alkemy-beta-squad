@@ -47,8 +47,7 @@ function presentacionDelImporte(movimiento) {
 // Una fila del historial. La usan el preview del dashboard y la pantalla
 // completa, asi que el formato de los montos y las fechas es siempre el mismo.
 function FilaDeMovimiento({ movimiento }) {
-  const signo = movimiento.esCredito ? "+" : "-";
-  const color = movimiento.esCredito ? "success.main" : "error.main";
+  const presentacion = presentacionDelImporte(movimiento);
   const IconoMovimiento = movimiento.esCredito
     ? ArrowDownwardRoundedIcon
     : ArrowUpwardRoundedIcon;
@@ -107,12 +106,12 @@ function FilaDeMovimiento({ movimiento }) {
         <Typography
           fontWeight={700}
           sx={{
-            color,
+            color: presentacion.color,
             whiteSpace: "nowrap",
             lineHeight: 1.3,
           }}
         >
-          {prefijo}
+          {presentacion.prefijo}
           {formatoPesos.format(Math.abs(movimiento.importe))}
         </Typography>
       </Box>
