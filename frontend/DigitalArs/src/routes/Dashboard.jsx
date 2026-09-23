@@ -14,15 +14,11 @@ import { useAuth } from "../context/authContext";
 import { useNotificaciones } from "../context/notificacionesContext";
 import AuthForm, { ProfileFields } from "../components/Auth/AuthForm";
 import DepositoModal from "../components/Cuentas/DepositoModal";
+import SaldoAnimado from "../components/Cuentas/SaldoAnimado";
 import TransferenciaModal from "../components/Cuentas/TransferenciaModal";
 import { MovimientosPreview } from "./Movimientos";
 import { getSessionUser } from "./dashboardUtils";
 import { esAdministrador } from "./rolesUtils";
-
-const formatoPesos = new Intl.NumberFormat("es-AR", {
-  style: "currency",
-  currency: "ARS",
-});
 
 export default function Dashboard() {
   const { session, obtenerMiCuenta } = useAuth();
@@ -183,9 +179,7 @@ export default function Dashboard() {
                       Saldo disponible en pesos
                     </Typography>
 
-                    <Typography variant="h4" fontWeight={700}>
-                      {formatoPesos.format(cuenta.saldo)}
-                    </Typography>
+                    <SaldoAnimado valor={cuenta.saldo} />
                   </Box>
 
                   {mensajeExito && (

@@ -7,6 +7,7 @@ import Snackbar from '@mui/material/Snackbar'
 import { NotificacionesContext } from './notificacionesContext'
 import { api } from './api'
 import { useAuth } from './authContext'
+import { esIngresoDeDinero } from '../components/Notificaciones/notificacionesUtils'
 import { esAdministrador } from '../routes/rolesUtils'
 
 const SIN_DATOS = { deLaSesion: null, items: [], noLeidas: 0 }
@@ -106,7 +107,12 @@ export default function NotificacionesProvider({ children }) {
       }
     })
 
-    setAviso({ mensaje: notificacion.mensaje, severidad: 'info' })
+    // Verde cuando entra dinero, igual que la fila del panel: el color del cartel y el de la
+    // lista salen de la misma regla, así no pueden decir cosas distintas del mismo aviso.
+    setAviso({
+      mensaje: notificacion.mensaje,
+      severidad: esIngresoDeDinero(notificacion) ? 'success' : 'info'
+    })
     setAvisosRecibidos(actual => actual + 1)
   }, [])
 

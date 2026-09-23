@@ -45,7 +45,9 @@ export default function CampanaDeNotificaciones() {
         direction="row"
         sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1, px: 2, py: 1.5 }}
       >
-        <Typography component="h2" fontWeight={700}>
+        {/* El peso va por sx: en MUI 9, Typography ya no acepta `fontWeight` como prop y lo
+            ignora sin avisar. */}
+        <Typography component="h2" sx={{ fontWeight: 700 }}>
           Notificaciones
         </Typography>
 

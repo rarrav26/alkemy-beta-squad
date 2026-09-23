@@ -7,12 +7,18 @@ import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 
 import { useNotificaciones } from '../../context/notificacionesContext'
+import { esIngresoDeDinero } from './notificacionesUtils'
 import { formatearFecha } from '../../routes/movimientosUtils'
 
-// Una notificación del panel. Es un ListItemButton y no un Box porque tocarla la marca como
-// leída: tiene que ser un control de verdad, con su área de toque y su foco de teclado.
+// OJO con Typography en MUI 9: `fontWeight` ya no es una prop y `color` solo entiende nombres de
+// paleta sueltos ("success", "textSecondary"), no rutas con punto ("success.main",
+// "text.secondary"). Lo que no entiende lo ignora en silencio, sin warning. Por eso acá todo el
+// estilo va por `sx`, que sí resuelve las rutas completas.
 function ItemDeNotificacion({ notificacion, onMarcarLeida }) {
   const sinLeer = !notificacion.leida
+
+  // El verde identifica el TIPO de aviso, así que no depende de si ya se leyó.
+  const esIngreso = esIngresoDeDinero(notificacion)
 
   return (
     <ListItemButton
@@ -39,26 +45,31 @@ function ItemDeNotificacion({ notificacion, onMarcarLeida }) {
           mt: 0.9,
           borderRadius: '50%',
           flexShrink: 0,
-          backgroundColor: sinLeer ? 'primary.main' : 'transparent'
+          backgroundColor: sinLeer
+            ? (esIngreso ? 'success.main' : 'primary.main')
+            : 'transparent'
         }}
       />
 
       <Box sx={{ minWidth: 0, flex: 1 }}>
         <Typography
-          fontWeight={sinLeer ? 700 : 500}
-          sx={{ lineHeight: 1.3 }}
+          sx={{
+            lineHeight: 1.3,
+            fontWeight: sinLeer ? 700 : 500,
+            color: esIngreso ? 'success.main' : 'text.primary'
+          }}
         >
           {notificacion.titulo}
         </Typography>
 
         <Typography
           variant="body2"
-          color={sinLeer ? 'text.primary' : 'text.secondary'}
+          sx={{ color: sinLeer ? 'text.primary' : 'text.secondary' }}
         >
           {notificacion.mensaje}
         </Typography>
 
-        <Typography variant="caption" color="text.secondary">
+        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
           {formatearFecha(notificacion.fecha)}
         </Typography>
       </Box>
@@ -71,7 +82,7 @@ function ItemDeNotificacion({ notificacion, onMarcarLeida }) {
 function ContenidoDelPanel({ cargando, error, notificaciones, onMarcarLeida, onReintentar }) {
   if (cargando) {
     return (
-      <Typography color="text.secondary" role="status" sx={{ px: 2, py: 3 }}>
+      <Typography role="status" sx={{ color: 'text.secondary', px: 2, py: 3 }}>
         Cargando notificaciones…
       </Typography>
     )
@@ -98,7 +109,7 @@ function ContenidoDelPanel({ cargando, error, notificaciones, onMarcarLeida, onR
 
   if (notificaciones.length === 0) {
     return (
-      <Typography color="text.secondary" sx={{ px: 2, py: 3 }}>
+      <Typography sx={{ color: 'text.secondary', px: 2, py: 3 }}>
         No tenés notificaciones.
       </Typography>
     )
