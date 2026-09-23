@@ -70,6 +70,7 @@ builder.Services.AddScoped<ITipoMovimientoRepository, TipoMovimientoRepository>(
 builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
 builder.Services.AddScoped<ICuentaRepository, CuentaRepository>();
 builder.Services.AddScoped<IMovimientoRepository, MovimientoRepository>();
+builder.Services.AddScoped<INotificacionRepository, NotificacionRepository>();
 
 // -----------------------------------------------------------------------------
 // 3. Identity: cuentas, contraseñas, roles e invitaciones
