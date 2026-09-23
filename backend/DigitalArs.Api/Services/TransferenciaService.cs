@@ -12,8 +12,15 @@ public class TransferenciaService(
     ICuentaRepository cuentas,
     IUsuarioRepository usuarios,
     ITipoMovimientoRepository tiposMovimiento,
+    INotificacionRepository notificaciones,
     DigitalArsDbContext context) : ITransferenciaService
 {
+    // El nombre tal como lo lee la otra persona: en la confirmación del destino y en el texto
+    // del aviso. Está en un solo lugar para que las tres partes escriban el nombre igual.
+    private static string NombreCompletoDe(Usuario usuario) =>
+        $"{usuario.nombre} {usuario.apellido}";
+
+
     public async Task<Resultado<DestinoResponseDto>> ResolverDestinoAsync(
         string identityUserId,
         TransferenciaDto dto,
@@ -98,7 +105,7 @@ public class TransferenciaService(
             Id: cuentaDestino.id,
             Alias: cuentaDestino.alias,
             Cvu: cuentaDestino.cvu,
-            Titular: $"{cuentaDestino.usuario!.nombre} {cuentaDestino.usuario.apellido}");
+            Titular: NombreCompletoDe(cuentaDestino.usuario!));
 
         return Resultado<DestinoResponseDto>.Exito(respuesta);
     }
@@ -208,10 +215,38 @@ public class TransferenciaService(
         movCredito.transferencia_id = movDebito.id;
         await context.SaveChangesAsync(cancellationToken);
 
+        // 9. Un aviso para cada lado, DENTRO de la misma transacción que los movimientos: una
+        // transferencia revertida no puede dejar a nadie avisado de dinero que no se movió.
+        // Van acá y no antes porque necesitan el id de cada movimiento, que lo asigna la base
+        // en el SaveChangesAsync de arriba. Los dos reusan fechaOperacion, así los movimientos
+        // y sus avisos tienen la misma marca temporal.
+        var avisoParaQuienEnvia = new Notificacion
+        {
+            usuario_id = usuarioOrigen.id,
+            movimiento_id = movDebito.id,
+            titulo = MensajesDeNotificacion.TituloTransferenciaEnviada,
+            mensaje = MensajesDeNotificacion.TransferenciaEnviada(
+                importe, NombreCompletoDe(cuentaDestino.usuario!)),
+            fecha = fechaOperacion
+        };
+
+        var avisoParaQuienRecibe = new Notificacion
+        {
+            usuario_id = cuentaDestino.usuario_id,
+            movimiento_id = movCredito.id,
+            titulo = MensajesDeNotificacion.TituloTransferenciaRecibida,
+            mensaje = MensajesDeNotificacion.TransferenciaRecibida(
+                importe, NombreCompletoDe(usuarioOrigen)),
+            fecha = fechaOperacion
+        };
+
+        await notificaciones.AddAsync(avisoParaQuienEnvia, cancellationToken);
+        await notificaciones.AddAsync(avisoParaQuienRecibe, cancellationToken);
+
         // Confirmar transacción
         await transaccion.CommitAsync(cancellationToken);
 
-        // 9. Re-leer saldo actualizado para la respuesta
+        // 10. Re-leer saldo actualizado para la respuesta
         var cuentaActualizada = await cuentas.GetByUsuarioIdAsync(usuarioOrigen.id, cancellationToken);
 
         return Resultado<TransferenciaResponseDto>.Exito(new TransferenciaResponseDto(cuentaActualizada!.saldo));
