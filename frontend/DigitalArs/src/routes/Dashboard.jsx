@@ -16,6 +16,7 @@ import DepositoModal from "../components/Cuentas/DepositoModal";
 import TransferenciaModal from "../components/Cuentas/TransferenciaModal";
 import { MovimientosPreview } from "./Movimientos";
 import { getSessionUser } from "./dashboardUtils";
+import { esAdministrador } from "./rolesUtils";
 
 const formatoPesos = new Intl.NumberFormat("es-AR", {
   style: "currency",
@@ -33,11 +34,11 @@ export default function Dashboard() {
   const [transferenciaAbierta, setTransferenciaAbierta] = useState(false);
   const [mensajeExito, setMensajeExito] = useState("");
 
-  const esAdministrador = !!usuario && usuario.role === "Administrador"; 
+  const esAdmin = esAdministrador(session);
 
   useEffect(() => {
     // El administrador usa el panel de gestión.
-    if (esAdministrador) return;
+    if (esAdmin) return;
 
     const controller = new AbortController();
 
@@ -78,7 +79,7 @@ export default function Dashboard() {
     cargarCuenta();
 
     return () => controller.abort();
-  }, [obtenerMiCuenta, esAdministrador, intento]);
+  }, [obtenerMiCuenta, esAdmin, intento]);
 
   function depositoRealizado(resultado) {
     setCuenta((actual) =>
@@ -119,7 +120,7 @@ export default function Dashboard() {
           <Chip label={usuario?.role ?? "Usuario"} />
           <Typography>{usuario?.email ?? "Sin correo disponible"}</Typography>
 
-          {esAdministrador ? (
+          {esAdmin ? (
             <>
               <Typography>
                 Registrá usuarios y entregales una invitación para que elijan su
@@ -215,8 +216,8 @@ export default function Dashboard() {
           )}
         </Stack>
       </Paper>
-      {!esAdministrador && cuenta && <MovimientosPreview />}
-      {!esAdministrador && cuenta && (
+      {!esAdmin && cuenta && <MovimientosPreview />}
+      {!esAdmin && cuenta && (
         <>
           <DepositoModal
             open={depositoAbierto}

@@ -7,18 +7,27 @@ namespace DigitalArs.Api.DTOs;
 // contraseña en RegistroDto, y el alta que hace un administrador, que la deja para después.
 public class PerfilUsuarioDto : IValidatableObject
 {
+    /// <example>Ana</example>
     [Required, StringLength(100)]
     public string Nombre { get; set; } = "";
 
+    /// <example>Perez</example>
     [Required, StringLength(100)]
     public string Apellido { get; set; } = "";
 
+    /// <example>ana@ejemplo.com</example>
     [Required, EmailAddress, StringLength(256)]
     public string Email { get; set; } = "";
 
+    /// <summary>DNI o PASAPORTE.</summary>
+    /// <example>DNI</example>
     [Required, StringLength(20)]
     public string TipoDocumento { get; set; } = "";
 
+    // El ejemplo va entre comillas: sin ellas se publica como número y el "Try it out" de
+    // Swagger manda un cuerpo que no se puede deserializar.
+    /// <summary>DNI: 7 u 8 dígitos. PASAPORTE: 2 o 3 letras seguidas de 6 o 7 números.</summary>
+    /// <example>"12345678"</example>
     [Required, StringLength(20)]
     public string NroDocumento { get; set; } = "";
 

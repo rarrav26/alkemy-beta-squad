@@ -80,11 +80,34 @@ function mensajePara(status, data) {
   if (status >= 500) return 'El servidor no pudo completar la solicitud.'
   return 'Revisá los datos ingresados.'
 }
-export async function obtenerUsuariosAdmin({ token, page = 1, pageSize = 10, signal } = {}) {
+export async function obtenerUsuariosAdmin({ token, page = 1, pageSize = 10, busqueda = '', signal } = {}) {
+  const termino = busqueda.trim()
+
   return apiRequest('/api/Usuarios', {
     method: 'GET',
     token,
-    params: { page, pageSize },
+    // El parámetro se omite cuando está vacío para no mandar "busqueda=" en la URL.
+    params: termino ? { page, pageSize, busqueda: termino } : { page, pageSize },
+    signal
+  })
+}
+
+// Edición de otro usuario por parte de un administrador: solo nombre, apellido y email.
+export async function actualizarUsuarioAdmin({ token, id, nombre, apellido, email, signal } = {}) {
+  return apiRequest(`/api/Usuarios/${id}`, {
+    method: 'PATCH',
+    token,
+    body: { nombre, apellido, email },
+    signal
+  })
+}
+
+// Alta y baja lógica. Responde 204 sin cuerpo, así que apiRequest devuelve null.
+export async function cambiarEstadoUsuarioAdmin({ token, id, isActive, signal } = {}) {
+  return apiRequest(`/api/Usuarios/${id}/active`, {
+    method: 'PATCH',
+    token,
+    body: { isActive },
     signal
   })
 }

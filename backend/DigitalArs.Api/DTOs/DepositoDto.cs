@@ -5,6 +5,8 @@ namespace DigitalArs.Api.DTOs;
 
 public class DepositoDto : IValidatableObject
 {
+    /// <summary>Mayor a cero y con 2 decimales como máximo.</summary>
+    /// <example>5000</example>
     [Required(ErrorMessage = "El importe es obligatorio.")]
     public decimal? Importe { get; set; }
 

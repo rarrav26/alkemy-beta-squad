@@ -6,14 +6,30 @@ import Dashboard, { NewUserPage } from '../../routes/Dashboard'
 import { MovimientosPage } from '../../routes/Movimientos'
 import PerfilPage from '../../routes/Perfil'
 import UsuariosAdmin from '../../routes/UsuariosAdmin'
+import { ROL_ADMINISTRADOR, ROL_USUARIO, puedeVerRuta } from '../../routes/rolesUtils'
 
-function Protected({ children, admin = false }) {
-  const { session } = useAuth()
+// Una ruta protegida no dibuja NADA hasta que el provider confirme contra el servidor que la
+// sesión sigue valiendo. Antes se renderizaba con lo que había en sessionStorage y la baja del
+// usuario se descubría después, cuando alguna llamada devolvía 403: se alcanzaba a ver el
+// dashboard y recién entonces lo expulsaba.
+// Esconder la pantalla no es el control de acceso: eso lo hace la API. Esto evita mostrarle a
+// alguien una vista que de todos modos no podría usar.
+function Protected({ children, rol }) {
+  const { session, sesionVerificada } = useAuth()
+
   if (!session) return <Navigate to="/login" replace />
-  
-  const rol = session?.user?.role || session?.user?.rol || session?.role
-  if (admin && rol !== 'Administrador') return <Navigate to="/dashboard" replace />
-  
+
+  if (!sesionVerificada) {
+    return (
+      <Box sx={{ display: 'grid', placeItems: 'center', minHeight: '60vh' }}>
+        <CircularProgress aria-label="Verificando tu sesión" />
+      </Box>
+    )
+  }
+
+  // /dashboard no pide rol, así que redirigir ahí nunca vuelve a caer en este mismo control.
+  if (!puedeVerRuta(session, rol)) return <Navigate to="/dashboard" replace />
+
   return children
 }
 
@@ -48,12 +64,14 @@ export default function Main() {
         
         {/* Rutas para cualquier usuario autenticado */}
         <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
-        <Route path="/movimientos" element={<Protected><MovimientosPage /></Protected>} />
         <Route path="/perfil" element={<Protected><PerfilPage /></Protected>} />
-        
+
+        {/* Rutas exclusivas del usuario regular: el administrador no tiene billetera */}
+        <Route path="/movimientos" element={<Protected rol={ROL_USUARIO}><MovimientosPage /></Protected>} />
+
         {/* Rutas exclusivas de Administrador */}
-        <Route path="/usuarios/nuevo" element={<Protected admin><NewUserPage /></Protected>} />
-        <Route path="/admin/usuarios" element={<Protected admin><UsuariosAdmin /></Protected>} />
+        <Route path="/usuarios/nuevo" element={<Protected rol={ROL_ADMINISTRADOR}><NewUserPage /></Protected>} />
+        <Route path="/admin/usuarios" element={<Protected rol={ROL_ADMINISTRADOR}><UsuariosAdmin /></Protected>} />
         
         {/* Ruta comodín */}
         <Route path="*" element={<Navigate to="/" replace />} />
