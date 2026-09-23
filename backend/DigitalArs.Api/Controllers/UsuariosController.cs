@@ -93,7 +93,7 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
     [HttpGet("{id:int}")]
     [Authorize(Roles = RolPrincipal.Administrador)]
     [ProducesResponseType<UsuarioResponse>(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
@@ -102,7 +102,7 @@ public class UsuariosController(IAccountService accounts) : ControllerBase
         if (resultado.Exitoso) return Ok(resultado.Valor);
 
         return resultado.Motivo == MotivoDeRechazo.NoEncontrado
-            ? NotFound()
+            ? NotFound(new ErrorResponse { Message = resultado.Errores?.FirstOrDefault() ?? "No se encontró el usuario." })
             : StatusCode(StatusCodes.Status500InternalServerError);
     }
 

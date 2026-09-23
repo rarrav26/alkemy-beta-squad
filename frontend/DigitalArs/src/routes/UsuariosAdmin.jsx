@@ -39,6 +39,7 @@ import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
 import { useAuth } from '../context/authContext';
 import { obtenerUsuariosAdmin, cambiarEstadoUsuarioAdmin } from '../context/api';
 import EditarUsuarioModal from '../components/Admin/EditarUsuarioModal';
+import DetalleUsuarioModal from '../components/Admin/DetalleUsuarioModal';
 
 // Las tres acciones. En la tabla van como iconos: ocupan siempre lo mismo, así la fila no se
 // reacomoda cuando el rótulo cambia entre "Activar" y "Desactivar", y el texto vive en el
@@ -145,8 +146,9 @@ export default function UsuariosAdmin() {
   const [busqueda, setBusqueda] = useState('');
   const [terminoAplicado, setTerminoAplicado] = useState('');
 
-  // Edición (HU-18) y baja/alta lógica (HU-19): el usuario elegido en cada caso.
+  // Edición (HU-18), baja/alta lógica (HU-19) y detalle (HU-16): el usuario elegido en cada caso.
   const [usuarioAEditar, setUsuarioAEditar] = useState(null);
+  const [usuarioIdDetalle, setUsuarioIdDetalle] = useState(null);
   const [cambiandoEstado, setCambiandoEstado] = useState(false);
 
   // La visibilidad del diálogo va SEPARADA de su contenido, y a propósito.
@@ -208,7 +210,7 @@ export default function UsuariosAdmin() {
   }
 
   function verDetalles(usuario) {
-    console.log('Detalles usuario ID:', usuario.usuarioId || usuario.id);
+    setUsuarioIdDetalle(usuario.usuarioId || usuario.id);
   }
 
   async function confirmarCambioDeEstado() {
@@ -578,6 +580,13 @@ export default function UsuariosAdmin() {
           )}
         </Box>
       )}
+
+      <DetalleUsuarioModal
+        open={Boolean(usuarioIdDetalle)}
+        usuarioId={usuarioIdDetalle}
+        token={token}
+        onClose={() => setUsuarioIdDetalle(null)}
+      />
 
       <EditarUsuarioModal
         key={usuarioAEditar?.usuarioId || usuarioAEditar?.id || 'sin-usuario'}
