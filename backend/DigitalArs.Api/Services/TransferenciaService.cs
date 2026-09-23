@@ -13,6 +13,7 @@ public class TransferenciaService(
     IUsuarioRepository usuarios,
     ITipoMovimientoRepository tiposMovimiento,
     INotificacionRepository notificaciones,
+    INotificadorEnTiempoReal notificador,
     DigitalArsDbContext context) : ITransferenciaService
 {
     // El nombre tal como lo lee la otra persona: en la confirmación del destino y en el texto
@@ -246,7 +247,17 @@ public class TransferenciaService(
         // Confirmar transacción
         await transaccion.CommitAsync(cancellationToken);
 
-        // 10. Re-leer saldo actualizado para la respuesta
+        // 10. Avisar a los dos, recién con la transferencia confirmada. Avisar antes del commit
+        // significaría que un rollback deja a alguien viendo plata que nunca se movió.
+        //
+        // No se les pasa el cancellationToken: si quien transfirió cortó la conexión justo
+        // después del commit, al que recibe el dinero igual tiene que llegarle el aviso. Y si
+        // el envío falla, no rompe nada: el notificador se traga su propia excepción y los dos
+        // avisos ya están guardados en la base.
+        await notificador.EnviarAsync(identityUserId, avisoParaQuienEnvia);
+        await notificador.EnviarAsync(cuentaDestino.usuario!.identity_user_id, avisoParaQuienRecibe);
+
+        // 11. Re-leer saldo actualizado para la respuesta
         var cuentaActualizada = await cuentas.GetByUsuarioIdAsync(usuarioOrigen.id, cancellationToken);
 
         return Resultado<TransferenciaResponseDto>.Exito(new TransferenciaResponseDto(cuentaActualizada!.saldo));
