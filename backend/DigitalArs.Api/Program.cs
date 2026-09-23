@@ -109,6 +109,7 @@ builder.Services.AddScoped<ICuentaService, CuentaService>();
 builder.Services.AddScoped<IDepositoService, DepositoService>();
 builder.Services.AddScoped<ITransferenciaService, TransferenciaService>();
 builder.Services.AddScoped<IHistorialService, HistorialService>();
+builder.Services.AddScoped<INotificacionService, NotificacionService>();
 
 // -----------------------------------------------------------------------------
 // 5. Manejo global de errores

@@ -17,5 +17,9 @@ public enum MotivoDeRechazo
     SaldoMaximoSuperado,
     SaldoInsuficiente,
     TipoMovimientoNoConfigurado,
-    DestinoNoEncontrado
+    DestinoNoEncontrado,
+
+    // Valor propio y no NoEncontrado: ese ya significa "no existe el usuario del token" y los
+    // controllers lo traducen a 401. Una notificación que no existe tiene que dar 404.
+    NotificacionNoEncontrada
 }
