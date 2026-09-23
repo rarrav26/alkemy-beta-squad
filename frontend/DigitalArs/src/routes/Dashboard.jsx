@@ -14,6 +14,7 @@ import { useAuth } from "../context/authContext";
 import AuthForm, { ProfileFields } from "../components/Auth/AuthForm";
 import DepositoModal from "../components/Cuentas/DepositoModal";
 import TransferenciaModal from "../components/Cuentas/TransferenciaModal";
+import TarjetaVirtual from "../components/Cuentas/TarjetaVirtual";
 import { MovimientosPreview } from "./Movimientos";
 import { getSessionUser } from "./dashboardUtils";
 import { esAdministrador } from "./rolesUtils";
@@ -216,6 +217,9 @@ export default function Dashboard() {
           )}
         </Stack>
       </Paper>
+      {/* La tarjeta va antes del historial: es un dato de la cuenta, no una operación.
+          Solo para quien tiene billetera, así que el admin no la ve. */}
+      {!esAdmin && cuenta && <TarjetaVirtual />}
       {!esAdmin && cuenta && <MovimientosPreview />}
       {!esAdmin && cuenta && (
         <>

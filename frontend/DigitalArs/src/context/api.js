@@ -69,10 +69,14 @@ function errorDeRespuesta({ status, data }) {
 }
 
 function mensajePara(status, data) {
+  if (typeof data === 'string' && data) return data
+  // El mensaje del backend tiene prioridad sobre el genérico, incluso en un 429: el límite de
+  // intentos del revelado de tarjeta explica cuánto hay que esperar, y el texto genérico decía
+  // otro tiempo. El limitador de pedidos responde sin cuerpo, así que ahí sigue valiendo el
+  // genérico de abajo.
+  if (data?.message) return data.message
   if (status === 429)
     return 'Demasiados intentos. Esperá un minuto y volvé a intentar.'
-  if (typeof data === 'string') return data
-  if (data?.message) return data.message
   if (data?.detail) return data.detail
   if (data?.title) return data.title
   if (status === 401) return 'Tu sesión venció. Volvé a ingresar.'
@@ -137,4 +141,53 @@ export async function obtenerMiPerfil({ token, signal } = {}) {
     ...usuario,
     cuenta
   }
+}
+
+// ==========================================================================================
+// TARJETAS
+// ==========================================================================================
+
+// Devuelve la tarjeta vigente, o null si el usuario todavía no generó ninguna.
+//
+// El 404 se traduce a null en vez de propagarse como error: "no tengo tarjeta" es un estado
+// normal del dashboard, no una falla. Cualquier otro error sí se propaga, para no esconder un
+// problema real detrás de un estado vacío.
+export async function obtenerMiTarjeta({ token, signal } = {}) {
+  try {
+    return await apiRequest('/api/Tarjetas/me', { method: 'GET', token, signal })
+  } catch (error) {
+    if (error?.status === 404) return null
+    throw error
+  }
+}
+
+export async function generarTarjeta({ token, signal } = {}) {
+  return apiRequest('/api/Tarjetas', { method: 'POST', token, signal })
+}
+
+// Devuelve el número completo y el código de seguridad. Exige la contraseña.
+// Es POST y no GET porque la contraseña va en el cuerpo, y así el número no queda en el
+// historial del navegador ni en los logs de acceso.
+export async function revelarTarjeta({ token, password, signal } = {}) {
+  return apiRequest('/api/Tarjetas/me/revelar', {
+    method: 'POST',
+    token,
+    body: { password },
+    signal
+  })
+}
+
+// Un solo helper para congelar y descongelar: es la misma transición en dos sentidos.
+export async function cambiarCongelamientoTarjeta({ token, congelada, signal } = {}) {
+  return apiRequest('/api/Tarjetas/me/congelada', {
+    method: 'PATCH',
+    token,
+    body: { congelada },
+    signal
+  })
+}
+
+// Baja permanente. No se puede revertir.
+export async function darDeBajaTarjeta({ token, signal } = {}) {
+  return apiRequest('/api/Tarjetas/me/baja', { method: 'PATCH', token, signal })
 }

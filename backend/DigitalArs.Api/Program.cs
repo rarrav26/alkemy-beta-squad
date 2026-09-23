@@ -108,6 +108,13 @@ builder.Services.AddScoped<ICuentaService, CuentaService>();
 builder.Services.AddScoped<IDepositoService, DepositoService>();
 builder.Services.AddScoped<ITransferenciaService, TransferenciaService>();
 builder.Services.AddScoped<IHistorialService, HistorialService>();
+builder.Services.AddScoped<ITarjetaService, TarjetaService>();
+
+// TarjetaService lleva en memoria los intentos fallidos de contraseña sobre el revelado del
+// código de seguridad. Es estado efímero y por eso no va a la base: se reinicia solo con el
+// tiempo. Con varias instancias de la API cada una llevaría su propia cuenta, lo cual es
+// aceptable acá porque corre una sola.
+builder.Services.AddMemoryCache();
 
 // -----------------------------------------------------------------------------
 // 5. Manejo global de errores
