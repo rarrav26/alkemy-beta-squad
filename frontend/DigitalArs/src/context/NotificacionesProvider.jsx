@@ -1,9 +1,21 @@
 import { useCallback, useEffect, useState } from 'react'
+import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr'
+
+import Alert from '@mui/material/Alert'
+import Snackbar from '@mui/material/Snackbar'
+
 import { NotificacionesContext } from './notificacionesContext'
+import { api } from './api'
 import { useAuth } from './authContext'
 import { esAdministrador } from '../routes/rolesUtils'
 
 const SIN_DATOS = { deLaSesion: null, items: [], noLeidas: 0 }
+
+// Tiene que coincidir letra por letra con el nombre que usa NotificadorSignalR en el backend.
+// Si no coincide, SignalR no avisa nada: simplemente no llega el mensaje.
+const EVENTO_DEL_HUB = 'NuevaNotificacion'
+
+const SEGUNDOS_DEL_AVISO = 5000
 
 // Las notificaciones del usuario: la lista, el contador del globito y las acciones de marcado.
 //
@@ -23,6 +35,14 @@ export default function NotificacionesProvider({ children }) {
   // notificaciones del anterior: quedaban en memoria hasta que llegaba la respuesta de la API.
   const [datos, setDatos] = useState(SIN_DATOS)
   const [error, setError] = useState('')
+
+  // El cartel efímero. Es { mensaje, severidad } o null: sirve tanto para avisar que entró
+  // dinero como para contar que una acción falló, así no hacen falta dos sistemas de avisos.
+  const [aviso, setAviso] = useState(null)
+
+  // Sube uno por cada aviso que llega por el socket. El Dashboard lo observa para volver a
+  // pedir el saldo: el mensaje trae los datos de la notificación, no el saldo de la cuenta.
+  const [avisosRecibidos, setAvisosRecibidos] = useState(0)
 
   // El administrador no tiene billetera, así que tampoco notificaciones: la API le responde 403.
   const activo = sesionVerificada && !esAdministrador(session)
@@ -70,6 +90,57 @@ export default function NotificacionesProvider({ children }) {
     recargar()
   }, [activo, recargar])
 
+  // Lo que pasa cuando el servidor empuja un aviso. Solo usa la forma funcional de setState, así
+  // que no depende de nada y no obliga a rehacer la conexión.
+  const recibirDelHub = useCallback(notificacion => {
+    // El alta en la lista y la suma al contador van en el MISMO updater: si el mensaje llegara
+    // repetido, no puede pasar que la fila no se duplique pero el globito sí cuente dos veces.
+    setDatos(actuales => {
+      const yaEstaba = actuales.items.some(item => item.id === notificacion.id)
+      if (yaEstaba) return actuales
+
+      return {
+        ...actuales,
+        items: [notificacion, ...actuales.items],
+        noLeidas: actuales.noLeidas + 1
+      }
+    })
+
+    setAviso({ mensaje: notificacion.mensaje, severidad: 'info' })
+    setAvisosRecibidos(actual => actual + 1)
+  }, [])
+
+  useEffect(() => {
+    if (!activo) return
+
+    const conexion = new HubConnectionBuilder()
+      // La URL base sale de la instancia de Axios, que ya resolvió VITE_API_URL y le sacó la
+      // barra final: esa lógica no se repite acá.
+      .withUrl(`${api.defaults.baseURL}/hubs/notificaciones`, {
+        // El navegador no deja mandar headers al abrir un WebSocket, así que el token viaja en
+        // la query. El backend lo acepta solo en la ruta del hub.
+        accessTokenFactory: () => sesionActual
+      })
+      .withAutomaticReconnect()
+      .configureLogging(LogLevel.Warning)
+      .build()
+
+    conexion.on(EVENTO_DEL_HUB, recibirDelHub)
+
+    // SignalR NO guarda lo que se envió mientras el cliente estaba desconectado, así que al
+    // volver no alcanza con seguir escuchando: hay que pedir todo de nuevo.
+    conexion.onreconnected(() => recargar())
+
+    // Si la conexión no se puede abrir, la campana sigue funcionando con lo que trajo el REST:
+    // el push es un atajo, no la fuente de verdad. SignalR ya loguea el motivo en la consola.
+    conexion.start().catch(() => {})
+
+    // Sin esto quedan conexiones colgadas al cerrar sesión o al entrar con otro usuario.
+    return () => {
+      conexion.stop()
+    }
+  }, [activo, sesionActual, recibirDelHub, recargar])
+
   const marcarLeida = useCallback(
     async id => {
       const notificacion = notificaciones.find(item => item.id === id)
@@ -92,6 +163,10 @@ export default function NotificacionesProvider({ children }) {
       } catch {
         // El servidor no aceptó el cambio, así que lo que hay en pantalla es mentira: se vuelve
         // a pedir todo en vez de intentar deshacer a mano.
+        setAviso({
+          mensaje: 'No pudimos marcar la notificación como leída.',
+          severidad: 'error'
+        })
         recargar()
       }
     },
@@ -108,6 +183,10 @@ export default function NotificacionesProvider({ children }) {
     try {
       await marcarTodasLasNotificacionesLeidas()
     } catch {
+      setAviso({
+        mensaje: 'No pudimos marcar las notificaciones como leídas.',
+        severidad: 'error'
+      })
       recargar()
     }
   }, [marcarTodasLasNotificacionesLeidas, recargar])
@@ -119,12 +198,31 @@ export default function NotificacionesProvider({ children }) {
         noLeidas,
         cargando,
         error,
+        avisosRecibidos,
         recargar,
         marcarLeida,
         marcarTodasLeidas
       }}
     >
       {children}
+
+      {/* El cartel lo dibuja el provider y no el panel, porque el aviso puede llegar en
+          cualquier pantalla y con la campana cerrada. Arriba y al centro: en un teléfono es
+          donde no tapa ni el encabezado ni los botones de abajo. */}
+      <Snackbar
+        open={aviso !== null}
+        autoHideDuration={SEGUNDOS_DEL_AVISO}
+        onClose={() => setAviso(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert
+          severity={aviso?.severidad ?? 'info'}
+          variant="filled"
+          onClose={() => setAviso(null)}
+        >
+          {aviso?.mensaje ?? ''}
+        </Alert>
+      </Snackbar>
     </NotificacionesContext.Provider>
   )
 }
