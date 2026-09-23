@@ -290,18 +290,21 @@ Consecuencia de seguridad: el token queda en la URL del hub y puede aparecer en 
   "titulo": "Transferencia recibida",
   "mensaje": "Recibiste $ 15.000,00 de Juan Pérez",
   "leida": false,
+  "movimientoId": 318,
   "fecha": "2026-09-23T15:42:10-03:00"
 }
 
 // NotificacionesResponse: lo que devuelve GET /api/notificaciones
 {
   "noLeidas": 12,
-  "notificaciones": [ /* las 30 más recientes, de la más nueva a la más vieja */ ]
+  "items": [ /* las 30 más recientes, de la más nueva a la más vieja */ ]
 }
 ```
 
 `fecha` sale con `HoraDeArgentina.DesdeUtc(...)`, igual que `DepositoResponse.Fecha`.
 `noLeidas` cuenta **todas** las no leídas, no solo las 30 que vienen en la lista: el globito tiene que ser correcto aunque haya más.
+
+La lista se llama `items` y no `notificaciones` para que sea igual que `PaginaResponse.Items`, que es lo que ya devuelven el historial y el listado de usuarios: un solo nombre para "el contenido de una respuesta con varios elementos".
 
 ### 4.8 Endpoints
 

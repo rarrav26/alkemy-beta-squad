@@ -1,18 +1,18 @@
 # Colección de Apidog — flujos de la demo del backend
 
 Prueba de punta a punta los flujos principales de la API contra la base local:
-registro, login, perfil, depósito, transferencia, historial y administración.
+registro, login, perfil, depósito, transferencia, historial, administración y notificaciones.
 Cada request trae sus aserciones (status, `code` de error y campos clave).
 
 | Archivo | Qué es |
 |---|---|
-| `DigitalArs.postman_collection.json` | La colección: 9 carpetas, 28 requests |
+| `DigitalArs.postman_collection.json` | La colección: 10 carpetas, 37 requests |
 | `DigitalArs-Local.postman_environment.json` | El entorno `DigitalArs Local`: `baseUrl`, credenciales y variables que se completan solas |
 
 Están en formato Postman v2.1 porque Apidog los importa tal cual, con los scripts de
 extracción del token y las aserciones.
 
-Resultado esperado de una corrida completa: **28 requests y 55 aserciones en verde**.
+Resultado esperado de una corrida completa: **37 requests y 70 aserciones en verde**.
 
 ## Antes de correrla
 
@@ -99,7 +99,7 @@ sin token no tiene que aparecer ningún header `Authorization`.
 
 ## Paso 4 — Correr
 
-**Run** en el escenario. Tiene que terminar con 28 requests y 55 aserciones en verde. Para
+**Run** en el escenario. Tiene que terminar con 37 requests y 70 aserciones en verde. Para
 repetirla, esperar un minuto (ver *Límite de solicitudes*).
 
 ## Problemas frecuentes
