@@ -15,8 +15,9 @@ public static class SignoDeMovimiento
 
     // Se tienen que escribir igual que la columna descripcion de Tipo_Movimiento: la consulta filtra por ese texto.
     public const string TipoDeposito = "DEPOSITO";
-    private const string TipoTransferenciaEnviada = "TRANSFERENCIA_ENVIADA";
-    private const string TipoTransferenciaRecibida = "TRANSFERENCIA_RECIBIDA";
+    // Se tienen que escribir igual que la columna descripcion de Tipo_Movimiento: la consulta filtra por ese texto.
+    public const string TipoTransferenciaEnviada = "TRANSFERENCIA_ENVIADA";
+    public const string TipoTransferenciaRecibida = "TRANSFERENCIA_RECIBIDA";
 
     private const string FiltroCredito = "credito";
     private const string FiltroDebito = "debito";

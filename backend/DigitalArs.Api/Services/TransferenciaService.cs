@@ -11,6 +11,7 @@ namespace DigitalArs.Api.Services;
 public class TransferenciaService(
     ICuentaRepository cuentas,
     IUsuarioRepository usuarios,
+    ITipoMovimientoRepository tiposMovimiento,
     DigitalArsDbContext context) : ITransferenciaService
 {
     public async Task<Resultado<DestinoResponseDto>> ResolverDestinoAsync(
@@ -43,7 +44,7 @@ public class TransferenciaService(
                 MotivoDeRechazo.NoEncontrado,
                 "No se encontró el usuario emisor.");
         }
-        //Agregamos el chequeo que no pueda buscar otros CVU si esta inactivo
+
         if (!usuarioOrigen.is_active)
         {
             return Resultado<DestinoResponseDto>.Fallo(
@@ -120,16 +121,12 @@ public class TransferenciaService(
         if (!usuarioOrigen.is_active)
             return Resultado<TransferenciaResponseDto>.Fallo(MotivoDeRechazo.UsuarioDesactivado, "Tu usuario se encuentra desactivado.");
 
-        var cuentaOrigen = await context.Cuentas
-            .SingleOrDefaultAsync(c => c.usuario_id == usuarioOrigen.id, cancellationToken);
-
+        // 1. Lecturas por repositorio
+        var cuentaOrigen = await cuentas.GetByUsuarioIdAsync(usuarioOrigen.id, cancellationToken);
         if (cuentaOrigen is null)
             return Resultado<TransferenciaResponseDto>.Fallo(MotivoDeRechazo.CuentaNoEncontrada, "No tenés una cuenta asociada.");
 
-        var cuentaDestino = await context.Cuentas
-            .Include(c => c.usuario)
-            .SingleOrDefaultAsync(c => c.alias == destino || c.cvu == destino, cancellationToken);
-
+        var cuentaDestino = await cuentas.GetByAliasOCvuAsync(destino, cancellationToken);
         if (cuentaDestino is null)
             return Resultado<TransferenciaResponseDto>.Fallo(MotivoDeRechazo.DestinoNoEncontrado, "No se encontró ninguna cuenta con ese alias o CVU.");
 
@@ -139,18 +136,51 @@ public class TransferenciaService(
         if (cuentaDestino.usuario is null || !cuentaDestino.usuario.is_active)
             return Resultado<TransferenciaResponseDto>.Fallo(MotivoDeRechazo.UsuarioDesactivado, "La cuenta destino no pertenece a un usuario activo.");
 
+        // 2. Validación de saldo en origen antes de entrar a base
         if (cuentaOrigen.saldo < importe)
             return Resultado<TransferenciaResponseDto>.Fallo(MotivoDeRechazo.SaldoInsuficiente, "Saldo insuficiente para realizar la transferencia.");
 
-        cuentaOrigen.saldo -= importe;
-        cuentaDestino.saldo += importe;
+        // 3. Tope de saldo en destino
+        if (cuentaDestino.saldo + importe > LimitesDeImporte.SaldoMaximo)
+            return Resultado<TransferenciaResponseDto>.Fallo(MotivoDeRechazo.SaldoMaximoSuperado, "La cuenta destino superaría el saldo máximo permitido.");
+
+        // 4. Transacción explícita obligatoria
+        await using var transaccion = await context.Database.BeginTransactionAsync(cancellationToken);
+
+        // 5. Débito con guarda atómica en SQL
+        var debitoOk = await cuentas.DecrementarSaldoAsync(usuarioOrigen.id, importe, cancellationToken);
+        if (!debitoOk)
+        {
+            await transaccion.RollbackAsync(cancellationToken);
+            return Resultado<TransferenciaResponseDto>.Fallo(MotivoDeRechazo.SaldoInsuficiente, "Saldo insuficiente para realizar la transferencia.");
+        }
+
+        // 6. Crédito con guarda en destino
+        var creditoOk = await cuentas.IncrementarSaldoAsync(cuentaDestino.usuario_id, importe, cancellationToken);
+        if (!creditoOk)
+        {
+            await transaccion.RollbackAsync(cancellationToken);
+            return Resultado<TransferenciaResponseDto>.Fallo(MotivoDeRechazo.NoSePudoActualizar, "No se pudo acreditar el dinero en la cuenta destino.");
+        }
+
+        // 7. Resolver tipos de movimiento dinámicamente (sin IDs fijos)
+        var tipoDebito = await tiposMovimiento.GetByDescripcionAsync(SignoDeMovimiento.TipoTransferenciaEnviada, cancellationToken);
+        var tipoCredito = await tiposMovimiento.GetByDescripcionAsync(SignoDeMovimiento.TipoTransferenciaRecibida, cancellationToken);
+
+        if (tipoDebito is null || tipoCredito is null)
+        {
+            await transaccion.RollbackAsync(cancellationToken);
+            return Resultado<TransferenciaResponseDto>.Fallo(
+                MotivoDeRechazo.TipoMovimientoNoConfigurado,
+                "Los tipos de movimiento requeridos no están configurados en el sistema.");
+        }
 
         var fechaOperacion = DateTime.UtcNow;
 
         var movDebito = new Movimiento
         {
             cuenta_id = cuentaOrigen.id,
-            tipo_movimiento_id = 2, // TRANSFERENCIA_ENVIADA
+            tipo_movimiento_id = tipoDebito.Id,
             importe = importe,
             fecha = fechaOperacion
         };
@@ -158,23 +188,26 @@ public class TransferenciaService(
         var movCredito = new Movimiento
         {
             cuenta_id = cuentaDestino.id,
-            tipo_movimiento_id = 3, // TRANSFERENCIA_RECIBIDA
+            tipo_movimiento_id = tipoCredito.Id,
             importe = importe,
             fecha = fechaOperacion
         };
 
         context.Movimientos.Add(movDebito);
         context.Movimientos.Add(movCredito);
-
         await context.SaveChangesAsync(cancellationToken);
 
-        if (movDebito.transferencia_id == null || movDebito.transferencia_id == 0)
-        {
-            movDebito.transferencia_id = movDebito.id;
-            movCredito.transferencia_id = movDebito.id;
-            await context.SaveChangesAsync(cancellationToken);
-        }
+        // 8. Enlazar transferencia_id sin if redundante
+        movDebito.transferencia_id = movDebito.id;
+        movCredito.transferencia_id = movDebito.id;
+        await context.SaveChangesAsync(cancellationToken);
 
-        return Resultado<TransferenciaResponseDto>.Exito(new TransferenciaResponseDto(cuentaOrigen.saldo));
+        // Confirmar transacción
+        await transaccion.CommitAsync(cancellationToken);
+
+        // 9. Re-leer saldo actualizado para la respuesta
+        var cuentaActualizada = await cuentas.GetByUsuarioIdAsync(usuarioOrigen.id, cancellationToken);
+
+        return Resultado<TransferenciaResponseDto>.Exito(new TransferenciaResponseDto(cuentaActualizada!.saldo));
     }
 }
