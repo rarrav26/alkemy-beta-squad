@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Alert,
   Box,
@@ -11,7 +11,7 @@ import {
 } from "@mui/material";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/authContext";
-import { useNotificaciones } from "../context/notificacionesContext";
+import useMiCuenta from "../hooks/useMiCuenta";
 import AuthForm, { ProfileFields } from "../components/Auth/AuthForm";
 import DepositoModal from "../components/Cuentas/DepositoModal";
 import SaldoAnimado from "../components/Cuentas/SaldoAnimado";
@@ -21,102 +21,24 @@ import { getSessionUser } from "./dashboardUtils";
 import { esAdministrador } from "./rolesUtils";
 
 export default function Dashboard() {
-  const { session, obtenerMiCuenta } = useAuth();
-  const { avisosRecibidos } = useNotificaciones();
+  const { session } = useAuth();
   const usuario = getSessionUser(session);
-  const [cuenta, setCuenta] = useState(null);
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState("");
-  const [intento, setIntento] = useState(0);
+  const esAdmin = esAdministrador(session);
+  // El administrador usa el panel de gestión: no tiene cuenta que cargar.
+  const { cuenta, cargando, error, reintentar, aplicarDeposito, aplicarTransferencia } =
+    useMiCuenta({ habilitado: !esAdmin });
   const [depositoAbierto, setDepositoAbierto] = useState(false);
   const [transferenciaAbierta, setTransferenciaAbierta] = useState(false);
   const [mensajeExito, setMensajeExito] = useState("");
 
-  const esAdmin = esAdministrador(session);
-
-  useEffect(() => {
-    // El administrador usa el panel de gestión.
-    if (esAdmin) return;
-
-    const controller = new AbortController();
-
-    async function cargarCuenta() {
-      setCargando(true);
-      setError("");
-      setCuenta(null);
-
-      try {
-        const datos = await obtenerMiCuenta(controller.signal);
-
-        if (!controller.signal.aborted) {
-          setCuenta(datos);
-        }
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          const mensajeCrudo = (error.message || '').trim()
-          const frasesUnicas = [
-            ...new Set(
-              mensajeCrudo
-                .split('.')
-                .map(frase => frase.trim())
-                .filter(Boolean)
-            )
-          ]
-          const mensajeNormalizado =
-            frasesUnicas.length > 0 ? `${frasesUnicas.join('. ')}.` : mensajeCrudo
-
-          setError(mensajeNormalizado)
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setCargando(false);
-        }
-      }
-    }
-
-    cargarCuenta();
-
-    return () => controller.abort();
-  }, [obtenerMiCuenta, esAdmin, intento]);
-
-  // Cuando entra dinero, el mensaje del socket trae la notificación, no el saldo: hay que volver
-  // a pedirlo. Va en un efecto aparte y NO reusa el contador "intento" de arriba, porque ese
-  // efecto pone la cuenta en null y la tarjeta mostraría "Cargando tu cuenta…" cada vez que
-  // llega una transferencia. Acá el saldo se cambia sin que se note el reemplazo.
-  useEffect(() => {
-    if (esAdmin || avisosRecibidos === 0) return;
-
-    const controller = new AbortController();
-
-    obtenerMiCuenta(controller.signal)
-      .then((datos) => {
-        if (!controller.signal.aborted) setCuenta(datos);
-      })
-      // Si el refresco de fondo falla, se deja el saldo anterior en pantalla: es preferible a
-      // romper la tarjeta por algo que el usuario no pidió.
-      .catch(() => {});
-
-    return () => controller.abort();
-  }, [avisosRecibidos, esAdmin, obtenerMiCuenta]);
-
   function depositoRealizado(resultado) {
-    setCuenta((actual) =>
-      actual ? { ...actual, saldo: resultado.saldoActual } : actual,
-    );
-
+    aplicarDeposito(resultado);
     setMensajeExito(resultado.message);
   }
 
   function transferenciaRealizada(resultado) {
-    setCuenta(actual => {
-      if (!actual) return actual
-      const nuevoSaldo =
-        resultado?.saldoActual !== undefined
-          ? resultado.saldoActual
-          : actual.saldo - (resultado?.importe || 0)
-      return { ...actual, saldo: nuevoSaldo }
-    })
-    setMensajeExito(resultado?.message || 'Transferencia realizada con éxito.')
+    aplicarTransferencia(resultado);
+    setMensajeExito(resultado?.message || 'Transferencia realizada con éxito.');
   }
 
   return (
@@ -162,7 +84,7 @@ export default function Dashboard() {
                     <Button
                       color="inherit"
                       size="small"
-                      onClick={() => setIntento((valor) => valor + 1)}
+                      onClick={reintentar}
                     >
                       Reintentar
                     </Button>

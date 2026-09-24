@@ -14,12 +14,13 @@ import {
 import MenuIcon from '@mui/icons-material/Menu'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/authContext'
-import { esAdministrador } from '../../routes/rolesUtils'
+import { esAdministrador, esSesionActiva } from '../../routes/rolesUtils'
 import CampanaDeNotificaciones from '../Notificaciones/CampanaDeNotificaciones'
 import ChangeTheme from './ChangeTheme'
 
 export default function ResponsiveAppBar() {
-  const { session, logout, ready, connectionError, sesionVerificada } = useAuth()
+  const auth = useAuth()
+  const { session, logout } = auth
 
   // Ancla del menú mobile. Se sigue el mismo patrón que ya usaba este AppBar: un IconButton
   // visible solo hasta "md" que abre un Menu con los mismos destinos que la barra de escritorio.
@@ -31,10 +32,8 @@ export default function ResponsiveAppBar() {
 
   const esAdmin = esAdministrador(session)
 
-  // La navegación exige que la sesión esté VERIFICADA, no solo presente. El encabezado se
-  // dibuja fuera de las rutas, así que sin este control un usuario desactivado alcanzaba a ver
-  // la barra con "Mi cuenta / Perfil / Cerrar sesión" mientras se comprobaba su estado.
-  const sesionActiva = ready && !connectionError && Boolean(session) && sesionVerificada
+  // El encabezado se dibuja fuera de las rutas, así que no lo cubre el control de Protected.
+  const sesionActiva = esSesionActiva(auth)
 
   // Una sola lista de destinos para las dos vistas: si mañana se agrega una sección, aparece
   // en la barra y en el menú mobile sin tener que acordarse de tocar los dos lugares.
