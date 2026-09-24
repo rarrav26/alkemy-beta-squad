@@ -16,10 +16,9 @@ public class TransferenciaService(
     INotificadorEnTiempoReal notificador,
     DigitalArsDbContext context) : ITransferenciaService
 {
-    // El nombre tal como lo lee la otra persona: en la confirmación del destino y en el texto
-    // del aviso. Está en un solo lugar para que las tres partes escriban el nombre igual.
+    // El formato del nombre vive en NombreDelTitular: lo comparte con el historial.
     private static string NombreCompletoDe(Usuario usuario) =>
-        $"{usuario.nombre} {usuario.apellido}";
+        NombreDelTitular.Completo(usuario.nombre, usuario.apellido);
 
 
     public async Task<Resultado<DestinoResponseDto>> ResolverDestinoAsync(

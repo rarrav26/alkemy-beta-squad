@@ -8,10 +8,15 @@ namespace DigitalArs.Api.DTOs;
 // Tipo es la etiqueta para mostrar (DEPOSITO, TRANSFERENCIA_ENVIADA,
 // TRANSFERENCIA_RECIBIDA) y Signo dice si el movimiento suma o resta
 // (CREDITO / DEBITO), que es lo que el front necesita para el color y el signo.
+//
+// Contraparte es el nombre del titular de la otra cuenta en una transferencia: a quién se
+// le envió (TRANSFERENCIA_ENVIADA) o quién la mandó (TRANSFERENCIA_RECIBIDA). Es null en lo
+// que no es transferencia.
 public record MovimientoResponse(
     int Id,
     DateTimeOffset Fecha,
     string Tipo,
     string Signo,
-    decimal Importe
+    decimal Importe,
+    string? Contraparte
 );

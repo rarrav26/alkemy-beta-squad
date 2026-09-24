@@ -39,11 +39,30 @@ public class MovimientoRepository(DigitalArsDbContext context)
             .ThenByDescending(movimiento => movimiento.id)
             .Skip((int)aSaltear)
             .Take(filtro.PageSize)
+            // La contraparte: una transferencia se guarda como dos movimientos (el débito de
+            // quien envía y el crédito de quien recibe) que comparten transferencia_id. Es el
+            // titular de la cuenta del OTRO movimiento con ese mismo transferencia_id.
+            //
+            // La subconsulta va escrita acá adentro y no en un método aparte a propósito: así
+            // EF la traduce a SQL y sale todo en UNA consulta. En un método, EF la correría
+            // fila por fila mientras todavía está leyendo la página.
+            //
+            // "transferencia_id != null" no es redundante: EF compara con la semántica de C#,
+            // donde null == null da verdadero. Sin esa condición, un depósito (que no tiene
+            // transferencia_id) encontraría como "contraparte" a cualquier otro depósito.
             .Select(movimiento => new MovimientoLeido(
                 movimiento.id,
                 movimiento.fecha,
                 movimiento.tipo_movimiento.descripcion,
-                movimiento.importe))
+                movimiento.importe,
+                context.Movimientos
+                    .Where(otro => movimiento.transferencia_id != null
+                        && otro.transferencia_id == movimiento.transferencia_id
+                        && otro.id != movimiento.id)
+                    .Select(otro => new ContraparteLeida(
+                        otro.cuenta.usuario.nombre,
+                        otro.cuenta.usuario.apellido))
+                    .FirstOrDefault()))
             .ToListAsync(cancellationToken);
 
         return new PaginaDeMovimientos(items, totalItems);
