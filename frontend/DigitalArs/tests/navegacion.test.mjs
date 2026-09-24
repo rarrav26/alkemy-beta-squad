@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  SECCION_CUENTAS,
   SECCION_INICIO,
   SECCION_MAS,
   seccionActivaDeLaRuta
@@ -8,6 +9,10 @@ import {
 
 test('el dashboard marca la pestaña Inicio', () => {
   assert.equal(seccionActivaDeLaRuta('/dashboard'), SECCION_INICIO)
+})
+
+test('la pantalla de cuentas marca la pestaña Cuentas', () => {
+  assert.equal(seccionActivaDeLaRuta('/cuentas'), SECCION_CUENTAS)
 })
 
 test('las rutas del menú Más marcan la pestaña Más', () => {

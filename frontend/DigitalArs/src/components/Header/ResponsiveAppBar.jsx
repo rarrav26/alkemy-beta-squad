@@ -37,9 +37,11 @@ export default function ResponsiveAppBar() {
 
   // Una sola lista de destinos para las dos vistas: si mañana se agrega una sección, aparece
   // en la barra y en el menú mobile sin tener que acordarse de tocar los dos lugares.
+  // "Cuentas" es solo del usuario regular: el administrador no tiene billetera.
   const enlaces = [
     { etiqueta: 'Mi cuenta', to: '/dashboard' },
     ...(esAdmin ? [{ etiqueta: 'Ver usuarios', to: '/admin/usuarios' }] : []),
+    ...(esAdmin ? [] : [{ etiqueta: 'Cuentas', to: '/cuentas' }]),
     { etiqueta: 'Perfil', to: '/perfil' }
   ]
 

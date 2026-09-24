@@ -11,6 +11,7 @@ const RUTAS_DEL_MENU_MAS = ['/movimientos', '/perfil']
 // estado guardado: así también acierta al recargar la página o al entrar desde un link.
 export function seccionActivaDeLaRuta(ruta) {
   if (ruta === '/dashboard') return SECCION_INICIO
+  if (ruta === '/cuentas') return SECCION_CUENTAS
   if (RUTAS_DEL_MENU_MAS.includes(ruta)) return SECCION_MAS
   return null
 }
