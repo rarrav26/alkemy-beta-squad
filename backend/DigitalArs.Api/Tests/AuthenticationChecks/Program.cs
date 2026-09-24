@@ -255,6 +255,64 @@ Check(EstadoDeTarjeta.PuedeDarseDeBaja(EstadoDeTarjeta.Activa), "Baja: se puede 
 Check(EstadoDeTarjeta.PuedeDarseDeBaja(EstadoDeTarjeta.Congelada),
     "Baja: se puede desde CONGELADA en un solo paso");
 
+// --- Pago con tarjeta: signo y filtros ---
+// El pago tiene que entrar en la taxonomía que ya existe, no quedar como DESCONOCIDO.
+Check(SignoDeMovimiento.DeTipo(SignoDeMovimiento.TipoPagoConTarjeta) == SignoDeMovimiento.Debito,
+    "Pago con tarjeta: es un DEBITO, igual que una transferencia enviada");
+Check(SignoDeMovimiento.DeTipo(SignoDeMovimiento.TipoPagoConTarjeta) != SignoDeMovimiento.Desconocido,
+    "Pago con tarjeta: NO queda como tipo desconocido");
+Check(SignoDeMovimiento.TiposDelFiltro("debito").Contains(SignoDeMovimiento.TipoPagoConTarjeta),
+    "Pago con tarjeta: entra en el filtro de débitos");
+Check(!SignoDeMovimiento.TiposDelFiltro("credito").Contains(SignoDeMovimiento.TipoPagoConTarjeta),
+    "Pago con tarjeta: NO entra en el filtro de créditos");
+// El texto tiene que coincidir con la fila del catálogo que inserta Create(v.004).sql.
+Check(SignoDeMovimiento.TipoPagoConTarjeta == "PAGO_CON_TARJETA",
+    "Pago con tarjeta: el texto coincide con el catálogo de la base");
+
+// --- El otro lado del pago: quien cobra ---
+Check(SignoDeMovimiento.DeTipo(SignoDeMovimiento.TipoPagoRecibido) == SignoDeMovimiento.Credito,
+    "Pago recibido: es un CREDITO para quien cobra");
+Check(SignoDeMovimiento.TiposDelFiltro("credito").Contains(SignoDeMovimiento.TipoPagoRecibido),
+    "Pago recibido: entra en el filtro de créditos");
+Check(SignoDeMovimiento.TipoPagoRecibido == "PAGO_RECIBIDO",
+    "Pago recibido: el texto coincide con el catálogo de la base");
+// Los dos lados tienen signos opuestos: si coincidieran, un pago sumaría o restaría dos veces.
+Check(SignoDeMovimiento.DeTipo(SignoDeMovimiento.TipoPagoConTarjeta)
+   != SignoDeMovimiento.DeTipo(SignoDeMovimiento.TipoPagoRecibido),
+    "Pago: los dos lados tienen signos opuestos");
+
+// --- Número de operación ---
+var fechaDeOperacion = new DateTime(2026, 9, 24, 12, 30, 0, DateTimeKind.Utc);
+Check(DatosDeTarjeta.NumeroDeOperacion(fechaDeOperacion, 42) == "20260924-000042",
+    "Número de operación: formato fecha-id con ceros adelante");
+// Dos movimientos distintos no pueden compartir número: el id del movimiento ya es único.
+Check(DatosDeTarjeta.NumeroDeOperacion(fechaDeOperacion, 42)
+   != DatosDeTarjeta.NumeroDeOperacion(fechaDeOperacion, 43),
+    "Número de operación: dos pagos del mismo día no lo comparten");
+
+// --- Tipos de evento de la bitácora ---
+// Tienen que coincidir con el CHECK CK_TarjetaEventos_Tipo: un typo acá sería un error al
+// insertar, que recién aparecería en ejecución.
+Check(TipoDeEventoDeTarjeta.Generada == "GENERADA", "Evento: GENERADA coincide con el CHECK");
+Check(TipoDeEventoDeTarjeta.Congelada == "CONGELADA", "Evento: CONGELADA coincide con el CHECK");
+Check(TipoDeEventoDeTarjeta.Descongelada == "DESCONGELADA", "Evento: DESCONGELADA coincide con el CHECK");
+Check(TipoDeEventoDeTarjeta.DadaDeBaja == "DADA_DE_BAJA", "Evento: DADA_DE_BAJA coincide con el CHECK");
+
+// DESCONGELADA es un evento que NO tiene estado equivalente: la tarjeta vuelve a ACTIVA. Es la
+// razón por la que las dos listas no se pueden unificar.
+Check(!EstadoDeTarjeta.EsEstadoConocido(TipoDeEventoDeTarjeta.Descongelada),
+    "Evento: DESCONGELADA no es un estado de tarjeta, y por eso las dos listas son distintas");
+
+// --- Mensajes de notificación de tarjeta ---
+// Nunca pueden llevar el número completo ni el código: quedan guardados para siempre.
+var numeroCompletoDePrueba = "4000111122223333";
+var mensajeCongelada = MensajesDeNotificacion.TarjetaCongelada(
+    DatosDeTarjeta.UltimosCuatro(numeroCompletoDePrueba));
+Check(!mensajeCongelada.Contains(numeroCompletoDePrueba),
+    "Aviso de tarjeta: no incluye el número completo");
+Check(mensajeCongelada.Contains("3333"),
+    "Aviso de tarjeta: incluye los últimos 4 para que el usuario sepa de qué tarjeta habla");
+
 Console.WriteLine("Todas las verificaciones pasaron.");
 
 Task<string> CrearInvitacion(IdentityUser usuario) =>

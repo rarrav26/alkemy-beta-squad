@@ -4,7 +4,9 @@
 export const tipoMovimientoMap = {
   DEPOSITO: 'Depósito',
   TRANSFERENCIA_ENVIADA: 'Transferencia enviada',
-  TRANSFERENCIA_RECIBIDA: 'Transferencia recibida'
+  TRANSFERENCIA_RECIBIDA: 'Transferencia recibida',
+  PAGO_CON_TARJETA: 'Pago con tarjeta',
+  PAGO_RECIBIDO: 'Pago recibido'
 }
 
 export function formatearTipoMovimiento(tipo = '') {
@@ -117,12 +119,30 @@ export function normalizarMovimiento(movimiento) {
     tipo: tipoFormateado,
     tipoRaw: tipo,
     importe: Number(movimiento.importe),
-    descripcion: movimiento.descripcion || tipoMovimientoMap[tipo] || 'Movimiento',
+    // Se usa tipoFormateado y no tipoMovimientoMap[tipo]: el map solo conoce los tipos que
+    // alguien se acordó de agregar, así que un tipo nuevo caía en el literal 'Movimiento'.
+    // tipoFormateado tiene el respaldo que convierte PAGO_CON_TARJETA en "Pago Con Tarjeta",
+    // así que un tipo nuevo se muestra legible aunque nadie toque este archivo.
+    descripcion: movimiento.descripcion || tipoFormateado,
+    // Los últimos cuatro dígitos de la tarjeta, solo en un pago. El backend manda null en los
+    // demás movimientos.
+    ultimosCuatro: movimiento.ultimosCuatro ?? null,
     // Dos booleanos y no uno: un movimiento con signo DESCONOCIDO no es crédito ni
     // débito, y con un solo flag caía del lado del débito y se pintaba en rojo.
     esCredito: movimiento.signo === 'CREDITO',
     esDebito: movimiento.signo === 'DEBITO'
   }
+}
+
+// El texto que se muestra en la fila del historial. Para un pago agrega la tarjeta usada:
+// "Pago con tarjeta •••• 5390". Sin esto, con varias tarjetas a lo largo del tiempo no se puede
+// saber con cuál se pagó.
+//
+// Los puntos son el carácter • y no cuatro asteriscos: es lo que usan las tarjetas reales y no
+// se confunde con el marcado de negrita de algunos renderizadores.
+export function descripcionConTarjeta(movimiento) {
+  if (!movimiento?.ultimosCuatro) return movimiento?.descripcion ?? ''
+  return `${movimiento.descripcion} •••• ${movimiento.ultimosCuatro}`
 }
 
 // La API siempre responde con la misma forma (PaginaResponse<MovimientoResponse>),

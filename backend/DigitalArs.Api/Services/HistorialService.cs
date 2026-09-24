@@ -101,7 +101,8 @@ public class HistorialService(
             Fecha: HoraDeArgentina.DesdeUtc(movimiento.FechaUtc),
             Tipo: movimiento.Tipo,
             Signo: SignoDeMovimiento.DeTipo(movimiento.Tipo),
-            Importe: movimiento.Importe);
+            Importe: movimiento.Importe,
+            UltimosCuatro: movimiento.UltimosCuatro);
 
     private static Resultado<PaginaResponse<MovimientoResponse>> Fallo(
         MotivoDeRechazo motivo,

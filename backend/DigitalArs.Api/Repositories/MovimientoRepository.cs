@@ -43,7 +43,22 @@ public class MovimientoRepository(DigitalArsDbContext context)
                 movimiento.id,
                 movimiento.fecha,
                 movimiento.tipo_movimiento.descripcion,
-                movimiento.importe))
+                movimiento.importe,
+                // Los últimos cuatro dígitos de la tarjeta del pago, o null si el movimiento no
+                // salió de una tarjeta.
+                //
+                // Se traen SOLO los últimos cuatro con Substring, no el número completo: así el
+                // número entero nunca sale de la base para una consulta de historial, aunque
+                // alguien agregue un log de la respuesta más adelante.
+                //
+                // Substring de EF se traduce a SUBSTRING de SQL Server, que cuenta desde 1: para
+                // los últimos 4 de un número de 16 dígitos, arranca en la posición 13.
+                movimiento.tarjeta_id == null
+                    ? null
+                    : context.Tarjetas
+                        .Where(t => t.id == movimiento.tarjeta_id)
+                        .Select(t => t.numero.Substring(12, 4))
+                        .FirstOrDefault()))
             .ToListAsync(cancellationToken);
 
         return new PaginaDeMovimientos(items, totalItems);

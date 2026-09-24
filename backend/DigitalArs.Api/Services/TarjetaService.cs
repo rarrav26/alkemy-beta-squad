@@ -1,6 +1,7 @@
 using DigitalArs.Api.Data.Context;
 using DigitalArs.Api.Data.Entities;
 using DigitalArs.Api.DTOs;
+using DigitalArs.Api.Helpers.Common;
 using DigitalArs.Api.Helpers.Domain;
 using DigitalArs.Api.Helpers.Results;
 using DigitalArs.Api.Interfaces;
@@ -15,6 +16,8 @@ public class TarjetaService(
     UserManager<IdentityUser> users,
     IUsuarioRepository usuarios,
     ICuentaRepository cuentas,
+    ITipoMovimientoRepository tipos,
+    INotificadorEnTiempoReal notificador,
     IMemoryCache intentos) : ITarjetaService
 {
     // Mismo patrón que AccountService.IntentosParaGenerarAlias: el número se sortea al azar,
@@ -26,6 +29,10 @@ public class TarjetaService(
 
     // Cuánto dura el bloqueo. Se cuenta desde el último intento fallido.
     private static readonly TimeSpan DuracionDelBloqueo = TimeSpan.FromMinutes(15);
+
+    // Cuántos eventos de bitácora devuelve el resumen del administrador. Es una lista para
+    // mirar, no un export: los contadores del resumen sí cuentan todo.
+    private const int EventosDelResumen = 20;
 
     // =======================================================================================
     // GENERAR
@@ -81,6 +88,15 @@ public class TarjetaService(
             return Resultado<TarjetaResponse>.Fallo(MotivoDeRechazo.TarjetaYaExiste,
                 "Ya tenés una tarjeta. Dala de baja antes de generar una nueva.");
         }
+
+        await RegistrarAsync(
+            tarjeta,
+            perfil,
+            identityUserId,
+            TipoDeEventoDeTarjeta.Generada,
+            MensajesDeNotificacion.TituloTarjetaGenerada,
+            MensajesDeNotificacion.TarjetaGenerada(DatosDeTarjeta.UltimosCuatro(tarjeta.numero)),
+            cancellationToken);
 
         return Resultado<TarjetaResponse>.Exito(Presentar(tarjeta, perfil));
     }
@@ -211,6 +227,25 @@ public class TarjetaService(
         tarjeta.estado = estadoDeseado;
         await db.SaveChangesAsync(cancellationToken);
 
+        // El aviso de congelar es el más valioso de los cuatro: si la tarjeta aparece congelada
+        // y no fue el usuario, la notificación es la evidencia de que alguien más entró.
+        // Y el evento en la bitácora es lo que permite contar cuántas veces la congeló, que el
+        // estado actual por sí solo no puede responder.
+        await RegistrarAsync(
+            tarjeta,
+            perfil,
+            identityUserId,
+            congelada
+                ? TipoDeEventoDeTarjeta.Congelada
+                : TipoDeEventoDeTarjeta.Descongelada,
+            congelada
+                ? MensajesDeNotificacion.TituloTarjetaCongelada
+                : MensajesDeNotificacion.TituloTarjetaDescongelada,
+            congelada
+                ? MensajesDeNotificacion.TarjetaCongelada(DatosDeTarjeta.UltimosCuatro(tarjeta.numero))
+                : MensajesDeNotificacion.TarjetaDescongelada(DatosDeTarjeta.UltimosCuatro(tarjeta.numero)),
+            cancellationToken);
+
         return Resultado<TarjetaResponse>.Exito(Presentar(tarjeta, perfil));
     }
 
@@ -251,7 +286,321 @@ public class TarjetaService(
 
         await db.SaveChangesAsync(cancellationToken);
 
+        await RegistrarAsync(
+            tarjeta,
+            perfil,
+            identityUserId,
+            TipoDeEventoDeTarjeta.DadaDeBaja,
+            MensajesDeNotificacion.TituloTarjetaDadaDeBaja,
+            MensajesDeNotificacion.TarjetaDadaDeBaja(DatosDeTarjeta.UltimosCuatro(tarjeta.numero)),
+            cancellationToken);
+
         return Resultado<TarjetaResponse>.Exito(Presentar(tarjeta, perfil));
+    }
+
+    // =======================================================================================
+    // PAGAR
+    // =======================================================================================
+
+    public async Task<Resultado<PagoConTarjetaResponse>> PagarAsync(
+        string identityUserId,
+        PagoConTarjetaDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        if (dto.Importe is not decimal importe)
+            return Resultado<PagoConTarjetaResponse>.Fallo(MotivoDeRechazo.DatosInvalidos,
+                "El importe es obligatorio.");
+
+        // Misma regla de importe que usan depósito y transferencia: vive en un solo lugar.
+        var errorDeImporte = LimitesDeImporte.PrimerErrorDe(importe);
+        if (errorDeImporte is not null)
+            return Resultado<PagoConTarjetaResponse>.Fallo(MotivoDeRechazo.DatosInvalidos, errorDeImporte);
+
+        // Se normaliza igual que en TransferenciaService: los alias se guardan en minúsculas, y
+        // la búsqueda compara texto exacto. Sin esto, escribir "Kiosco.La.Esquina" no encontraría
+        // la cuenta y el usuario leería "no existe" en lugar de un error de formato.
+        var destino = DatosDeCuenta.NormalizarAlias(dto.Destino);
+
+        if (!DatosDeCuenta.EsDestinoValido(destino))
+            return Resultado<PagoConTarjetaResponse>.Fallo(MotivoDeRechazo.DatosInvalidos,
+                "El destino tiene que ser un alias válido o un CVU de 22 dígitos.");
+
+        var contexto = await ResolverContextoAsync(identityUserId, cancellationToken);
+        if (!contexto.Exitoso)
+            return Resultado<PagoConTarjetaResponse>.Fallo(contexto.Motivo!.Value, contexto.Errores);
+
+        var (perfil, cuenta) = contexto.Valor!;
+
+        var tarjeta = await BuscarVigenteAsync(cuenta.id, cancellationToken);
+        if (tarjeta is null)
+            return Resultado<PagoConTarjetaResponse>.Fallo(MotivoDeRechazo.TarjetaNoEncontrada,
+                "Todavía no generaste tu tarjeta.");
+
+        // ACA SE CUMPLE, LITERALMENTE, "tarjeta congelada no permite operaciones asociadas".
+        // Se compara contra Activa en vez de reusar PuedeRevelarseElCodigo: hoy las dos reglas
+        // coinciden, pero son permisos distintos y atarlos haría que cambiar una cambie la otra
+        // sin querer.
+        if (tarjeta.estado != EstadoDeTarjeta.Activa)
+            return Resultado<PagoConTarjetaResponse>.Fallo(
+                MotivoDeRechazo.EstadoDeTarjetaNoPermiteLaOperacion,
+                tarjeta.estado == EstadoDeTarjeta.Congelada
+                    ? "Tu tarjeta está congelada. Descongelala para poder pagar."
+                    : "Tu tarjeta está dada de baja. Generá una nueva para poder pagar.");
+
+        var hoy = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (DatosDeTarjeta.EstaVencida(tarjeta.vencimiento, hoy))
+            return Resultado<PagoConTarjetaResponse>.Fallo(
+                MotivoDeRechazo.EstadoDeTarjetaNoPermiteLaOperacion,
+                "Tu tarjeta está vencida. Dala de baja y generá una nueva.");
+
+        var cuentaDestino = await cuentas.GetByAliasOCvuAsync(destino, cancellationToken);
+        if (cuentaDestino is null)
+            return Resultado<PagoConTarjetaResponse>.Fallo(MotivoDeRechazo.DestinoNoEncontrado,
+                "No encontramos una cuenta con ese alias o CVU.");
+
+        if (cuentaDestino.id == cuenta.id)
+            return Resultado<PagoConTarjetaResponse>.Fallo(MotivoDeRechazo.MismaCuenta,
+                "No podés pagarte a tu propia cuenta.");
+
+        var perfilDestino = await usuarios.GetByIdAsync(cuentaDestino.usuario_id, cancellationToken);
+        if (perfilDestino is null)
+            return Resultado<PagoConTarjetaResponse>.Fallo(MotivoDeRechazo.DestinoNoEncontrado,
+                "No encontramos el titular de la cuenta destino.");
+
+        // Un destino desactivado no puede cobrar, igual que en una transferencia.
+        if (!perfilDestino.is_active)
+            return Resultado<PagoConTarjetaResponse>.Fallo(MotivoDeRechazo.DestinoNoEncontrado,
+                "La cuenta destino no está disponible.");
+
+        var tipoPago = await tipos.GetByDescripcionAsync(
+            SignoDeMovimiento.TipoPagoConTarjeta, cancellationToken);
+        var tipoCobro = await tipos.GetByDescripcionAsync(
+            SignoDeMovimiento.TipoPagoRecibido, cancellationToken);
+
+        if (tipoPago is null || tipoCobro is null)
+            return Resultado<PagoConTarjetaResponse>.Fallo(
+                MotivoDeRechazo.TipoMovimientoNoConfigurado,
+                "No están configurados los tipos de movimiento de pago con tarjeta.");
+
+        // Transacción explícita: el débito, el crédito, los dos movimientos y los dos avisos
+        // entran o no entran juntos. Acá SI corresponde que los avisos vayan adentro (al
+        // contrario que en congelar): avisar de un pago que no se concretó sería peor que no
+        // avisar. Mismo criterio que DepositoService y TransferenciaService.
+        await using var transaccion = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        if (cuenta.saldo < importe)
+            return Resultado<PagoConTarjetaResponse>.Fallo(MotivoDeRechazo.SaldoInsuficiente,
+                "Saldo insuficiente para realizar el pago.");
+
+        if (cuentaDestino.saldo + importe > LimitesDeImporte.SaldoMaximo)
+            return Resultado<PagoConTarjetaResponse>.Fallo(MotivoDeRechazo.SaldoMaximoSuperado,
+                "La cuenta destino superaría el saldo máximo permitido.");
+
+        // Guardas atómicas en SQL: la condición va en el WHERE, así dos pagos simultáneos no
+        // pueden dejar la cuenta en negativo. Se reusan los mismos métodos del repositorio que
+        // usa TransferenciaService, que es donde vive la parte difícil.
+        var debitado = await cuentas.DecrementarSaldoAsync(perfil.id, importe, cancellationToken);
+        if (!debitado)
+        {
+            await transaccion.RollbackAsync(cancellationToken);
+            return Resultado<PagoConTarjetaResponse>.Fallo(MotivoDeRechazo.SaldoInsuficiente,
+                "Saldo insuficiente para realizar el pago.");
+        }
+
+        var acreditado = await cuentas.IncrementarSaldoAsync(
+            cuentaDestino.usuario_id, importe, cancellationToken);
+
+        if (!acreditado)
+        {
+            await transaccion.RollbackAsync(cancellationToken);
+            return Resultado<PagoConTarjetaResponse>.Fallo(MotivoDeRechazo.NoSePudoActualizar,
+                "No se pudo acreditar el pago en la cuenta destino.");
+        }
+
+        var fechaDelPago = DateTime.UtcNow;
+        var ultimosCuatro = DatosDeTarjeta.UltimosCuatro(tarjeta.numero);
+        var titularOrigen = $"{perfil.nombre} {perfil.apellido}";
+        var titularDestino = $"{perfilDestino.nombre} {perfilDestino.apellido}";
+
+        // El movimiento del que paga: lleva la tarjeta, porque salió de ella.
+        var movimientoPago = new Movimiento
+        {
+            cuenta_id = cuenta.id,
+            tipo_movimiento_id = tipoPago.Id,
+            importe = importe,
+            fecha = fechaDelPago,
+            transferencia_id = null,
+            tarjeta_id = tarjeta.id
+        };
+
+        // El movimiento del que cobra: SIN tarjeta_id. La tarjeta es del pagador, y el cobrador
+        // no tiene por qué ver en su historial con qué tarjeta le pagaron.
+        var movimientoCobro = new Movimiento
+        {
+            cuenta_id = cuentaDestino.id,
+            tipo_movimiento_id = tipoCobro.Id,
+            importe = importe,
+            fecha = fechaDelPago,
+            transferencia_id = null,
+            tarjeta_id = null
+        };
+
+        db.Movimientos.Add(movimientoPago);
+        db.Movimientos.Add(movimientoCobro);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var concepto = string.IsNullOrWhiteSpace(dto.Concepto) ? null : dto.Concepto.Trim();
+
+        // Un aviso para cada lado, igual que en una transferencia. El concepto va en los DOS
+        // mensajes, y es lo que hace que quede guardado: no hay columna de detalle en
+        // Movimientos, así que el texto de la notificación es su lugar de persistencia.
+        var avisoPago = new Notificacion
+        {
+            usuario_id = perfil.id,
+            // Un pago SI tiene movimiento, al contrario que los eventos de tarjeta.
+            movimiento_id = movimientoPago.id,
+            titulo = MensajesDeNotificacion.TituloPagoConTarjeta,
+            mensaje = MensajesDeNotificacion.PagoConTarjeta(
+                importe, titularDestino, ultimosCuatro, concepto),
+            fecha = fechaDelPago
+        };
+
+        var avisoCobro = new Notificacion
+        {
+            usuario_id = perfilDestino.id,
+            movimiento_id = movimientoCobro.id,
+            titulo = MensajesDeNotificacion.TituloPagoRecibido,
+            mensaje = MensajesDeNotificacion.PagoRecibido(importe, titularOrigen, concepto),
+            fecha = fechaDelPago
+        };
+
+        db.Notificaciones.Add(avisoPago);
+        db.Notificaciones.Add(avisoCobro);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var cuentaActualizada = await cuentas.GetByUsuarioIdAsync(perfil.id, cancellationToken);
+        if (cuentaActualizada is null)
+            throw new InvalidOperationException("No se encontró la cuenta después del pago.");
+
+        var respuesta = new PagoConTarjetaResponse(
+            Message: "Pago realizado exitosamente.",
+            // Se arma con el id del movimiento, que recién existe después del SaveChanges.
+            NumeroDeOperacion: DatosDeTarjeta.NumeroDeOperacion(fechaDelPago, movimientoPago.id),
+            MovimientoId: movimientoPago.id,
+            Importe: importe,
+            SaldoActual: cuentaActualizada.saldo,
+            UltimosCuatro: ultimosCuatro,
+            Titular: titularDestino,
+            Destino: destino,
+            Concepto: concepto,
+            Fecha: HoraDeArgentina.DesdeUtc(fechaDelPago));
+
+        await transaccion.CommitAsync(cancellationToken);
+
+        // Recién con el pago confirmado, y sin cancellationToken: si quien llamó cortó la
+        // conexión, los avisos igual tienen que salir. El del cobrador se manda a SU identity,
+        // no al del pagador.
+        await notificador.EnviarAsync(identityUserId, avisoPago);
+        await notificador.EnviarAsync(perfilDestino.identity_user_id, avisoCobro);
+
+        return Resultado<PagoConTarjetaResponse>.Exito(respuesta);
+    }
+
+    // =======================================================================================
+    // RESUMEN PARA EL ADMINISTRADOR
+    // =======================================================================================
+
+    public async Task<Resultado<ResumenDeTarjetasResponse>> ObtenerResumenAsync(
+        int usuarioId,
+        CancellationToken cancellationToken = default)
+    {
+        // Se comprueba que el usuario exista para poder devolver 404 en vez de un resumen en
+        // cero, que no distinguiría "no hizo nada" de "no existe".
+        var perfil = await usuarios.GetByIdAsync(usuarioId, cancellationToken);
+        if (perfil is null)
+            return Resultado<ResumenDeTarjetasResponse>.Fallo(MotivoDeRechazo.NoEncontrado,
+                "No se encontró el usuario.");
+
+        var cuenta = await cuentas.GetByUsuarioIdAsync(usuarioId, cancellationToken);
+
+        // El admin no tiene cuenta, así que tampoco tarjetas. Se devuelve un resumen vacío en
+        // lugar de un error: preguntar por la actividad de tarjetas de alguien sin billetera es
+        // una pregunta válida y la respuesta honesta es "ninguna".
+        if (cuenta is null)
+            return Resultado<ResumenDeTarjetasResponse>.Exito(new ResumenDeTarjetasResponse(
+                UsuarioId: usuarioId,
+                TarjetasGeneradas: 0,
+                VecesQueCongelo: 0,
+                VecesQueDescongelo: 0,
+                TarjetasDadasDeBaja: 0,
+                TieneTarjetaVigente: false,
+                EstadoActual: null,
+                PagosRealizados: 0,
+                TotalPagado: 0m,
+                Eventos: []));
+
+        // Los ids de TODAS las tarjetas que tuvo, incluidas las dadas de baja: el historial es
+        // justamente lo que se quiere auditar.
+        var tarjetasDelUsuario = await db.Tarjetas
+            .AsNoTracking()
+            .Where(t => t.cuenta_id == cuenta.id)
+            .Select(t => t.id)
+            .ToListAsync(cancellationToken);
+
+        // Un solo GROUP BY en la base en lugar de cuatro COUNT separados: es una consulta contra
+        // el índice IX_TarjetaEventos_Tarjeta_Fecha y trae a lo sumo cuatro filas.
+        var conteos = await db.TarjetaEventos
+            .AsNoTracking()
+            .Where(e => tarjetasDelUsuario.Contains(e.tarjeta_id))
+            .GroupBy(e => e.tipo)
+            .Select(grupo => new { Tipo = grupo.Key, Cantidad = grupo.Count() })
+            .ToDictionaryAsync(x => x.Tipo, x => x.Cantidad, cancellationToken);
+
+        var vigente = await BuscarVigenteAsync(cuenta.id, cancellationToken);
+
+        var pagos = await db.Movimientos
+            .AsNoTracking()
+            .Where(m => m.tarjeta_id != null && tarjetasDelUsuario.Contains(m.tarjeta_id.Value))
+            .ToListAsync(cancellationToken);
+
+        // La bitácora en orden cronológico inverso. El desempate por id importa: cuatro eventos
+        // de la misma operación pueden compartir el milisegundo, y sin él el orden entre ellos lo
+        // decide SQL Server y puede cambiar entre consultas. Mismo criterio que usó el equipo en
+        // NotificacionRepository.
+        //
+        // Se traen los últimos EventosDelResumen y no todos: es una bitácora para mirar, no un
+        // export. Los contadores de arriba sí cuentan TODO, así que el resumen no miente aunque
+        // la lista esté recortada.
+        var eventos = await db.TarjetaEventos
+            .AsNoTracking()
+            .Where(e => tarjetasDelUsuario.Contains(e.tarjeta_id))
+            .OrderByDescending(e => e.fecha)
+            .ThenByDescending(e => e.id)
+            .Take(EventosDelResumen)
+            .Join(db.Tarjetas,
+                  evento => evento.tarjeta_id,
+                  tarjeta => tarjeta.id,
+                  // Solo los últimos cuatro dígitos, igual que en el historial: el número
+                  // completo no sale de la base para una consulta de auditoría.
+                  (evento, tarjeta) => new { evento.tipo, evento.fecha, Numero = tarjeta.numero })
+            .ToListAsync(cancellationToken);
+
+        return Resultado<ResumenDeTarjetasResponse>.Exito(new ResumenDeTarjetasResponse(
+            UsuarioId: usuarioId,
+            TarjetasGeneradas: conteos.GetValueOrDefault(TipoDeEventoDeTarjeta.Generada),
+            VecesQueCongelo: conteos.GetValueOrDefault(TipoDeEventoDeTarjeta.Congelada),
+            VecesQueDescongelo: conteos.GetValueOrDefault(TipoDeEventoDeTarjeta.Descongelada),
+            TarjetasDadasDeBaja: conteos.GetValueOrDefault(TipoDeEventoDeTarjeta.DadaDeBaja),
+            TieneTarjetaVigente: vigente is not null,
+            EstadoActual: vigente?.estado,
+            PagosRealizados: pagos.Count,
+            TotalPagado: pagos.Sum(m => m.importe),
+            Eventos: eventos
+                .Select(e => new EventoDeTarjetaResponse(
+                    Tipo: e.tipo,
+                    UltimosCuatro: DatosDeTarjeta.UltimosCuatro(e.Numero),
+                    Fecha: HoraDeArgentina.DesdeUtc(e.fecha)))
+                .ToList()));
     }
 
     // =======================================================================================
@@ -371,6 +720,74 @@ public class TarjetaService(
 
     private void LimpiarIntentos(string identityUserId) =>
         intentos.Remove(ClaveDeIntentos(identityUserId));
+
+    // ---------------------------------------------------------------------------------------
+    // Bitácora y avisos
+    //
+    // Un solo método registra LAS DOS cosas: el evento en TarjetaEventos (que es auditoría, y
+    // queda para siempre) y la notificación al usuario. Están juntos a propósito: son las dos
+    // caras del mismo hecho, y si fueran dos llamadas separadas alguna operación terminaría
+    // haciendo una y olvidando la otra.
+    //
+    // Se llama SIEMPRE DESPUÉS de que el cambio en la tarjeta ya se guardó.
+    //
+    // DIFERENCIA DELIBERADA CON DepositoService y con PagarAsync: en esos dos el aviso va DENTRO
+    // de la transacción, porque avisar de plata que no se movió sería peor que no avisar. Acá es
+    // al revés: lo importante es el estado de la tarjeta. Si el usuario congeló su tarjeta
+    // porque sospecha uso indebido, ese congelamiento TIENE que quedar aunque falle el registro;
+    // revertirlo dejaría operativa una tarjeta que el usuario quiso bloquear.
+    //
+    // Por eso todo está envuelto en un try: un fallo acá no puede hacer fracasar la operación.
+    // Es el mismo criterio que ya documenta INotificadorEnTiempoReal para el envío, extendido
+    // al guardado.
+    //
+    // La notificación se guarda con movimiento_id en null: estos eventos no mueven dinero. Ver
+    // database/Notificaciones(v.002).sql.
+    private async Task RegistrarAsync(
+        Tarjeta tarjeta,
+        Usuario perfil,
+        string identityUserId,
+        string tipoDeEvento,
+        string titulo,
+        string mensaje,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var ahora = DateTime.UtcNow;
+
+            db.TarjetaEventos.Add(new TarjetaEvento
+            {
+                tarjeta_id = tarjeta.id,
+                tipo = tipoDeEvento,
+                fecha = ahora
+            });
+
+            var notificacion = new Notificacion
+            {
+                usuario_id = perfil.id,
+                movimiento_id = null,
+                titulo = titulo,
+                mensaje = mensaje,
+                fecha = ahora
+            };
+
+            db.Notificaciones.Add(notificacion);
+
+            // Un solo SaveChanges para el evento y el aviso: van juntos o no van.
+            await db.SaveChangesAsync(cancellationToken);
+
+            // Sin cancellationToken: si quien llamó cortó la conexión justo después de que el
+            // cambio se guardó, el aviso igual tiene que salir. Mismo criterio que DepositoService.
+            await notificador.EnviarAsync(identityUserId, notificacion);
+        }
+        catch (Exception)
+        {
+            // Se descarta a propósito. La operación sobre la tarjeta ya está guardada y es lo
+            // que importa; solo se pierde el rastro y el aviso. Tragarlo acá es lo que impide
+            // que un problema en la bitácora rompa una función de seguridad.
+        }
+    }
 
     // El perfil y la cuenta que toda operación necesita. Es un record para poder viajar dentro
     // de un Resultado<T>, que exige que T sea una clase.

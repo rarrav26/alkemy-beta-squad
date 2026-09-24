@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using DigitalArs.Api.DTOs;
 using DigitalArs.Api.Errors;
+using DigitalArs.Api.Helpers.Domain;
 using DigitalArs.Api.Helpers.Results;
 using DigitalArs.Api.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -129,6 +130,62 @@ public class TarjetasController(ITarjetaService tarjetas) : ControllerBase
             : Mapear(resultado, "No se pudo dar de baja la tarjeta.");
     }
 
+    /// <summary>Paga con la tarjeta, descontando del saldo de la cuenta.</summary>
+    // Registra un movimiento de tipo PAGO_CON_TARJETA, así el pago aparece en el historial y en
+    // el saldo como cualquier otro débito. Exige la tarjeta ACTIVA: una congelada no paga.
+    [HttpPost("me/pagar")]
+    [ProducesResponseType<PagoConTarjetaResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Pagar(
+        [FromBody] PagoConTarjetaDto dto,
+        CancellationToken cancellationToken)
+    {
+        var identityUserId = IdentityUserId();
+        if (identityUserId is null) return Unauthorized();
+
+        var resultado = await tarjetas.PagarAsync(identityUserId, dto, cancellationToken);
+
+        return resultado.Exitoso
+            ? Ok(resultado.Valor)
+            : Mapear(resultado, "No se pudo realizar el pago.");
+    }
+
+    /// <summary>Resumen de actividad de tarjetas de un usuario. Solo para administradores.</summary>
+    // Responde "cuántas veces congeló su tarjeta" y "cuántas dio de baja", que el estado actual
+    // por sí solo no puede contestar.
+    //
+    // [Authorize(Roles = ...)] explícito además del [Authorize] de la clase: sin el rol, un
+    // usuario común podría auditar a cualquier otro pasando su id. Es el mismo agujero que
+    // cerramos en el listado de usuarios.
+    [HttpGet("resumen/{usuarioId:int}")]
+    [Authorize(Roles = RolPrincipal.Administrador)]
+    [ProducesResponseType<ResumenDeTarjetasResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ObtenerResumen(
+        int usuarioId,
+        CancellationToken cancellationToken)
+    {
+        var resultado = await tarjetas.ObtenerResumenAsync(usuarioId, cancellationToken);
+
+        if (resultado.Exitoso) return Ok(resultado.Valor);
+
+        var error = RespuestaDeError.Desde(resultado, "No se pudo obtener el resumen.");
+
+        // No usa Mapear: ahí NoEncontrado significa "no existe el usuario del token" y devuelve
+        // 401. Acá significa "no existe el usuario consultado", que es un 404.
+        return resultado.Motivo switch
+        {
+            MotivoDeRechazo.NoEncontrado => NotFound(error),
+            _ => StatusCode(StatusCodes.Status500InternalServerError, error)
+        };
+    }
+
     // ---------------------------------------------------------------------------------------
 
     private string? IdentityUserId()
@@ -165,10 +222,20 @@ public class TarjetasController(ITarjetaService tarjetas) : ControllerBase
             // estado y no un problema de los datos enviados, así que 409 y no 400.
             MotivoDeRechazo.EstadoDeTarjetaNoPermiteLaOperacion => Conflict(error),
 
-            // Contraseña incorrecta en el revelado. 400 y no 401: la sesión sigue siendo
-            // válida, lo que falló es la reconfirmación. Un 401 haría que el front cerrara la
-            // sesión del usuario por haberse equivocado tipeando.
+            // Contraseña incorrecta en el revelado, o datos inválidos en el pago. 400 y no 401:
+            // la sesión sigue siendo válida, lo que falló es el dato enviado. Un 401 haría que
+            // el front cerrara la sesión del usuario por haberse equivocado tipeando.
             MotivoDeRechazo.CredencialesInvalidas => BadRequest(error),
+            MotivoDeRechazo.DatosInvalidos => BadRequest(error),
+
+            // No alcanza la plata. 409 y no 400: el pedido está bien formado, lo que no da es
+            // el estado de la cuenta. Es el mismo criterio que usa el resto del proyecto.
+            MotivoDeRechazo.SaldoInsuficiente => Conflict(error),
+
+            // El catálogo de tipos de movimiento no tiene PAGO_CON_TARJETA: falta correr
+            // Create(v.004).sql. Es un problema de instalación, no del pedido.
+            MotivoDeRechazo.TipoMovimientoNoConfigurado =>
+                StatusCode(StatusCodes.Status500InternalServerError, error),
 
             MotivoDeRechazo.DemasiadosIntentos =>
                 StatusCode(StatusCodes.Status429TooManyRequests, error),

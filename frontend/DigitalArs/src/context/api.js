@@ -202,3 +202,25 @@ export async function cambiarCongelamientoTarjeta({ token, congelada, signal } =
 export async function darDeBajaTarjeta({ token, signal } = {}) {
   return apiRequest('/api/Tarjetas/me/baja', { method: 'PATCH', token, signal })
 }
+
+// Pago con tarjeta a un alias o CVU real: descuenta del saldo y lo acredita en el destino, así
+// que queda registrado como movimiento en las DOS cuentas y aparece en los dos historiales.
+// Devuelve el comprobante con el número de operación y el saldo actualizado.
+export async function pagarConTarjeta({ token, destino, importe, concepto, signal } = {}) {
+  return apiRequest('/api/Tarjetas/me/pagar', {
+    method: 'POST',
+    token,
+    body: { destino, importe, concepto },
+    signal
+  })
+}
+
+// Resumen de actividad de tarjetas de un usuario. Solo para administradores: la API responde
+// 403 a cualquier otro rol.
+export async function obtenerResumenDeTarjetas({ token, usuarioId, signal } = {}) {
+  return apiRequest(`/api/Tarjetas/resumen/${usuarioId}`, {
+    method: 'GET',
+    token,
+    signal
+  })
+}

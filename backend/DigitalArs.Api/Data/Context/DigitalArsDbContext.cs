@@ -21,6 +21,8 @@ public partial class DigitalArsDbContext : DbContext
 
     public virtual DbSet<Tarjeta> Tarjetas { get; set; }
 
+    public virtual DbSet<TarjetaEvento> TarjetaEventos { get; set; }
+
     public virtual DbSet<Usuario> Usuarios { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -111,6 +113,29 @@ public partial class DigitalArsDbContext : DbContext
                 .HasForeignKey(d => d.cuenta_id)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Tarjetas_Cuentas");
+        });
+
+        modelBuilder.Entity<TarjetaEvento>(entity =>
+        {
+            entity.ToTable("TarjetaEventos");
+
+            entity.HasIndex(e => new { e.tarjeta_id, e.fecha }, "IX_TarjetaEventos_Tarjeta_Fecha")
+                .IsDescending(false, true);
+
+            entity.Property(e => e.tipo)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+            entity.Property(e => e.fecha)
+                .HasPrecision(3)
+                .HasDefaultValueSql("(sysutcdatetime())");
+
+            // Sin navegación a Tarjeta: la FK la hace cumplir SQL Server y nadie recorre la
+            // relación desde código. Mismo criterio que usó el equipo con Notificacion.
+            entity.HasOne<Tarjeta>()
+                .WithMany()
+                .HasForeignKey(e => e.tarjeta_id)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_TarjetaEventos_Tarjetas");
         });
 
         modelBuilder.Entity<Usuario>(entity =>

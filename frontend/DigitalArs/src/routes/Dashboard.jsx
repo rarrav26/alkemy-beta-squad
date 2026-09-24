@@ -108,6 +108,17 @@ export default function Dashboard() {
     setMensajeExito(resultado.message);
   }
 
+  // Un pago con tarjeta descuenta del saldo, así que actualiza lo mismo que un depósito.
+  // El backend devuelve el saldo ya calculado: no se resta acá, para que la pantalla diga
+  // exactamente lo que quedó guardado.
+  function pagoRealizado(resultado) {
+    setCuenta((actual) =>
+      actual ? { ...actual, saldo: resultado.saldoActual } : actual,
+    );
+
+    setMensajeExito(resultado.message);
+  }
+
   function transferenciaRealizada(resultado) {
     setCuenta(actual => {
       if (!actual) return actual
@@ -234,8 +245,14 @@ export default function Dashboard() {
         </Stack>
       </Paper>
       {/* La tarjeta va antes del historial: es un dato de la cuenta, no una operación.
-          Solo para quien tiene billetera, así que el admin no la ve. */}
-      {!esAdmin && cuenta && <TarjetaVirtual />}
+          Solo para quien tiene billetera, así que el admin no la ve.
+          Recibe el saldo porque un pago lo descuenta, y avisa acá para actualizarlo. */}
+      {!esAdmin && cuenta && (
+        <TarjetaVirtual
+          saldoDisponible={cuenta.saldo}
+          onPagoRealizado={pagoRealizado}
+        />
+      )}
       {!esAdmin && cuenta && <MovimientosPreview />}
       {!esAdmin && cuenta && (
         <>

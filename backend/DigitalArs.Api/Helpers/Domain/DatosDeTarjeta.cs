@@ -132,6 +132,18 @@ public static class DatosDeTarjeta
         Random.Shared.Next(0, 1000).ToString("D3");
 
     // --------------------------------------------------------------------------------------
+    // NÚMERO DE OPERACIÓN
+    // --------------------------------------------------------------------------------------
+
+    // El identificador que un banco imprime en el comprobante. Se arma con la fecha más el id
+    // del movimiento, así que es único sin necesidad de sortear nada ni consultar la base:
+    // el id del movimiento ya es único, y la fecha adelante lo hace legible y ordenable.
+    //
+    // Ejemplo: 20260924-000042
+    public static string NumeroDeOperacion(DateTime fechaUtc, int movimientoId) =>
+        $"{fechaUtc:yyyyMMdd}-{movimientoId:D6}";
+
+    // --------------------------------------------------------------------------------------
     // PRESENTACIÓN
     // --------------------------------------------------------------------------------------
 

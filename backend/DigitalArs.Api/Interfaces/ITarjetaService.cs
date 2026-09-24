@@ -32,4 +32,22 @@ public interface ITarjetaService
     Task<Resultado<TarjetaResponse>> DarDeBajaAsync(
         string identityUserId,
         CancellationToken cancellationToken = default);
+
+    // Paga con la tarjeta, descontando del saldo de la cuenta. Registra un movimiento de tipo
+    // PAGO_CON_TARJETA, así el pago aparece en el historial y en el saldo como cualquier otro
+    // débito.
+    //
+    // Exige la tarjeta ACTIVA: una congelada no paga. Eso es lo que hace literal el criterio
+    // "tarjeta congelada no permite operaciones asociadas".
+    Task<Resultado<PagoConTarjetaResponse>> PagarAsync(
+        string identityUserId,
+        PagoConTarjetaDto dto,
+        CancellationToken cancellationToken = default);
+
+    // Resumen de auditoría para el ADMINISTRADOR: cuántas veces congeló, cuántas dio de baja,
+    // cuánto pagó. Recibe el id de Usuarios y no un identityUserId, porque el admin consulta a
+    // OTRO usuario, no a sí mismo. Quien llama tiene que haber comprobado el rol.
+    Task<Resultado<ResumenDeTarjetasResponse>> ObtenerResumenAsync(
+        int usuarioId,
+        CancellationToken cancellationToken = default);
 }

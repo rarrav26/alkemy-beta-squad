@@ -16,22 +16,25 @@ import {
 import AcUnitIcon from "@mui/icons-material/AcUnit";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
+import ShoppingCartOutlinedIcon from "@mui/icons-material/ShoppingCartOutlined";
 import { useAuth } from "../../context/authContext";
 import {
   cambiarCongelamientoTarjeta,
   darDeBajaTarjeta,
   generarTarjeta,
   obtenerMiTarjeta,
+  pagarConTarjeta,
   revelarTarjeta,
 } from "../../context/api";
 import TarjetaVisual from "./TarjetaVisual";
 import RevelarCodigoModal from "./RevelarCodigoModal";
+import PagarConTarjetaModal from "./PagarConTarjetaModal";
 
 // Cuánto se ve el código antes de que la tarjeta se dé vuelta sola. Suficiente para leer tres
 // dígitos y copiarlos, no tanto como para dejarlos expuestos si el usuario se va del escritorio.
 const SEGUNDOS_VISIBLE = 12;
 
-export default function TarjetaVirtual() {
+export default function TarjetaVirtual({ saldoDisponible = 0, onPagoRealizado }) {
   const { session } = useAuth();
   const token = session?.token;
 
@@ -59,6 +62,13 @@ export default function TarjetaVirtual() {
   const [verificando, setVerificando] = useState(false);
 
   const [bajaAbierta, setBajaAbierta] = useState(false);
+
+  const [pagoAbierto, setPagoAbierto] = useState(false);
+  const [errorDePago, setErrorDePago] = useState("");
+  const [pagando, setPagando] = useState(false);
+  // El comprobante del último pago. Mientras tiene valor, el modal muestra el comprobante en
+  // lugar del formulario.
+  const [comprobante, setComprobante] = useState(null);
 
   // Contador de reintentos: incrementarlo vuelve a disparar el efecto de carga. Es el mismo
   // patrón que usa Dashboard para su botón de reintento.
@@ -187,6 +197,28 @@ export default function TarjetaVirtual() {
     });
   }
 
+  async function pagar({ destino, importe, concepto }) {
+    setPagando(true);
+    setErrorDePago("");
+
+    try {
+      const resultado = await pagarConTarjeta({ token, destino, importe, concepto });
+
+      // El modal NO se cierra: pasa a mostrar el comprobante con el número de operación, como
+      // hace un banco. Lo cierra el usuario cuando terminó de leerlo.
+      setComprobante(resultado);
+
+      // El saldo lo maneja el Dashboard, que es dueño del dato: se le avisa con la respuesta
+      // del backend en vez de calcularlo acá. Mismo patrón que usan depósito y transferencia.
+      onPagoRealizado?.(resultado);
+    } catch (fallo) {
+      // El modal queda abierto para corregir el destino o el importe.
+      setErrorDePago(fallo.message);
+    } finally {
+      setPagando(false);
+    }
+  }
+
   if (cargando) {
     return (
       <Contenedor>
@@ -277,9 +309,29 @@ export default function TarjetaVirtual() {
           spacing={1}
           sx={{ flexWrap: "wrap", gap: 1, justifyContent: "center" }}
         >
-          {tarjeta.puedeRevelarseElCodigo && !secreto && (
+          {/* Pagar solo con la tarjeta ACTIVA: una congelada no opera, y el backend lo rechaza
+              igual. Se esconde el botón en vez de mostrarlo deshabilitado porque el estado ya
+              está explicado en el cartel de abajo. */}
+          {tarjeta.estado === "ACTIVA" && !tarjeta.estaVencida && (
             <Button
               variant="contained"
+              startIcon={<ShoppingCartOutlinedIcon />}
+              onClick={() => {
+                setErrorDePago("");
+                // Se limpia el comprobante anterior al ABRIR y no al cerrar: limpiarlo al cerrar
+                // lo haría desaparecer a la vista durante la animación del diálogo.
+                setComprobante(null);
+                setPagoAbierto(true);
+              }}
+              disabled={accionEnCurso}
+            >
+              Pagar
+            </Button>
+          )}
+
+          {tarjeta.puedeRevelarseElCodigo && !secreto && (
+            <Button
+              variant="outlined"
               startIcon={<VisibilityIcon />}
               onClick={() => {
                 // El error se limpia acá, al ABRIR, y no al cerrar: limpiarlo al cerrar lo
@@ -334,8 +386,8 @@ export default function TarjetaVirtual() {
 
         {tarjeta.estado === "CONGELADA" && (
           <Alert severity="info" sx={{ width: "100%" }}>
-            Tu tarjeta está congelada: no permite operaciones ni mostrar el código de
-            seguridad. Podés descongelarla cuando quieras.
+            Tu tarjeta está congelada: no permite pagar ni mostrar el código de seguridad.
+            Podés descongelarla cuando quieras.
           </Alert>
         )}
 
@@ -352,6 +404,16 @@ export default function TarjetaVirtual() {
         onConfirmar={confirmarPassword}
         error={errorDePassword}
         cargando={verificando}
+      />
+
+      <PagarConTarjetaModal
+        open={pagoAbierto}
+        onClose={() => setPagoAbierto(false)}
+        onConfirmar={pagar}
+        saldoDisponible={saldoDisponible}
+        comprobante={comprobante}
+        error={errorDePago}
+        cargando={pagando}
       />
 
       {/* La baja es irreversible, así que se confirma. El texto dice explícitamente que no se

@@ -21,6 +21,7 @@ import { ElementosGlobales } from "../context/ElementosGlobales";
 import {
   construirConsulta,
   contarFiltrosAplicados,
+  descripcionConTarjeta,
   filtrosIniciales,
   formatearFecha,
   normalizarRespuestaMovimientos,
@@ -86,7 +87,7 @@ function FilaDeMovimiento({ movimiento }) {
 
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography fontWeight={700} sx={{ lineHeight: 1.3 }}>
-            {movimiento.descripcion}
+            {descripcionConTarjeta(movimiento)}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             {formatearFecha(movimiento.fecha)}
