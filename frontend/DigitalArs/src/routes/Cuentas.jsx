@@ -5,13 +5,14 @@ import Box from '@mui/material/Box'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 
+import ListaDeGestion from '../components/Comunes/ListaDeGestion'
 import BalanceMensual from '../components/Cuentas/BalanceMensual'
 import EstadoDeCargaDeCuenta from '../components/Cuentas/EstadoDeCargaDeCuenta'
-import GestionaTuCuenta from '../components/Cuentas/GestionaTuCuenta'
 import ModalesDeDinero from '../components/Cuentas/ModalesDeDinero'
 import TarjetaDeSaldo from '../components/Inicio/TarjetaDeSaldo'
 import UltimosMovimientos from '../components/Movimientos/UltimosMovimientos'
 import AvisoProximamente from '../components/Proximamente/AvisoProximamente'
+import ChipProximamente from '../components/Proximamente/ChipProximamente'
 import {
   BALANCE_MENSUAL_DE_MUESTRA,
   ETIQUETA_DE_VARIACION_DE_MUESTRA,
@@ -65,7 +66,13 @@ export default function CuentasPage() {
 
           <BalanceMensual balance={BALANCE_MENSUAL_DE_MUESTRA} onElegir={mostrarAviso} />
 
-          <GestionaTuCuenta opciones={OPCIONES_DE_GESTION_DE_MUESTRA} onElegir={mostrarAviso} />
+          {/* Toda la sección es de muestra: el chip va una sola vez, junto al título. */}
+          <ListaDeGestion
+            titulo="Gestioná tu cuenta"
+            idDelTitulo="titulo-gestiona-tu-cuenta"
+            complemento={<ChipProximamente />}
+            opciones={OPCIONES_DE_GESTION_DE_MUESTRA.map(opcion => ({ ...opcion, onClick: mostrarAviso }))}
+          />
         </Stack>
       )}
 

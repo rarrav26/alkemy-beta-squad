@@ -1,13 +1,20 @@
+import { useState } from 'react'
+
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
+import DeleteOutlineRounded from '@mui/icons-material/DeleteOutlineRounded'
 
+import ListaDeGestion from '../components/Comunes/ListaDeGestion'
+import ConfirmarBajaDeTarjetaDialog from '../components/Cuentas/ConfirmarBajaDeTarjetaDialog'
 import PagarConTarjetaModal from '../components/Cuentas/PagarConTarjetaModal'
 import RevelarCodigoModal from '../components/Cuentas/RevelarCodigoModal'
 import TarjetaVisual from '../components/Cuentas/TarjetaVisual'
 import UltimosMovimientos from '../components/Movimientos/UltimosMovimientos'
+import AvisoProximamente from '../components/Proximamente/AvisoProximamente'
+import { OPCIONES_DE_GESTION_DE_TARJETA_DE_MUESTRA } from '../components/Proximamente/datosDeMuestra'
 import AccionesDeTarjeta from '../components/Tarjetas/AccionesDeTarjeta'
 import TarjetaVacia from '../components/Tarjetas/TarjetaVacia'
 import useMiCuenta from '../hooks/useMiCuenta'
@@ -121,6 +128,31 @@ export default function TarjetasPage() {
   // botón aparece recién cuando la cuenta está.
   const puedePagar = tarjetaDelUsuario.puedePagar && Boolean(cuenta)
 
+  const [avisoAbierto, setAvisoAbierto] = useState(false)
+
+  // Todo lo de muestra responde igual: avisa que todavía no está disponible.
+  function mostrarAviso() {
+    setAvisoAbierto(true)
+  }
+
+  // Las opciones de muestra, cada una con su chip; al final, dar de baja, que sí funciona y
+  // pide confirmación porque es irreversible.
+  const opcionesDeGestion = [
+    ...OPCIONES_DE_GESTION_DE_TARJETA_DE_MUESTRA.map(opcion => ({
+      ...opcion,
+      proximamente: true,
+      onClick: mostrarAviso
+    })),
+    {
+      id: 'dar-de-baja',
+      titulo: 'Dar de baja la tarjeta',
+      descripcion: 'Deja de funcionar para siempre. Después podés generar una nueva.',
+      Icono: DeleteOutlineRounded,
+      peligrosa: true,
+      onClick: tarjetaDelUsuario.abrirBaja
+    }
+  ]
+
   return (
     <Box sx={{ maxWidth: 600, mx: 'auto', px: 2, pt: { xs: 2, md: 4 }, pb: 3 }}>
       <Typography component="h1" variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
@@ -145,7 +177,26 @@ export default function TarjetasPage() {
             mensajeSinMovimientos="Todavía no hiciste pagos con tu tarjeta."
           />
         )}
+
+        {tarjetaDelUsuario.tarjeta && (
+          <ListaDeGestion
+            titulo="Gestioná tu tarjeta"
+            idDelTitulo="titulo-gestiona-tu-tarjeta"
+            opciones={opcionesDeGestion}
+          />
+        )}
       </Stack>
+
+      {tarjetaDelUsuario.tarjeta && (
+        <ConfirmarBajaDeTarjetaDialog
+          open={tarjetaDelUsuario.bajaAbierta}
+          onClose={tarjetaDelUsuario.cerrarBaja}
+          onConfirmar={tarjetaDelUsuario.darDeBaja}
+          ultimosCuatro={tarjetaDelUsuario.tarjeta.ultimosCuatro}
+        />
+      )}
+
+      <AvisoProximamente open={avisoAbierto} onClose={() => setAvisoAbierto(false)} />
 
       <RevelarCodigoModal
         open={tarjetaDelUsuario.revelarAbierto}
