@@ -42,3 +42,10 @@ export const ATAJOS_DE_MUESTRA = [
   { id: 'servicios', etiqueta: 'Servicios', Icono: ReceiptRounded },
   { id: 'prestamos', etiqueta: 'Préstamos', Icono: RequestQuoteRounded }
 ]
+
+// Balance del mes de la pantalla Cuentas. Son montos inventados: la tarjeta que los muestra
+// lleva el chip "Próximamente" y su dona se anuncia como "datos de muestra".
+export const BALANCE_MENSUAL_DE_MUESTRA = {
+  ingresos: 185000,
+  gastos: 128500
+}
