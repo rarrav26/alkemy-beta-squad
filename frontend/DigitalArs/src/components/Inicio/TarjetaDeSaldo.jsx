@@ -2,6 +2,7 @@ import Avatar from '@mui/material/Avatar'
 import Box from '@mui/material/Box'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
+import Chip from '@mui/material/Chip'
 import Divider from '@mui/material/Divider'
 import IconButton from '@mui/material/IconButton'
 import Stack from '@mui/material/Stack'
@@ -10,6 +11,7 @@ import AccountBalanceWalletRounded from '@mui/icons-material/AccountBalanceWalle
 import AddRounded from '@mui/icons-material/AddRounded'
 import BadgeRounded from '@mui/icons-material/BadgeRounded'
 import SwapHorizRounded from '@mui/icons-material/SwapHorizRounded'
+import TrendingUpRounded from '@mui/icons-material/TrendingUpRounded'
 import VisibilityOffRounded from '@mui/icons-material/VisibilityOffRounded'
 import VisibilityRounded from '@mui/icons-material/VisibilityRounded'
 
@@ -29,7 +31,14 @@ function SaldoOculto() {
 
 // La tarjeta principal del Inicio mobile: saldo de la cuenta en pesos y las tres acciones más
 // usadas. No abre los modales por su cuenta: avisa con los callbacks y quien la usa decide.
-export default function TarjetaDeSaldo({ saldo, onAgregar, onTransferir, onVerAliasYCvu }) {
+// La etiqueta de variación es opcional: sin ella, el chip no se dibuja.
+export default function TarjetaDeSaldo({
+  saldo,
+  etiquetaDeVariacion,
+  onAgregar,
+  onTransferir,
+  onVerAliasYCvu
+}) {
   const { saldoVisible, alternarVisibilidad } = useSaldoVisible()
 
   const acciones = [
@@ -51,9 +60,21 @@ export default function TarjetaDeSaldo({ saldo, onAgregar, onTransferir, onVerAl
           </Typography>
         </Stack>
 
-        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 2 }}>
-          Saldo disponible
-        </Typography>
+        <Stack direction="row" spacing={1} sx={{ mt: 2, alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            Saldo disponible
+          </Typography>
+
+          {etiquetaDeVariacion && (
+            <Chip
+              size="small"
+              color="success"
+              variant="outlined"
+              icon={<TrendingUpRounded aria-hidden="true" />}
+              label={etiquetaDeVariacion}
+            />
+          )}
+        </Stack>
 
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
           {saldoVisible ? <SaldoAnimado valor={saldo} /> : <SaldoOculto />}

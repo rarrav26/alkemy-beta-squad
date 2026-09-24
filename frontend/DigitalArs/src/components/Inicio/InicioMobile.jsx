@@ -14,8 +14,17 @@ import { MovimientosPreview } from '../../routes/Movimientos'
 import AliasYCvuDialog from '../Cuentas/AliasYCvuDialog'
 import EstadoDeCargaDeCuenta from '../Cuentas/EstadoDeCargaDeCuenta'
 import AvisoProximamente from '../Proximamente/AvisoProximamente'
-import { ATAJOS_DE_MUESTRA } from './datosDeMuestra'
+import BannerPromocional from './BannerPromocional'
+import CuentasEnOtrasMonedas from './CuentasEnOtrasMonedas'
+import {
+  ATAJOS_DE_MUESTRA,
+  BANNER_DE_MUESTRA,
+  CUENTAS_DE_MUESTRA,
+  ETIQUETA_DE_VARIACION_DE_MUESTRA,
+  PROMO_DE_CREDITO_DE_MUESTRA
+} from './datosDeMuestra'
 import GrillaDeAtajos from './GrillaDeAtajos'
+import PromoCredito from './PromoCredito'
 import TarjetaDeSaldo from './TarjetaDeSaldo'
 
 // El título de la página existe para el lector de pantalla, pero no se dibuja: en mobile el
@@ -54,10 +63,12 @@ export default function InicioMobile({
     { id: 'perfil', etiqueta: 'Mi perfil', Icono: PersonRounded, onClick: () => navegar('/perfil') }
   ]
 
-  const atajosDeMuestra = ATAJOS_DE_MUESTRA.map(atajo => ({
-    ...atajo,
-    onClick: () => setAvisoAbierto(true)
-  }))
+  // Todo lo de muestra responde igual: avisa que todavía no está disponible.
+  function mostrarAviso() {
+    setAvisoAbierto(true)
+  }
+
+  const atajosDeMuestra = ATAJOS_DE_MUESTRA.map(atajo => ({ ...atajo, onClick: mostrarAviso }))
 
   return (
     <Box sx={{ px: 2, pt: 1, pb: 2 }} aria-busy={cargando}>
@@ -77,12 +88,19 @@ export default function InicioMobile({
 
           <TarjetaDeSaldo
             saldo={cuenta.saldo}
+            etiquetaDeVariacion={ETIQUETA_DE_VARIACION_DE_MUESTRA}
             onAgregar={onAgregar}
             onTransferir={onTransferir}
             onVerAliasYCvu={() => setAliasYCvuAbierto(true)}
           />
 
+          <CuentasEnOtrasMonedas cuentas={CUENTAS_DE_MUESTRA} onElegir={mostrarAviso} />
+
           <GrillaDeAtajos atajos={[...atajosReales, ...atajosDeMuestra]} />
+
+          <PromoCredito promo={PROMO_DE_CREDITO_DE_MUESTRA} onElegir={mostrarAviso} />
+
+          <BannerPromocional banner={BANNER_DE_MUESTRA} onElegir={mostrarAviso} />
         </Stack>
       )}
 
