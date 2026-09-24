@@ -8,7 +8,7 @@ import List from '@mui/material/List'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import ArrowBackRounded from '@mui/icons-material/ArrowBackRounded'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import useHistorialMobile from '../../hooks/useHistorialMobile'
 import { hayFiltrosAplicados } from '../../routes/movimientosUtils'
@@ -105,8 +105,12 @@ function CargarMas({ historial }) {
 // lista que crece con "Cargar más". Los datos y los filtros viven en useHistorialMobile.
 export default function HistorialMobile() {
   const navegar = useNavigate()
-  const historial = useHistorialMobile()
-  const [textoDeBusqueda, setTextoDeBusqueda] = useState('')
+  // ?buscar= abre el historial con una búsqueda ya puesta (por ejemplo, desde "Tus pagos con
+  // tarjeta"). La caja muestra ese mismo texto, así el usuario ve por qué está filtrado.
+  const [parametros] = useSearchParams()
+  const busquedaInicial = parametros.get('buscar') ?? ''
+  const historial = useHistorialMobile({ busquedaInicial })
+  const [textoDeBusqueda, setTextoDeBusqueda] = useState(busquedaInicial)
   const [hojaDeFechasAbierta, setHojaDeFechasAbierta] = useState(false)
 
   const { desde, hasta } = historial.filtrosAplicados

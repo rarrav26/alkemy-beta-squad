@@ -4,10 +4,13 @@ import ListItem from '@mui/material/ListItem'
 import Typography from '@mui/material/Typography'
 import CallMadeRounded from '@mui/icons-material/CallMadeRounded'
 import CallReceivedRounded from '@mui/icons-material/CallReceivedRounded'
+import CreditCardRounded from '@mui/icons-material/CreditCardRounded'
 import SavingsRounded from '@mui/icons-material/SavingsRounded'
+import StorefrontRounded from '@mui/icons-material/StorefrontRounded'
 import SwapHorizRounded from '@mui/icons-material/SwapHorizRounded'
 
 import {
+  descripcionConTarjeta,
   detalleDeLaContraparte,
   formatearFechaCorta,
   textoDelImporte
@@ -19,6 +22,8 @@ function IconoDelMovimiento({ tipo }) {
   if (tipo === 'DEPOSITO') return <SavingsRounded aria-hidden="true" />
   if (tipo === 'TRANSFERENCIA_ENVIADA') return <CallMadeRounded aria-hidden="true" />
   if (tipo === 'TRANSFERENCIA_RECIBIDA') return <CallReceivedRounded aria-hidden="true" />
+  if (tipo === 'PAGO_CON_TARJETA') return <CreditCardRounded aria-hidden="true" />
+  if (tipo === 'PAGO_RECIBIDO') return <StorefrontRounded aria-hidden="true" />
   return <SwapHorizRounded aria-hidden="true" />
 }
 
@@ -49,8 +54,9 @@ export default function FilaDeMovimientoCompacta({ movimiento, conDivisor }) {
         <Typography variant="caption" component="p" sx={{ color: 'text.secondary' }}>
           {formatearFechaCorta(movimiento.fecha)}
         </Typography>
+        {/* En un pago suma la tarjeta usada: "Pago con tarjeta •••• 3435". */}
         <Typography noWrap sx={{ fontWeight: 500 }}>
-          {movimiento.tipo}
+          {descripcionConTarjeta(movimiento)}
         </Typography>
         {detalle && (
           <Typography variant="caption" component="p" noWrap sx={{ color: 'text.secondary' }}>

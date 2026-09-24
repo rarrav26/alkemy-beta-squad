@@ -21,12 +21,15 @@ const MOVIMIENTOS_POR_PAGINA = 20
 // - al cambiar un filtro (búsqueda, tipo o fechas): la lista arranca de nuevo;
 // - al entrar dinero en tiempo real: solo se suman arriba los movimientos nuevos, sin perder
 //   las páginas viejas que el usuario ya había cargado. Reemplaza al refresco cada 15 s.
-export default function useHistorialMobile() {
+//
+// busquedaInicial permite abrir el historial ya filtrado (por ejemplo, desde "Tus pagos con
+// tarjeta", que manda "tarjeta").
+export default function useHistorialMobile({ busquedaInicial = '' } = {}) {
   const { obtenerMovimientos } = useAuth()
   const { avisosRecibidos } = useNotificaciones()
 
   const [filtros, setFiltros] = useState(filtrosIniciales)
-  const [busquedaAplicada, setBusquedaAplicada] = useState('')
+  const [busquedaAplicada, setBusquedaAplicada] = useState(busquedaInicial.trim())
   const [movimientos, setMovimientos] = useState([])
   const [paginaCargada, setPaginaCargada] = useState(1)
   const [totalPaginas, setTotalPaginas] = useState(1)

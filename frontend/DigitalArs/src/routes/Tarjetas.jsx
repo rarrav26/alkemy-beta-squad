@@ -7,10 +7,16 @@ import Typography from '@mui/material/Typography'
 import PagarConTarjetaModal from '../components/Cuentas/PagarConTarjetaModal'
 import RevelarCodigoModal from '../components/Cuentas/RevelarCodigoModal'
 import TarjetaVisual from '../components/Cuentas/TarjetaVisual'
+import UltimosMovimientos from '../components/Movimientos/UltimosMovimientos'
 import AccionesDeTarjeta from '../components/Tarjetas/AccionesDeTarjeta'
 import TarjetaVacia from '../components/Tarjetas/TarjetaVacia'
 import useMiCuenta from '../hooks/useMiCuenta'
 import useMiTarjeta from '../hooks/useMiTarjeta'
+
+// La API busca por nombre de tipo de movimiento, y "tarjeta" solo coincide con
+// PAGO_CON_TARJETA (el PAGO_RECIBIDO de quien cobra no lo contiene). Así se listan los pagos
+// hechos con la tarjeta sin un endpoint aparte.
+const BUSQUEDA_DE_PAGOS_CON_TARJETA = 'tarjeta'
 
 // La tarjeta a la vista, con sus pistas y avisos de estado.
 function TarjetaActiva({ tarjetaDelUsuario, puedePagar }) {
@@ -121,9 +127,25 @@ export default function TarjetasPage() {
         Tus tarjetas
       </Typography>
 
-      <Box aria-busy={tarjetaDelUsuario.cargando}>
-        <ContenidoDeTarjetas tarjetaDelUsuario={tarjetaDelUsuario} puedePagar={puedePagar} />
-      </Box>
+      <Stack spacing={3}>
+        <Box aria-busy={tarjetaDelUsuario.cargando}>
+          <ContenidoDeTarjetas tarjetaDelUsuario={tarjetaDelUsuario} puedePagar={puedePagar} />
+        </Box>
+
+        {/* Aparece aunque todavía no haya tarjeta: los pagos de una tarjeta dada de baja
+            siguen siendo movimientos de la cuenta. */}
+        {cuenta && (
+          <UltimosMovimientos
+            saldo={cuenta.saldo}
+            cantidad={4}
+            titulo="Tus pagos con tarjeta"
+            idDelTitulo="titulo-pagos-con-tarjeta"
+            busqueda={BUSQUEDA_DE_PAGOS_CON_TARJETA}
+            rutaDeVerMas={`/movimientos?buscar=${BUSQUEDA_DE_PAGOS_CON_TARJETA}`}
+            mensajeSinMovimientos="Todavía no hiciste pagos con tu tarjeta."
+          />
+        )}
+      </Stack>
 
       <RevelarCodigoModal
         open={tarjetaDelUsuario.revelarAbierto}
