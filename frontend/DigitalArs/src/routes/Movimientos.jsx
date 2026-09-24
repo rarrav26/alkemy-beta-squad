@@ -23,6 +23,7 @@ import useNavegacionMobile from "../hooks/useNavegacionMobile";
 import {
   construirConsulta,
   contarFiltrosAplicados,
+  detalleDeLaContraparte,
   filtrosIniciales,
   formatearFecha,
   normalizarRespuestaMovimientos,
@@ -53,6 +54,7 @@ function presentacionDelImporte(movimiento) {
 // completa, asi que el formato de los montos y las fechas es siempre el mismo.
 function FilaDeMovimiento({ movimiento }) {
   const presentacion = presentacionDelImporte(movimiento);
+  const detalle = detalleDeLaContraparte(movimiento);
   const IconoMovimiento = movimiento.esCredito
     ? ArrowDownwardRoundedIcon
     : ArrowUpwardRoundedIcon;
@@ -93,6 +95,11 @@ function FilaDeMovimiento({ movimiento }) {
           <Typography fontWeight={700} sx={{ lineHeight: 1.3 }}>
             {movimiento.descripcion}
           </Typography>
+          {detalle && (
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              {detalle}
+            </Typography>
+          )}
           <Typography variant="body2" color="text.secondary">
             {formatearFecha(movimiento.fecha)}
           </Typography>

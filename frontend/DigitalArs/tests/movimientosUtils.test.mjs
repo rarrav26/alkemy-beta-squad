@@ -3,9 +3,11 @@ import assert from 'node:assert/strict'
 import {
   construirConsulta,
   contarFiltrosAplicados,
+  detalleDeLaContraparte,
   filtrosIniciales,
   formatearFechaCorta,
   hayMasPaginas,
+  normalizarMovimiento,
   prefijoDelImporte,
   rangoDeFechasValido,
   sumarNuevosAlPrincipio,
@@ -160,4 +162,24 @@ test('el rango de fechas vale con una sola fecha o con desde antes que hasta', (
 
 test('el rango de fechas no vale si desde es posterior a hasta', () => {
   assert.equal(rangoDeFechasValido('2026-09-30', '2026-09-01'), false)
+})
+
+test('una transferencia enviada dice para quien fue y una recibida de quien vino', () => {
+  const enviada = { tipoRaw: 'TRANSFERENCIA_ENVIADA', contraparte: 'Tomas Destino' }
+  const recibida = { tipoRaw: 'TRANSFERENCIA_RECIBIDA', contraparte: 'Lucia Prueba' }
+
+  assert.equal(detalleDeLaContraparte(enviada), 'Para Tomas Destino')
+  assert.equal(detalleDeLaContraparte(recibida), 'De Lucia Prueba')
+})
+
+test('lo que no es transferencia no lleva linea de contraparte', () => {
+  assert.equal(detalleDeLaContraparte({ tipoRaw: 'DEPOSITO', contraparte: null }), null)
+})
+
+test('normalizar un movimiento conserva la contraparte y la deja en null si no viene', () => {
+  const conContraparte = normalizarMovimiento({ id: 1, tipo: 'TRANSFERENCIA_ENVIADA', signo: 'DEBITO', importe: 10, contraparte: 'Tomas Destino' })
+  const sinContraparte = normalizarMovimiento({ id: 2, tipo: 'DEPOSITO', signo: 'CREDITO', importe: 10 })
+
+  assert.equal(conContraparte.contraparte, 'Tomas Destino')
+  assert.equal(sinContraparte.contraparte, null)
 })

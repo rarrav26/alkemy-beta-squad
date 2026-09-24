@@ -76,6 +76,16 @@ export function formatearFechaCorta(fecha) {
   return formatoFechaCorta.format(new Date(fecha))
 }
 
+// La línea que dice con quién fue la transferencia: "Para Ana Gómez" si la mandó el usuario,
+// "De Ana Gómez" si la recibió. Lo que no es transferencia no tiene contraparte y no lleva
+// línea (null). Si llegara un tipo nuevo con contraparte, se muestra solo el nombre.
+export function detalleDeLaContraparte(movimiento) {
+  if (!movimiento.contraparte) return null
+  if (movimiento.tipoRaw === 'TRANSFERENCIA_ENVIADA') return `Para ${movimiento.contraparte}`
+  if (movimiento.tipoRaw === 'TRANSFERENCIA_RECIBIDA') return `De ${movimiento.contraparte}`
+  return movimiento.contraparte
+}
+
 // El signo que se le pone al importe. Un movimiento que el backend no sabe clasificar (signo
 // DESCONOCIDO) va sin signo: no sabemos si suma o resta, así que no lo afirmamos.
 export function prefijoDelImporte(movimiento) {
@@ -151,6 +161,8 @@ export function normalizarMovimiento(movimiento) {
     tipoRaw: tipo,
     importe: Number(movimiento.importe),
     descripcion: movimiento.descripcion || tipoMovimientoMap[tipo] || 'Movimiento',
+    // El titular de la otra cuenta en una transferencia; null en todo lo demás.
+    contraparte: movimiento.contraparte ?? null,
     // Dos booleanos y no uno: un movimiento con signo DESCONOCIDO no es crédito ni
     // débito, y con un solo flag caía del lado del débito y se pintaba en rojo.
     esCredito: movimiento.signo === 'CREDITO',

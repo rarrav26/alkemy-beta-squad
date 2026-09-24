@@ -7,7 +7,11 @@ import CallReceivedRounded from '@mui/icons-material/CallReceivedRounded'
 import SavingsRounded from '@mui/icons-material/SavingsRounded'
 import SwapHorizRounded from '@mui/icons-material/SwapHorizRounded'
 
-import { formatearFechaCorta, textoDelImporte } from '../../routes/movimientosUtils'
+import {
+  detalleDeLaContraparte,
+  formatearFechaCorta,
+  textoDelImporte
+} from '../../routes/movimientosUtils'
 
 // Un ícono por cada tipo que existe en la tabla Tipo_Movimiento. Si se agrega un tipo nuevo y
 // no se suma acá, se muestra con el ícono genérico en vez de romper la fila.
@@ -29,6 +33,9 @@ function colorDelImporte(movimiento) {
 // ícono del tipo, fecha arriba, tipo abajo e importe a la derecha. `conDivisor` separa la
 // fila de la siguiente (la última no lo lleva).
 export default function FilaDeMovimientoCompacta({ movimiento, conDivisor }) {
+  // "Para Tomas Destino" / "De Lucia Prueba": solo en transferencias; el resto no lleva línea.
+  const detalle = detalleDeLaContraparte(movimiento)
+
   return (
     <ListItem disableGutters divider={conDivisor} sx={{ gap: 2, py: 1.5 }}>
       <Avatar
@@ -45,6 +52,11 @@ export default function FilaDeMovimientoCompacta({ movimiento, conDivisor }) {
         <Typography noWrap sx={{ fontWeight: 500 }}>
           {movimiento.tipo}
         </Typography>
+        {detalle && (
+          <Typography variant="caption" component="p" noWrap sx={{ color: 'text.secondary' }}>
+            {detalle}
+          </Typography>
+        )}
       </Box>
 
       <Typography sx={{ fontWeight: 600, whiteSpace: 'nowrap', color: colorDelImporte(movimiento) }}>
