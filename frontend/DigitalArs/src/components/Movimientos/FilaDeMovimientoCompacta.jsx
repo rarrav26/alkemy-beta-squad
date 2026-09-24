@@ -25,9 +25,10 @@ function colorDelImporte(movimiento) {
   return 'text.primary'
 }
 
-// Una fila de la lista corta de movimientos: ícono del tipo, fecha arriba, tipo abajo e
-// importe a la derecha. `conDivisor` separa la fila de la siguiente (la última no lo lleva).
-export default function FilaDeUltimoMovimiento({ movimiento, conDivisor }) {
+// Una fila de movimiento en las pantallas mobile (últimos movimientos e historial completo):
+// ícono del tipo, fecha arriba, tipo abajo e importe a la derecha. `conDivisor` separa la
+// fila de la siguiente (la última no lo lleva).
+export default function FilaDeMovimientoCompacta({ movimiento, conDivisor }) {
   return (
     <ListItem disableGutters divider={conDivisor} sx={{ gap: 2, py: 1.5 }}>
       <Avatar

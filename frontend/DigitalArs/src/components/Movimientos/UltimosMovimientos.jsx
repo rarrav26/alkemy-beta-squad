@@ -9,7 +9,7 @@ import { Link as LinkDeRouter } from 'react-router-dom'
 
 import useUltimosMovimientos from '../../hooks/useUltimosMovimientos'
 import TituloDeSeccion from '../Comunes/TituloDeSeccion'
-import FilaDeUltimoMovimiento from './FilaDeUltimoMovimiento'
+import FilaDeMovimientoCompacta from './FilaDeMovimientoCompacta'
 
 // Qué se ve dentro de la tarjeta. Returns tempranos en vez de condiciones anidadas en el JSX.
 // El error va antes que el vacío: si la carga falló, no sabemos si el usuario tiene
@@ -38,7 +38,7 @@ function ContenidoDeLaLista({ cargando, error, movimientos }) {
   return (
     <List disablePadding>
       {movimientos.map((movimiento, indice) => (
-        <FilaDeUltimoMovimiento
+        <FilaDeMovimientoCompacta
           key={movimiento.id}
           movimiento={movimiento}
           conDivisor={indice < movimientos.length - 1}

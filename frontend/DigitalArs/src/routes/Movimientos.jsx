@@ -16,8 +16,10 @@ import {
   useTheme,
 } from "@mui/material";
 import { Link } from "react-router-dom";
+import HistorialMobile from "../components/Movimientos/HistorialMobile";
 import { useAuth } from "../context/authContext";
 import { ElementosGlobales } from "../context/ElementosGlobales";
+import useNavegacionMobile from "../hooks/useNavegacionMobile";
 import {
   construirConsulta,
   contarFiltrosAplicados,
@@ -239,7 +241,8 @@ export function MovimientosPreview() {
   );
 }
 
-export function MovimientosPage() {
+// El historial de escritorio: filtros en un panel y paginación con Anterior / Siguiente.
+function HistorialDeEscritorio() {
   const { obtenerMovimientos } = useAuth();
   const { darkMode } = useContext(ElementosGlobales);
   const theme = useTheme();
@@ -700,6 +703,16 @@ export function MovimientosPage() {
       </Stack>
     </Box>
   );
+}
+
+// Una vista por componente, y no un if en el medio de una sola: cada una tiene sus propios
+// hooks (la de escritorio consulta cada 15 s), y así la que no se ve no corre nada.
+export function MovimientosPage() {
+  const usaNavegacionMobile = useNavegacionMobile();
+
+  if (usaNavegacionMobile) return <HistorialMobile />;
+
+  return <HistorialDeEscritorio />;
 }
 
 export default MovimientosPage;
