@@ -1,7 +1,6 @@
 import { useState } from 'react'
 
 import Badge from '@mui/material/Badge'
-import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Divider from '@mui/material/Divider'
 import Drawer from '@mui/material/Drawer'
@@ -9,11 +8,12 @@ import IconButton from '@mui/material/IconButton'
 import Popover from '@mui/material/Popover'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
-import NotificationsIcon from '@mui/icons-material/Notifications'
+import NotificationsRounded from '@mui/icons-material/NotificationsRounded'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 
 import { useNotificaciones } from '../../context/notificacionesContext'
+import TiradorDeHoja from '../Navegacion/TiradorDeHoja'
 import ListaDeNotificaciones from './ListaDeNotificaciones'
 
 // El globito muestra hasta 9; con 10 o más, MUI lo dibuja como "9+". Con 0 lo esconde solo.
@@ -75,7 +75,7 @@ export default function CampanaDeNotificaciones() {
         aria-expanded={abierto ? 'true' : undefined}
       >
         <Badge badgeContent={noLeidas} color="error" max={TOPE_DEL_GLOBITO}>
-          <NotificationsIcon />
+          <NotificationsRounded />
         </Badge>
       </IconButton>
 
@@ -97,18 +97,7 @@ export default function CampanaDeNotificaciones() {
             }
           }}
         >
-          {/* El tirador de la hoja: indica que el panel se arrastra o se cierra hacia abajo. */}
-          <Box
-            aria-hidden="true"
-            sx={{
-              width: 36,
-              height: 4,
-              borderRadius: 2,
-              backgroundColor: 'divider',
-              mx: 'auto',
-              mt: 1.25
-            }}
-          />
+          <TiradorDeHoja />
           {panel}
         </Drawer>
       ) : (
