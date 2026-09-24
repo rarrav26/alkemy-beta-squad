@@ -3,7 +3,10 @@ import assert from 'node:assert/strict'
 import {
   construirConsulta,
   contarFiltrosAplicados,
-  filtrosIniciales
+  filtrosIniciales,
+  formatearFechaCorta,
+  prefijoDelImporte,
+  textoDelImporte
 } from '../src/routes/movimientosUtils.js'
 
 // Lo que la pantalla le pasa a construirConsulta: los filtros del panel mas la
@@ -82,4 +85,34 @@ test('cuenta cada filtro puesto una vez', () => {
 // de puros espacios no filtra nada y no tiene que sumar.
 test('una busqueda de solo espacios no cuenta como filtro', () => {
   assert.equal(contarFiltrosAplicados(filtros({ busqueda: '   ' })), 0)
+})
+
+// Intl separa "$" del número con un espacio duro; para comparar se normaliza a espacio común.
+function sinEspaciosDuros(texto) {
+  return texto.replace(/\u00a0/g, ' ')
+}
+
+test('la fecha corta se escribe como dia y mes', () => {
+  assert.equal(formatearFechaCorta('2026-09-24T15:00:00Z'), '24 de septiembre')
+})
+
+test('la fecha corta usa la hora argentina y no la del navegador', () => {
+  // 01:00 UTC del 25 son las 22:00 del 24 en Argentina.
+  assert.equal(formatearFechaCorta('2026-09-25T01:00:00Z'), '24 de septiembre')
+})
+
+test('el importe lleva signo segun sea credito, debito o desconocido', () => {
+  assert.equal(prefijoDelImporte({ esCredito: true, esDebito: false }), '+')
+  assert.equal(prefijoDelImporte({ esCredito: false, esDebito: true }), '-')
+  assert.equal(prefijoDelImporte({ esCredito: false, esDebito: false }), '')
+})
+
+test('el texto del importe junta signo y monto en pesos', () => {
+  const credito = { esCredito: true, esDebito: false, importe: 57.01 }
+  const debito = { esCredito: false, esDebito: true, importe: 2000 }
+  const desconocido = { esCredito: false, esDebito: false, importe: 10 }
+
+  assert.equal(sinEspaciosDuros(textoDelImporte(credito)), '+ $ 57,01')
+  assert.equal(sinEspaciosDuros(textoDelImporte(debito)), '- $ 2.000,00')
+  assert.equal(sinEspaciosDuros(textoDelImporte(desconocido)), '$ 10,00')
 })

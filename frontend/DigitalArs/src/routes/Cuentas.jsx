@@ -6,6 +6,7 @@ import Typography from '@mui/material/Typography'
 import EstadoDeCargaDeCuenta from '../components/Cuentas/EstadoDeCargaDeCuenta'
 import ModalesDeDinero from '../components/Cuentas/ModalesDeDinero'
 import TarjetaDeSaldo from '../components/Inicio/TarjetaDeSaldo'
+import UltimosMovimientos from '../components/Movimientos/UltimosMovimientos'
 import { ETIQUETA_DE_VARIACION_DE_MUESTRA } from '../components/Proximamente/datosDeMuestra'
 import useMiCuenta from '../hooks/useMiCuenta'
 import useOperacionesDeDinero from '../hooks/useOperacionesDeDinero'
@@ -44,6 +45,8 @@ export default function CuentasPage() {
             onAgregar={operaciones.abrirDeposito}
             onTransferir={operaciones.abrirTransferencia}
           />
+
+          <UltimosMovimientos saldo={cuenta.saldo} cantidad={4} />
         </Stack>
       )}
 

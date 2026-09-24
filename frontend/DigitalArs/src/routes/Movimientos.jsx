@@ -26,6 +26,7 @@ import {
   normalizarRespuestaMovimientos,
   opcionesTipo,
   paginaVacia,
+  prefijoDelImporte,
 } from "./movimientosUtils";
 
 const formatoPesos = new Intl.NumberFormat("es-AR", {
@@ -35,13 +36,15 @@ const formatoPesos = new Intl.NumberFormat("es-AR", {
 
 const MILISEGUNDOS_ENTRE_REFRESCOS = 15000;
 
-// Un movimiento que el backend no sabe clasificar (signo DESCONOCIDO) se muestra sin
-// signo y en color de texto normal: no sabemos si suma o resta, asi que no lo afirmamos.
+// El signo sale de prefijoDelImporte (compartido con la lista corta del Inicio y Cuentas);
+// acá solo se elige el color. Un movimiento de signo DESCONOCIDO va en color de texto normal.
 function presentacionDelImporte(movimiento) {
-  if (movimiento.esCredito) return { prefijo: "+", color: "success.main" };
-  if (movimiento.esDebito) return { prefijo: "-", color: "error.main" };
+  const prefijo = prefijoDelImporte(movimiento);
 
-  return { prefijo: "", color: "text.primary" };
+  if (movimiento.esCredito) return { prefijo, color: "success.main" };
+  if (movimiento.esDebito) return { prefijo, color: "error.main" };
+
+  return { prefijo, color: "text.primary" };
 }
 
 // Una fila del historial. La usan el preview del dashboard y la pantalla

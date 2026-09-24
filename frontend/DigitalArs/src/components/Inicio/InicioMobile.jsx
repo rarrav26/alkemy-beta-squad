@@ -10,8 +10,8 @@ import ReceiptLongRounded from '@mui/icons-material/ReceiptLongRounded'
 import SwapHorizRounded from '@mui/icons-material/SwapHorizRounded'
 import { useNavigate } from 'react-router-dom'
 
-import { MovimientosPreview } from '../../routes/Movimientos'
 import EstadoDeCargaDeCuenta from '../Cuentas/EstadoDeCargaDeCuenta'
+import UltimosMovimientos from '../Movimientos/UltimosMovimientos'
 import AvisoProximamente from '../Proximamente/AvisoProximamente'
 import {
   ATAJOS_DE_MUESTRA,
@@ -98,10 +98,10 @@ export default function InicioMobile({
           <PromoCredito promo={PROMO_DE_CREDITO_DE_MUESTRA} onElegir={mostrarAviso} />
 
           <BannerPromocional banner={BANNER_DE_MUESTRA} onElegir={mostrarAviso} />
+
+          <UltimosMovimientos saldo={cuenta.saldo} cantidad={4} />
         </Stack>
       )}
-
-      {cuenta && <MovimientosPreview />}
 
       <AvisoProximamente open={avisoAbierto} onClose={() => setAvisoAbierto(false)} />
     </Box>

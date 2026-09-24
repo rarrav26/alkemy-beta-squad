@@ -63,6 +63,39 @@ export function formatearFecha(fecha) {
   return formatoFecha.format(new Date(fecha))
 }
 
+// "24 de septiembre": la fecha de las listas cortas (últimos movimientos), donde la hora
+// sobra. La zona horaria va fija para que un movimiento de las 22 h no aparezca con la fecha
+// del día siguiente en un navegador configurado en otra zona.
+const formatoFechaCorta = new Intl.DateTimeFormat('es-AR', {
+  day: 'numeric',
+  month: 'long',
+  timeZone: 'America/Argentina/Buenos_Aires'
+})
+
+export function formatearFechaCorta(fecha) {
+  return formatoFechaCorta.format(new Date(fecha))
+}
+
+// El signo que se le pone al importe. Un movimiento que el backend no sabe clasificar (signo
+// DESCONOCIDO) va sin signo: no sabemos si suma o resta, así que no lo afirmamos.
+export function prefijoDelImporte(movimiento) {
+  if (movimiento.esCredito) return '+'
+  if (movimiento.esDebito) return '-'
+  return ''
+}
+
+const formatoPesos = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' })
+
+// "+ $ 57,01" / "- $ 2.000,00" / "$ 10,00". El importe siempre llega en positivo desde la
+// API y el signo lo decide el tipo de movimiento.
+export function textoDelImporte(movimiento) {
+  const monto = formatoPesos.format(Math.abs(movimiento.importe))
+  const prefijo = prefijoDelImporte(movimiento)
+
+  if (!prefijo) return monto
+  return `${prefijo} ${monto}`
+}
+
 // Arma los parámetros de la consulta dejando afuera los filtros vacíos: para la
 // API, un parámetro ausente significa "no filtres por esto".
 export function construirConsulta(filtros, pagina, tamanioPagina) {
