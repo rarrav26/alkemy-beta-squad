@@ -71,6 +71,10 @@ export default function BarraInferior() {
         showLabels
         value={seccionActiva}
         onChange={elegirSeccion}
+        // MUI les da 80px de ancho mínimo a las acciones: con 5 (contando el hueco del QR)
+        // suman 400px y en un teléfono de 360–375px la última ("Más") quedaba cortada. Sin
+        // mínimo, se reparten el ancho disponible en partes iguales.
+        sx={{ '& .MuiBottomNavigationAction-root': { minWidth: 0, px: 0.5 } }}
       >
         <BottomNavigationAction label="Inicio" value={SECCION_INICIO} icon={<HomeRounded />} />
         <BottomNavigationAction label="Cuentas" value={SECCION_CUENTAS} icon={<AccountBalanceRounded />} />

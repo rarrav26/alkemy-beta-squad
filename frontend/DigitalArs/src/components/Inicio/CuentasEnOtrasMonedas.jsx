@@ -16,10 +16,19 @@ export default function CuentasEnOtrasMonedas({ cuentas, onElegir }) {
     <Box component="section" aria-labelledby="titulo-otras-cuentas">
       <TituloDeSeccion id="titulo-otras-cuentas">Otras cuentas</TituloDeSeccion>
 
+      {/* La barra de scroll se oculta: en el teléfono no se usa (se desliza con el dedo) y en
+          una ventana angosta de escritorio aparecía como una franja blanca en modo noche. Que
+          se puede deslizar ya lo dice la tarjeta siguiente asomando. */}
       <Stack
         direction="row"
         spacing={1.5}
-        sx={{ overflowX: 'auto', scrollSnapType: 'x mandatory', pb: 1 }}
+        sx={{
+          overflowX: 'auto',
+          scrollSnapType: 'x mandatory',
+          pb: 1,
+          scrollbarWidth: 'none',
+          '&::-webkit-scrollbar': { display: 'none' }
+        }}
       >
         {cuentas.map(({ id, nombre, descripcion, Icono }) => (
           <Card
