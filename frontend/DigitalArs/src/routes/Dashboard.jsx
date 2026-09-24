@@ -12,8 +12,11 @@ import {
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/authContext";
 import useMiCuenta from "../hooks/useMiCuenta";
+import useNavegacionMobile from "../hooks/useNavegacionMobile";
 import AuthForm, { ProfileFields } from "../components/Auth/AuthForm";
 import DepositoModal from "../components/Cuentas/DepositoModal";
+import EstadoDeCargaDeCuenta from "../components/Cuentas/EstadoDeCargaDeCuenta";
+import InicioMobile from "../components/Inicio/InicioMobile";
 import SaldoAnimado from "../components/Cuentas/SaldoAnimado";
 import TransferenciaModal from "../components/Cuentas/TransferenciaModal";
 import { MovimientosPreview } from "./Movimientos";
@@ -30,6 +33,7 @@ export default function Dashboard() {
   const [depositoAbierto, setDepositoAbierto] = useState(false);
   const [transferenciaAbierta, setTransferenciaAbierta] = useState(false);
   const [mensajeExito, setMensajeExito] = useState("");
+  const usaNavegacionMobile = useNavegacionMobile();
 
   function depositoRealizado(resultado) {
     aplicarDeposito(resultado);
@@ -39,6 +43,55 @@ export default function Dashboard() {
   function transferenciaRealizada(resultado) {
     aplicarTransferencia(resultado);
     setMensajeExito(resultado?.message || 'Transferencia realizada con éxito.');
+  }
+
+  // Al abrir una operación nueva se borra el aviso de la anterior, para que no quede un
+  // "Transferencia realizada" viejo arriba de un depósito que recién empieza.
+  function abrirDeposito() {
+    setMensajeExito("");
+    setDepositoAbierto(true);
+  }
+
+  function abrirTransferencia() {
+    setMensajeExito("");
+    setTransferenciaAbierta(true);
+  }
+
+  // Los modales son los mismos para la vista de escritorio y la mobile: solo cambia el botón
+  // que los abre.
+  const modalesDeDinero = !esAdmin && cuenta && (
+    <>
+      <DepositoModal
+        open={depositoAbierto}
+        onClose={() => setDepositoAbierto(false)}
+        onDepositoRealizado={depositoRealizado}
+      />
+      <TransferenciaModal
+        open={transferenciaAbierta}
+        onClose={() => setTransferenciaAbierta(false)}
+        saldoDisponible={cuenta.saldo}
+        onTransferenciaRealizada={transferenciaRealizada}
+      />
+    </>
+  );
+
+  // useNavegacionMobile ya deja afuera al administrador: esta rama es solo del usuario regular.
+  if (usaNavegacionMobile) {
+    return (
+      <>
+        <InicioMobile
+          cuenta={cuenta}
+          cargando={cargando}
+          error={error}
+          onReintentar={reintentar}
+          mensajeExito={mensajeExito}
+          onCerrarMensajeExito={() => setMensajeExito("")}
+          onAgregar={abrirDeposito}
+          onTransferir={abrirTransferencia}
+        />
+        {modalesDeDinero}
+      </>
+    );
   }
 
   return (
@@ -73,26 +126,11 @@ export default function Dashboard() {
             </>
           ) : (
             <Box sx={{ width: "100%" }} aria-busy={cargando}>
-              {cargando && (
-                <Typography role="status">Cargando tu cuenta…</Typography>
-              )}
-
-              {!cargando && error && (
-                <Alert
-                  severity="error"
-                  action={
-                    <Button
-                      color="inherit"
-                      size="small"
-                      onClick={reintentar}
-                    >
-                      Reintentar
-                    </Button>
-                  }
-                >
-                  {error}
-                </Alert>
-              )}
+              <EstadoDeCargaDeCuenta
+                cargando={cargando}
+                error={error}
+                onReintentar={reintentar}
+              />
 
               {!cargando && !error && cuenta && (
                 <Stack spacing={2}>
@@ -114,23 +152,11 @@ export default function Dashboard() {
                   )}
 
                   <Stack direction='row' spacing={2}>
-                    <Button
-                      variant='contained'
-                      onClick={() => {
-                        setMensajeExito('')
-                        setDepositoAbierto(true)
-                      }}
-                    >
+                    <Button variant='contained' onClick={abrirDeposito}>
                       Ingresar dinero
                     </Button>
 
-                    <Button
-                      variant='outlined'
-                      onClick={() => {
-                        setMensajeExito('')
-                        setTransferenciaAbierta(true)
-                      }}
-                    >
+                    <Button variant='outlined' onClick={abrirTransferencia}>
                       Transferir dinero
                     </Button>
                   </Stack>
@@ -155,21 +181,7 @@ export default function Dashboard() {
         </Stack>
       </Paper>
       {!esAdmin && cuenta && <MovimientosPreview />}
-      {!esAdmin && cuenta && (
-        <>
-          <DepositoModal
-            open={depositoAbierto}
-            onClose={() => setDepositoAbierto(false)}
-            onDepositoRealizado={depositoRealizado}
-          />
-          <TransferenciaModal
-            open={transferenciaAbierta}
-            onClose={() => setTransferenciaAbierta(false)}
-            saldoDisponible={cuenta.saldo}
-            onTransferenciaRealizada={transferenciaRealizada}
-          />
-        </>
-      )}
+      {modalesDeDinero}
     </Box>
   );
 }

@@ -1,0 +1,36 @@
+import Avatar from '@mui/material/Avatar'
+import ButtonBase from '@mui/material/ButtonBase'
+import Typography from '@mui/material/Typography'
+
+// Un acceso con ícono en un círculo y el texto debajo. Lo usan las acciones de la tarjeta de
+// saldo y la grilla de atajos, así las dos se ven y responden igual al tocarlas.
+//
+// Es un botón con texto visible, así que el lector de pantalla lee la etiqueta: el ícono es
+// decorativo y se oculta.
+export default function Atajo({ etiqueta, Icono, onClick }) {
+  return (
+    <ButtonBase
+      onClick={onClick}
+      sx={{
+        width: '100%',
+        flexDirection: 'column',
+        gap: 0.75,
+        p: 0.5,
+        borderRadius: 2,
+        transition: 'transform 120ms ease-out',
+        // Pequeño "hundimiento" al tocar: en una pantalla táctil no hay hover, y sin esto el
+        // usuario no tiene confirmación de que el toque se registró.
+        '&:active': { transform: 'scale(0.95)' },
+        '&.Mui-focusVisible': { outline: '2px solid', outlineColor: 'primary.main' }
+      }}
+    >
+      <Avatar sx={{ width: 48, height: 48, bgcolor: 'action.hover', color: 'primary.main' }}>
+        <Icono aria-hidden="true" />
+      </Avatar>
+
+      <Typography variant="caption" sx={{ color: 'text.primary', textAlign: 'center', lineHeight: 1.2 }}>
+        {etiqueta}
+      </Typography>
+    </ButtonBase>
+  )
+}
