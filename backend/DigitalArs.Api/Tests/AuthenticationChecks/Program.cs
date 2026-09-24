@@ -119,6 +119,200 @@ Check(!DatosDeCuenta.EsDestinoValido("000000310000001234567X"), "Destino: rechaz
 Check(!DatosDeCuenta.EsDestinoValido(""), "Destino: rechaza vacío");
 Check(!DatosDeCuenta.EsDestinoValido(null), "Destino: rechaza nulo");
 
+// ==========================================================================================
+// TARJETAS
+// ==========================================================================================
+
+// --- Número: forma y dígito verificador de Luhn ---
+// Se sortean varios porque la generación es aleatoria: uno solo podría pasar por casualidad.
+for (var intento = 0; intento < 200; intento++)
+{
+    var sorteado = DatosDeTarjeta.SortearNumero();
+
+    if (sorteado.Length != DatosDeTarjeta.LargoNumero)
+        throw new Exception("Número de tarjeta: largo incorrecto -> " + sorteado);
+
+    if (!sorteado.StartsWith(DatosDeTarjeta.PrefijoEmisor))
+        throw new Exception("Número de tarjeta: prefijo incorrecto -> " + sorteado);
+
+    if (!sorteado.All(char.IsAsciiDigit))
+        throw new Exception("Número de tarjeta: tiene caracteres que no son dígitos -> " + sorteado);
+
+    if (!DatosDeTarjeta.EsNumeroValido(sorteado))
+        throw new Exception("Número de tarjeta: no pasa Luhn -> " + sorteado);
+}
+Console.WriteLine("PASS: Número de tarjeta: 200 sorteos con largo, prefijo y Luhn válidos");
+
+// Dos sorteos seguidos tienen que dar distinto: si dieran siempre lo mismo, el número sería
+// en la práctica derivado de la cuenta y chocaría con UQ_Tarjetas_Numero al regenerar.
+Check(DatosDeTarjeta.SortearNumero() != DatosDeTarjeta.SortearNumero(),
+    "Número de tarjeta: dos sorteos dan números distintos");
+
+// Luhn contra un número de prueba público conocido (el de la documentación de Visa).
+Check(DatosDeTarjeta.EsNumeroValido("4111111111111111"),
+    "Luhn: acepta el número de prueba conocido de Visa");
+Check(!DatosDeTarjeta.EsNumeroValido("4111111111111112"),
+    "Luhn: rechaza ese mismo número con el último dígito cambiado");
+Check(!DatosDeTarjeta.EsNumeroValido("4000123456789012"),
+    "Luhn: rechaza un número de 16 dígitos con verificador incorrecto");
+Check(!DatosDeTarjeta.EsNumeroValido("400011111111111"),
+    "Luhn: rechaza 15 dígitos");
+Check(!DatosDeTarjeta.EsNumeroValido("41111111111111111"),
+    "Luhn: rechaza 17 dígitos");
+Check(!DatosDeTarjeta.EsNumeroValido("4111-1111-1111-1111"),
+    "Luhn: rechaza el número con guiones");
+Check(!DatosDeTarjeta.EsNumeroValido(""), "Luhn: rechaza vacío");
+Check(!DatosDeTarjeta.EsNumeroValido(null), "Luhn: rechaza nulo");
+
+// El verificador tiene que ser un solo dígito, y agregárselo al cuerpo tiene que dar un
+// número válido. Se prueba con un cuerpo de 15 dígitos, que es lo que recibe en producción.
+var cuerpoDePrueba = "400011112222333";
+var verificador = DatosDeTarjeta.DigitoVerificador(cuerpoDePrueba);
+Check(verificador is >= 0 and <= 9, "Dígito verificador: es un solo dígito");
+Check(DatosDeTarjeta.EsNumeroValido(cuerpoDePrueba + verificador),
+    "Dígito verificador: el número queda válido al agregarlo");
+
+// --- Vencimiento ---
+// Fecha fija para que el chequeo no dependa del día en que se corre.
+var hoyDePrueba = new DateOnly(2026, 9, 23);
+var vence = DatosDeTarjeta.VencimientoDesde(hoyDePrueba);
+Check(vence.Year == 2029, "Vencimiento: suma 3 años");
+Check(vence.Month == 9, "Vencimiento: conserva el mes");
+Check(vence.Day == 30, "Vencimiento: cae el último día del mes (septiembre tiene 30)");
+
+// Febrero es el caso que rompe si se asume que todos los meses tienen 30 o 31 días.
+Check(DatosDeTarjeta.VencimientoDesde(new DateOnly(2026, 2, 10)).Day == 28,
+    "Vencimiento: febrero no bisiesto cae el 28");
+Check(DatosDeTarjeta.VencimientoDesde(new DateOnly(2029, 2, 10)).Day == 29,
+    "Vencimiento: febrero bisiesto cae el 29");
+
+// El último día del mes todavía NO está vencida: por eso se guarda el último día y no el 1.
+Check(!DatosDeTarjeta.EstaVencida(vence, vence),
+    "Vencimiento: el último día de vigencia no está vencida");
+Check(DatosDeTarjeta.EstaVencida(vence, vence.AddDays(1)),
+    "Vencimiento: al día siguiente sí está vencida");
+Check(!DatosDeTarjeta.EstaVencida(vence, hoyDePrueba),
+    "Vencimiento: una tarjeta recién generada no está vencida");
+
+// --- Código de seguridad ---
+// Se sortean muchos para que salgan los casos con ceros adelante, que son los que se
+// pierden si se formatea mal.
+for (var intento = 0; intento < 500; intento++)
+{
+    var codigo = DatosDeTarjeta.SortearCodigoDeSeguridad();
+
+    if (codigo.Length != 3)
+        throw new Exception("Código de seguridad: no tiene 3 dígitos -> " + codigo);
+
+    if (!codigo.All(char.IsAsciiDigit))
+        throw new Exception("Código de seguridad: tiene caracteres que no son dígitos -> " + codigo);
+}
+Console.WriteLine("PASS: Código de seguridad: 500 sorteos de 3 dígitos, ceros adelante incluidos");
+
+// --- Enmascarado: nunca puede dejar salir el número completo ---
+Check(DatosDeTarjeta.UltimosCuatro("4000111122223333") == "3333",
+    "Enmascarado: devuelve los últimos 4 dígitos");
+Check(DatosDeTarjeta.UltimosCuatro("4000111122223333").Length == 4,
+    "Enmascarado: devuelve exactamente 4 dígitos y no el número entero");
+
+// --- Estados y transiciones ---
+Check(EstadoDeTarjeta.EsEstadoConocido(EstadoDeTarjeta.Activa), "Estado: ACTIVA es conocido");
+Check(EstadoDeTarjeta.EsEstadoConocido(EstadoDeTarjeta.Congelada), "Estado: CONGELADA es conocido");
+Check(EstadoDeTarjeta.EsEstadoConocido(EstadoDeTarjeta.DadaDeBaja), "Estado: DADA_DE_BAJA es conocido");
+Check(!EstadoDeTarjeta.EsEstadoConocido("VENCIDA"), "Estado: rechaza un estado inventado");
+Check(!EstadoDeTarjeta.EsEstadoConocido(null), "Estado: rechaza nulo");
+
+// Vigente = ocupa el lugar de la única tarjeta de la cuenta. Tiene que decir lo mismo que el
+// filtro del índice UQ_Tarjetas_CuentaVigente.
+Check(EstadoDeTarjeta.EsVigente(EstadoDeTarjeta.Activa), "Vigente: la activa ocupa el lugar");
+Check(EstadoDeTarjeta.EsVigente(EstadoDeTarjeta.Congelada), "Vigente: la CONGELADA también ocupa el lugar");
+Check(!EstadoDeTarjeta.EsVigente(EstadoDeTarjeta.DadaDeBaja), "Vigente: la dada de baja libera el lugar");
+
+// El criterio de aceptación de congelar: la congelada no permite revelar el código.
+Check(EstadoDeTarjeta.PuedeRevelarseElCodigo(EstadoDeTarjeta.Activa),
+    "Revelar: se permite con la tarjeta activa");
+Check(!EstadoDeTarjeta.PuedeRevelarseElCodigo(EstadoDeTarjeta.Congelada),
+    "Revelar: NO se permite con la tarjeta congelada");
+Check(!EstadoDeTarjeta.PuedeRevelarseElCodigo(EstadoDeTarjeta.DadaDeBaja),
+    "Revelar: NO se permite con la tarjeta dada de baja");
+
+Check(EstadoDeTarjeta.PuedeCongelarse(EstadoDeTarjeta.Activa), "Congelar: se puede desde ACTIVA");
+Check(!EstadoDeTarjeta.PuedeCongelarse(EstadoDeTarjeta.Congelada), "Congelar: no se recongela");
+Check(!EstadoDeTarjeta.PuedeCongelarse(EstadoDeTarjeta.DadaDeBaja), "Congelar: no se puede desde la baja");
+
+Check(EstadoDeTarjeta.PuedeDescongelarse(EstadoDeTarjeta.Congelada), "Descongelar: se puede desde CONGELADA");
+Check(!EstadoDeTarjeta.PuedeDescongelarse(EstadoDeTarjeta.Activa), "Descongelar: la activa ya está descongelada");
+
+// El criterio de aceptación de la baja: es terminal, no se revierte por ningún camino.
+Check(!EstadoDeTarjeta.PuedeDescongelarse(EstadoDeTarjeta.DadaDeBaja),
+    "Baja es terminal: una tarjeta dada de baja NO se descongela");
+Check(!EstadoDeTarjeta.PuedeCongelarse(EstadoDeTarjeta.DadaDeBaja),
+    "Baja es terminal: una tarjeta dada de baja NO se congela");
+Check(!EstadoDeTarjeta.PuedeDarseDeBaja(EstadoDeTarjeta.DadaDeBaja),
+    "Baja es terminal: no se da de baja dos veces");
+
+Check(EstadoDeTarjeta.PuedeDarseDeBaja(EstadoDeTarjeta.Activa), "Baja: se puede desde ACTIVA");
+Check(EstadoDeTarjeta.PuedeDarseDeBaja(EstadoDeTarjeta.Congelada),
+    "Baja: se puede desde CONGELADA en un solo paso");
+
+// --- Pago con tarjeta: signo y filtros ---
+// El pago tiene que entrar en la taxonomía que ya existe, no quedar como DESCONOCIDO.
+Check(SignoDeMovimiento.DeTipo(SignoDeMovimiento.TipoPagoConTarjeta) == SignoDeMovimiento.Debito,
+    "Pago con tarjeta: es un DEBITO, igual que una transferencia enviada");
+Check(SignoDeMovimiento.DeTipo(SignoDeMovimiento.TipoPagoConTarjeta) != SignoDeMovimiento.Desconocido,
+    "Pago con tarjeta: NO queda como tipo desconocido");
+Check(SignoDeMovimiento.TiposDelFiltro("debito").Contains(SignoDeMovimiento.TipoPagoConTarjeta),
+    "Pago con tarjeta: entra en el filtro de débitos");
+Check(!SignoDeMovimiento.TiposDelFiltro("credito").Contains(SignoDeMovimiento.TipoPagoConTarjeta),
+    "Pago con tarjeta: NO entra en el filtro de créditos");
+// El texto tiene que coincidir con la fila del catálogo que inserta Create(v.004).sql.
+Check(SignoDeMovimiento.TipoPagoConTarjeta == "PAGO_CON_TARJETA",
+    "Pago con tarjeta: el texto coincide con el catálogo de la base");
+
+// --- El otro lado del pago: quien cobra ---
+Check(SignoDeMovimiento.DeTipo(SignoDeMovimiento.TipoPagoRecibido) == SignoDeMovimiento.Credito,
+    "Pago recibido: es un CREDITO para quien cobra");
+Check(SignoDeMovimiento.TiposDelFiltro("credito").Contains(SignoDeMovimiento.TipoPagoRecibido),
+    "Pago recibido: entra en el filtro de créditos");
+Check(SignoDeMovimiento.TipoPagoRecibido == "PAGO_RECIBIDO",
+    "Pago recibido: el texto coincide con el catálogo de la base");
+// Los dos lados tienen signos opuestos: si coincidieran, un pago sumaría o restaría dos veces.
+Check(SignoDeMovimiento.DeTipo(SignoDeMovimiento.TipoPagoConTarjeta)
+   != SignoDeMovimiento.DeTipo(SignoDeMovimiento.TipoPagoRecibido),
+    "Pago: los dos lados tienen signos opuestos");
+
+// --- Número de operación ---
+var fechaDeOperacion = new DateTime(2026, 9, 24, 12, 30, 0, DateTimeKind.Utc);
+Check(DatosDeTarjeta.NumeroDeOperacion(fechaDeOperacion, 42) == "20260924-000042",
+    "Número de operación: formato fecha-id con ceros adelante");
+// Dos movimientos distintos no pueden compartir número: el id del movimiento ya es único.
+Check(DatosDeTarjeta.NumeroDeOperacion(fechaDeOperacion, 42)
+   != DatosDeTarjeta.NumeroDeOperacion(fechaDeOperacion, 43),
+    "Número de operación: dos pagos del mismo día no lo comparten");
+
+// --- Tipos de evento de la bitácora ---
+// Tienen que coincidir con el CHECK CK_TarjetaEventos_Tipo: un typo acá sería un error al
+// insertar, que recién aparecería en ejecución.
+Check(TipoDeEventoDeTarjeta.Generada == "GENERADA", "Evento: GENERADA coincide con el CHECK");
+Check(TipoDeEventoDeTarjeta.Congelada == "CONGELADA", "Evento: CONGELADA coincide con el CHECK");
+Check(TipoDeEventoDeTarjeta.Descongelada == "DESCONGELADA", "Evento: DESCONGELADA coincide con el CHECK");
+Check(TipoDeEventoDeTarjeta.DadaDeBaja == "DADA_DE_BAJA", "Evento: DADA_DE_BAJA coincide con el CHECK");
+
+// DESCONGELADA es un evento que NO tiene estado equivalente: la tarjeta vuelve a ACTIVA. Es la
+// razón por la que las dos listas no se pueden unificar.
+Check(!EstadoDeTarjeta.EsEstadoConocido(TipoDeEventoDeTarjeta.Descongelada),
+    "Evento: DESCONGELADA no es un estado de tarjeta, y por eso las dos listas son distintas");
+
+// --- Mensajes de notificación de tarjeta ---
+// Nunca pueden llevar el número completo ni el código: quedan guardados para siempre.
+var numeroCompletoDePrueba = "4000111122223333";
+var mensajeCongelada = MensajesDeNotificacion.TarjetaCongelada(
+    DatosDeTarjeta.UltimosCuatro(numeroCompletoDePrueba));
+Check(!mensajeCongelada.Contains(numeroCompletoDePrueba),
+    "Aviso de tarjeta: no incluye el número completo");
+Check(mensajeCongelada.Contains("3333"),
+    "Aviso de tarjeta: incluye los últimos 4 para que el usuario sepa de qué tarjeta habla");
+
 Console.WriteLine("Todas las verificaciones pasaron.");
 
 Task<string> CrearInvitacion(IdentityUser usuario) =>

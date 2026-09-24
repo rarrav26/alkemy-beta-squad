@@ -23,6 +23,7 @@ import useNavegacionMobile from "../hooks/useNavegacionMobile";
 import {
   construirConsulta,
   contarFiltrosAplicados,
+  descripcionConTarjeta,
   detalleDeLaContraparte,
   filtrosIniciales,
   formatearFecha,
@@ -93,7 +94,7 @@ function FilaDeMovimiento({ movimiento }) {
 
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography fontWeight={700} sx={{ lineHeight: 1.3 }}>
-            {movimiento.descripcion}
+            {descripcionConTarjeta(movimiento)}
           </Typography>
           {detalle && (
             <Typography variant="body2" sx={{ color: "text.secondary" }}>

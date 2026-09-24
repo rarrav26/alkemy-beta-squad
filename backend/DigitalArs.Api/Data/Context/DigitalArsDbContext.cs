@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using DigitalArs.Api.Data.Entities;
+using DigitalArs.Api.Helpers.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace DigitalArs.Api.Data.Context;
@@ -17,6 +18,10 @@ public partial class DigitalArsDbContext : DbContext
     public virtual DbSet<Movimiento> Movimientos { get; set; }
 
     public virtual DbSet<Tipo_Movimiento> Tipo_Movimientos { get; set; }
+
+    public virtual DbSet<Tarjeta> Tarjetas { get; set; }
+
+    public virtual DbSet<TarjetaEvento> TarjetaEventos { get; set; }
 
     public virtual DbSet<Usuario> Usuarios { get; set; }
 
@@ -70,6 +75,67 @@ public partial class DigitalArsDbContext : DbContext
 
             entity.Property(e => e.id).ValueGeneratedNever();
             entity.Property(e => e.descripcion).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<Tarjeta>(entity =>
+        {
+            entity.HasIndex(e => e.numero, "UQ_Tarjetas_Numero").IsUnique();
+
+            // "Una unica tarjeta vigente por cuenta". HasFilter es lo que traduce el indice
+            // filtrado de la base (WHERE estado IN (...)): sin el, EF creeria que la
+            // unicidad aplica a TODAS las filas de la cuenta y una tarjeta dada de baja
+            // impediria generar otra.
+            // El filtro se escribe con los nombres de columna de SQL, no de C#, porque es
+            // SQL crudo que EF pega tal cual. Está copiado EXACTO de como lo devuelve
+            // sys.indexes.filter_definition (con el espacio después de la coma): si difiere,
+            // un scaffold futuro lo ve como un cambio y genera una migración al aire.
+            entity.HasIndex(e => e.cuenta_id, "UQ_Tarjetas_CuentaVigente")
+                .IsUnique()
+                .HasFilter("([estado] IN ('ACTIVA', 'CONGELADA'))");
+
+            entity.Property(e => e.numero)
+                .HasMaxLength(16)
+                .IsUnicode(false);
+            entity.Property(e => e.cvv)
+                .HasMaxLength(3)
+                .IsFixedLength()
+                .IsUnicode(false);
+            entity.Property(e => e.estado)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasDefaultValue(EstadoDeTarjeta.Activa, "DF_Tarjetas_Estado");
+            entity.Property(e => e.fecha_alta)
+                .HasPrecision(3)
+                .HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.fecha_baja).HasPrecision(3);
+
+            entity.HasOne(d => d.cuenta).WithMany(p => p.Tarjetas)
+                .HasForeignKey(d => d.cuenta_id)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Tarjetas_Cuentas");
+        });
+
+        modelBuilder.Entity<TarjetaEvento>(entity =>
+        {
+            entity.ToTable("TarjetaEventos");
+
+            entity.HasIndex(e => new { e.tarjeta_id, e.fecha }, "IX_TarjetaEventos_Tarjeta_Fecha")
+                .IsDescending(false, true);
+
+            entity.Property(e => e.tipo)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+            entity.Property(e => e.fecha)
+                .HasPrecision(3)
+                .HasDefaultValueSql("(sysutcdatetime())");
+
+            // Sin navegación a Tarjeta: la FK la hace cumplir SQL Server y nadie recorre la
+            // relación desde código. Mismo criterio que usó el equipo con Notificacion.
+            entity.HasOne<Tarjeta>()
+                .WithMany()
+                .HasForeignKey(e => e.tarjeta_id)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_TarjetaEventos_Tarjetas");
         });
 
         modelBuilder.Entity<Usuario>(entity =>

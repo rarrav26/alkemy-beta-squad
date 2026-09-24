@@ -102,6 +102,7 @@ public class HistorialService(
             Tipo: movimiento.Tipo,
             Signo: SignoDeMovimiento.DeTipo(movimiento.Tipo),
             Importe: movimiento.Importe,
+            UltimosCuatro: movimiento.UltimosCuatro,
             Contraparte: NombreDeLaContraparte(movimiento.Contraparte));
 
     // Lo que no es transferencia no tiene contraparte, y viaja como null.

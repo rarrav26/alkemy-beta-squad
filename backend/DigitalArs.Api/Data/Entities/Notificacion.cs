@@ -20,9 +20,14 @@ public class Notificacion
     // A quién se le avisa. Es Usuarios.id, no el id de Identity.
     public int usuario_id { get; set; }
 
-    // El movimiento que originó el aviso. De acá sale el tipo de evento sin
-    // guardarlo de nuevo en esta tabla.
-    public int movimiento_id { get; set; }
+    // El movimiento que originó el aviso, cuando hay uno. De acá sale el tipo de
+    // evento sin guardarlo de nuevo en esta tabla.
+    //
+    // NULLABLE: no todo aviso nace de un movimiento de dinero. Las operaciones de
+    // tarjeta (congelar, descongelar, generar, dar de baja) le interesan al usuario
+    // y no mueven plata, así que no tienen movimiento al que apuntar. Ver
+    // database/Notificaciones(v.002).sql.
+    public int? movimiento_id { get; set; }
 
     public string titulo { get; set; } = null!;
 

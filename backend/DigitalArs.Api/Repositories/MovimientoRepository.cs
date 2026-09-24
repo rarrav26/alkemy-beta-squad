@@ -39,22 +39,36 @@ public class MovimientoRepository(DigitalArsDbContext context)
             .ThenByDescending(movimiento => movimiento.id)
             .Skip((int)aSaltear)
             .Take(filtro.PageSize)
-            // La contraparte: una transferencia se guarda como dos movimientos (el débito de
-            // quien envía y el crédito de quien recibe) que comparten transferencia_id. Es el
-            // titular de la cuenta del OTRO movimiento con ese mismo transferencia_id.
-            //
-            // La subconsulta va escrita acá adentro y no en un método aparte a propósito: así
-            // EF la traduce a SQL y sale todo en UNA consulta. En un método, EF la correría
-            // fila por fila mientras todavía está leyendo la página.
-            //
-            // "transferencia_id != null" no es redundante: EF compara con la semántica de C#,
-            // donde null == null da verdadero. Sin esa condición, un depósito (que no tiene
-            // transferencia_id) encontraría como "contraparte" a cualquier otro depósito.
+            // Las dos subconsultas de abajo van escritas acá adentro y no en métodos aparte a
+            // propósito: así EF las traduce a SQL y sale todo en UNA consulta. En un método, EF
+            // las correría fila por fila mientras todavía está leyendo la página.
             .Select(movimiento => new MovimientoLeido(
                 movimiento.id,
                 movimiento.fecha,
                 movimiento.tipo_movimiento.descripcion,
                 movimiento.importe,
+                // Los últimos cuatro dígitos de la tarjeta del pago, o null si el movimiento no
+                // salió de una tarjeta.
+                //
+                // Se traen SOLO los últimos cuatro con Substring, no el número completo: así el
+                // número entero nunca sale de la base para una consulta de historial, aunque
+                // alguien agregue un log de la respuesta más adelante.
+                //
+                // Substring de EF se traduce a SUBSTRING de SQL Server, que cuenta desde 1: para
+                // los últimos 4 de un número de 16 dígitos, arranca en la posición 13.
+                movimiento.tarjeta_id == null
+                    ? null
+                    : context.Tarjetas
+                        .Where(t => t.id == movimiento.tarjeta_id)
+                        .Select(t => t.numero.Substring(12, 4))
+                        .FirstOrDefault(),
+                // La contraparte: una transferencia se guarda como dos movimientos (el débito de
+                // quien envía y el crédito de quien recibe) que comparten transferencia_id. Es el
+                // titular de la cuenta del OTRO movimiento con ese mismo transferencia_id.
+                //
+                // "transferencia_id != null" no es redundante: EF compara con la semántica de C#,
+                // donde null == null da verdadero. Sin esa condición, un depósito (que no tiene
+                // transferencia_id) encontraría como "contraparte" a cualquier otro depósito.
                 context.Movimientos
                     .Where(otro => movimiento.transferencia_id != null
                         && otro.transferencia_id == movimiento.transferencia_id
