@@ -11,18 +11,17 @@ import SwapHorizRounded from '@mui/icons-material/SwapHorizRounded'
 import { useNavigate } from 'react-router-dom'
 
 import { MovimientosPreview } from '../../routes/Movimientos'
-import AliasYCvuDialog from '../Cuentas/AliasYCvuDialog'
 import EstadoDeCargaDeCuenta from '../Cuentas/EstadoDeCargaDeCuenta'
 import AvisoProximamente from '../Proximamente/AvisoProximamente'
-import BannerPromocional from './BannerPromocional'
-import CuentasEnOtrasMonedas from './CuentasEnOtrasMonedas'
 import {
   ATAJOS_DE_MUESTRA,
   BANNER_DE_MUESTRA,
   CUENTAS_DE_MUESTRA,
   ETIQUETA_DE_VARIACION_DE_MUESTRA,
   PROMO_DE_CREDITO_DE_MUESTRA
-} from './datosDeMuestra'
+} from '../Proximamente/datosDeMuestra'
+import BannerPromocional from './BannerPromocional'
+import CuentasEnOtrasMonedas from './CuentasEnOtrasMonedas'
 import GrillaDeAtajos from './GrillaDeAtajos'
 import PromoCredito from './PromoCredito'
 import TarjetaDeSaldo from './TarjetaDeSaldo'
@@ -53,7 +52,6 @@ export default function InicioMobile({
   onTransferir
 }) {
   const navegar = useNavigate()
-  const [aliasYCvuAbierto, setAliasYCvuAbierto] = useState(false)
   const [avisoAbierto, setAvisoAbierto] = useState(false)
 
   const atajosReales = [
@@ -87,11 +85,10 @@ export default function InicioMobile({
           )}
 
           <TarjetaDeSaldo
-            saldo={cuenta.saldo}
+            cuenta={cuenta}
             etiquetaDeVariacion={ETIQUETA_DE_VARIACION_DE_MUESTRA}
             onAgregar={onAgregar}
             onTransferir={onTransferir}
-            onVerAliasYCvu={() => setAliasYCvuAbierto(true)}
           />
 
           <CuentasEnOtrasMonedas cuentas={CUENTAS_DE_MUESTRA} onElegir={mostrarAviso} />
@@ -105,15 +102,6 @@ export default function InicioMobile({
       )}
 
       {cuenta && <MovimientosPreview />}
-
-      {cuenta && (
-        <AliasYCvuDialog
-          open={aliasYCvuAbierto}
-          onClose={() => setAliasYCvuAbierto(false)}
-          alias={cuenta.alias}
-          cvu={cuenta.cvu}
-        />
-      )}
 
       <AvisoProximamente open={avisoAbierto} onClose={() => setAvisoAbierto(false)} />
     </Box>

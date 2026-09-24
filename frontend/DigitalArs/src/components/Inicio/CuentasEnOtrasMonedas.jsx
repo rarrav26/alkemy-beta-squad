@@ -6,7 +6,7 @@ import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 
 import ChipProximamente from '../Proximamente/ChipProximamente'
-import TituloDeSeccion from './TituloDeSeccion'
+import TituloDeSeccion from '../Comunes/TituloDeSeccion'
 
 // Fila con scroll horizontal de cuentas en otras monedas. Cada tarjeta ocupa el 75% del ancho
 // para que asome la siguiente: así se entiende sin explicación que hay más deslizando.

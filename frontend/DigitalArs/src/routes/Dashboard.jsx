@@ -13,12 +13,12 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/authContext";
 import useMiCuenta from "../hooks/useMiCuenta";
 import useNavegacionMobile from "../hooks/useNavegacionMobile";
+import useOperacionesDeDinero from "../hooks/useOperacionesDeDinero";
 import AuthForm, { ProfileFields } from "../components/Auth/AuthForm";
-import DepositoModal from "../components/Cuentas/DepositoModal";
 import EstadoDeCargaDeCuenta from "../components/Cuentas/EstadoDeCargaDeCuenta";
 import InicioMobile from "../components/Inicio/InicioMobile";
+import ModalesDeDinero from "../components/Cuentas/ModalesDeDinero";
 import SaldoAnimado from "../components/Cuentas/SaldoAnimado";
-import TransferenciaModal from "../components/Cuentas/TransferenciaModal";
 import { MovimientosPreview } from "./Movimientos";
 import { getSessionUser } from "./dashboardUtils";
 import { esAdministrador } from "./rolesUtils";
@@ -30,49 +30,13 @@ export default function Dashboard() {
   // El administrador usa el panel de gestión: no tiene cuenta que cargar.
   const { cuenta, cargando, error, reintentar, aplicarDeposito, aplicarTransferencia } =
     useMiCuenta({ habilitado: !esAdmin });
-  const [depositoAbierto, setDepositoAbierto] = useState(false);
-  const [transferenciaAbierta, setTransferenciaAbierta] = useState(false);
-  const [mensajeExito, setMensajeExito] = useState("");
+  const operaciones = useOperacionesDeDinero({ aplicarDeposito, aplicarTransferencia });
   const usaNavegacionMobile = useNavegacionMobile();
-
-  function depositoRealizado(resultado) {
-    aplicarDeposito(resultado);
-    setMensajeExito(resultado.message);
-  }
-
-  function transferenciaRealizada(resultado) {
-    aplicarTransferencia(resultado);
-    setMensajeExito(resultado?.message || 'Transferencia realizada con éxito.');
-  }
-
-  // Al abrir una operación nueva se borra el aviso de la anterior, para que no quede un
-  // "Transferencia realizada" viejo arriba de un depósito que recién empieza.
-  function abrirDeposito() {
-    setMensajeExito("");
-    setDepositoAbierto(true);
-  }
-
-  function abrirTransferencia() {
-    setMensajeExito("");
-    setTransferenciaAbierta(true);
-  }
 
   // Los modales son los mismos para la vista de escritorio y la mobile: solo cambia el botón
   // que los abre.
   const modalesDeDinero = !esAdmin && cuenta && (
-    <>
-      <DepositoModal
-        open={depositoAbierto}
-        onClose={() => setDepositoAbierto(false)}
-        onDepositoRealizado={depositoRealizado}
-      />
-      <TransferenciaModal
-        open={transferenciaAbierta}
-        onClose={() => setTransferenciaAbierta(false)}
-        saldoDisponible={cuenta.saldo}
-        onTransferenciaRealizada={transferenciaRealizada}
-      />
-    </>
+    <ModalesDeDinero operaciones={operaciones} saldoDisponible={cuenta.saldo} />
   );
 
   // useNavegacionMobile ya deja afuera al administrador: esta rama es solo del usuario regular.
@@ -84,10 +48,10 @@ export default function Dashboard() {
           cargando={cargando}
           error={error}
           onReintentar={reintentar}
-          mensajeExito={mensajeExito}
-          onCerrarMensajeExito={() => setMensajeExito("")}
-          onAgregar={abrirDeposito}
-          onTransferir={abrirTransferencia}
+          mensajeExito={operaciones.mensajeExito}
+          onCerrarMensajeExito={operaciones.cerrarMensajeExito}
+          onAgregar={operaciones.abrirDeposito}
+          onTransferir={operaciones.abrirTransferencia}
         />
         {modalesDeDinero}
       </>
@@ -142,21 +106,21 @@ export default function Dashboard() {
                     <SaldoAnimado valor={cuenta.saldo} />
                   </Box>
 
-                  {mensajeExito && (
+                  {operaciones.mensajeExito && (
                     <Alert
                       severity="success"
-                      onClose={() => setMensajeExito("")}
+                      onClose={operaciones.cerrarMensajeExito}
                     >
-                      {mensajeExito}
+                      {operaciones.mensajeExito}
                     </Alert>
                   )}
 
                   <Stack direction='row' spacing={2}>
-                    <Button variant='contained' onClick={abrirDeposito}>
+                    <Button variant='contained' onClick={operaciones.abrirDeposito}>
                       Ingresar dinero
                     </Button>
 
-                    <Button variant='outlined' onClick={abrirTransferencia}>
+                    <Button variant='outlined' onClick={operaciones.abrirTransferencia}>
                       Transferir dinero
                     </Button>
                   </Stack>

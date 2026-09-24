@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box'
 
+import TituloDeSeccion from '../Comunes/TituloDeSeccion'
 import Atajo from './Atajo'
-import TituloDeSeccion from './TituloDeSeccion'
 
 // Grilla de 4 columnas con los accesos rápidos. Solo dibuja: qué atajos hay y qué hace cada uno
 // lo decide quien la usa, así sirve igual para atajos reales y de muestra.
