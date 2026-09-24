@@ -41,6 +41,7 @@ Revisado contra el código real. Donde esta sección contradice al resto del doc
    - Cuentas, Tarjetas y QR avisan "Próximamente".
 4. **Nombres en español**, como el resto del proyecto.
 5. **Íconos:** variante **`Rounded`** en todo el Home. `Movimientos` ya la usa.
+6. **Nada propio de Naranja X en la app.** La referencia es solo visual: no se usan sus nombres de producto (por ejemplo "Frascos"), sus eslóganes (por ejemplo "Qué lindo es poder") ni su marca. Los productos de muestra llevan nombres genéricos propios: "Plazo fijo" en lugar de "Frascos".
 
 **Mapeo de nombres del spec a nombres del proyecto:**
 
@@ -108,7 +109,7 @@ Todo componente de este spec debe leer estos valores vía `theme.palette.*` o `s
 | 2 | `BalanceCard`        | Cuenta en pesos, badge de rendimiento, saldo oculto/visible, 3 acciones | `Card`, `Chip`, `IconButton`, `Stack`, `Avatar` | `CountUp` al revelar el saldo |
 | 3 | `AccountsPeek`       | Preview con scroll horizontal de otra cuenta (ej. USD)              | `Stack` horizontal con `overflow-x: auto` | — |
 | 4 | `ShortcutsGrid`      | Grid 2×4 "Tus atajos" con íconos y badges de promo                  | `Grid`/`Box`, `Avatar`, `Badge`        | leve `scale` al presionar (CSS, no hace falta lib) |
-| 5 | `CreditPromoCard`    | "Qué lindo es poder" — disponible de tarjeta de crédito             | `Card` con fondo en degradé usando tokens de color | — |
+| 5 | `CreditPromoCard`    | Promo de crédito con un texto propio — disponible de tarjeta de crédito | `Card` con fondo en degradé usando tokens de color | — |
 | 6 | `PromoBanner`        | Banner promocional horizontal                                       | `Card`                                  | — |
 | 7 | `BottomNav`          | Navegación inferior + botón flotante central                        | `BottomNavigation`, `BottomNavigationAction`, `Fab` | — |
 
@@ -157,7 +158,7 @@ frontend/src/
 
 ### 4.3 `ShortcutsGrid` + `ShortcutItem`
 - **Props de `ShortcutsGrid`:** `items: Array<{ id, label, icon, badge? }>`
-- **Piezas MUI:** `Grid container spacing={2}` con `Grid item xs={3}` (4 columnas) repetido en 2 filas; cada `ShortcutItem` es un `Avatar` circular con el ícono adentro + `Typography variant="caption"` debajo; `Badge` de MUI para el "20%" sobre el ícono de Frascos.
+- **Piezas MUI:** `Grid container spacing={2}` con `Grid item xs={3}` (4 columnas) repetido en 2 filas; cada `ShortcutItem` es un `Avatar` circular con el ícono adentro + `Typography variant="caption"` debajo; `Badge` de MUI para una insignia opcional (por ejemplo "Nuevo" sobre el atajo de muestra "Plazo fijo").
 - **Interacción:** al tocar, aplicar `transform: scale(0.95)` en `:active` vía `sx` — esto es CSS puro de MUI, no hace falta ninguna librería de animación para el micro-press.
 
 ### 4.4 `BottomNav`
