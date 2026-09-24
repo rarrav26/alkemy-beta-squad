@@ -16,8 +16,8 @@ import VisibilityOffRounded from '@mui/icons-material/VisibilityOffRounded'
 import VisibilityRounded from '@mui/icons-material/VisibilityRounded'
 
 import useSaldoVisible from '../../hooks/useSaldoVisible'
-import SaldoAnimado from '../Cuentas/SaldoAnimado'
 import Atajo from './Atajo'
+import SaldoRevelado from './SaldoRevelado'
 
 // Mismo tamaño y peso que SaldoAnimado, así la tarjeta no salta de alto al alternar. Para el
 // lector de pantalla "Shh..." no dice nada: se anuncia como "Saldo oculto".
@@ -77,7 +77,7 @@ export default function TarjetaDeSaldo({
         </Stack>
 
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-          {saldoVisible ? <SaldoAnimado valor={saldo} /> : <SaldoOculto />}
+          {saldoVisible ? <SaldoRevelado saldo={saldo} /> : <SaldoOculto />}
 
           <IconButton
             onClick={alternarVisibilidad}
