@@ -7,7 +7,6 @@ import {
   Paper,
   Stack,
   Typography,
-  TextField,
 } from "@mui/material";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/authContext";
@@ -253,10 +252,27 @@ export default function Dashboard() {
 }
 
 export function NewUserPage() {
-  const { createUser } = useAuth();
-  const [invitation, setInvitation] = useState(null);
-  const [copyMessage, setCopyMessage] = useState("");
-  if (invitation)
+  const { createUser, reenviarInvitacion } = useAuth();
+  // El alta ya no trae el código de invitación: viaja solo por correo, así que el
+  // administrador nunca lo ve. Acá se guarda a quién se le mandó y si salió.
+  const [alta, setAlta] = useState(null);
+  const [reenviando, setReenviando] = useState(false);
+  const [errorDeReenvio, setErrorDeReenvio] = useState("");
+
+  async function reenviar() {
+    setReenviando(true);
+    setErrorDeReenvio("");
+    try {
+      const invitacion = await reenviarInvitacion(alta.usuarioId);
+      setAlta({ ...alta, invitationSent: invitacion.invitationSent });
+    } catch (error) {
+      setErrorDeReenvio(error.message);
+    } finally {
+      setReenviando(false);
+    }
+  }
+
+  if (alta)
     return (
       <Box sx={{ maxWidth: 650, mx: "auto", p: 3 }}>
         <Paper variant="outlined" sx={{ p: 3 }}>
@@ -264,51 +280,33 @@ export function NewUserPage() {
             <Typography component="h1" variant="h4">
               Usuario registrado
             </Typography>
-            <Alert severity="success">
-              Se creó la cuenta de {invitation.email}. Todavía debe elegir su
-              contraseña.
-            </Alert>
-            <Typography>
-              Entregale este código por un medio privado. Vence en 24 horas y se
-              usa una sola vez.
-            </Typography>
-            <TextField
-              label="Código de invitación"
-              value={invitation.invitationToken}
-              multiline
-              minRows={3}
-              slotProps={{ input: { readOnly: true } }}
-            />
-            <Button
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(
-                    invitation.invitationToken,
-                  );
-                  setCopyMessage("Código copiado.");
-                } catch {
-                  setCopyMessage("Seleccioná el código y copialo manualmente.");
-                }
-              }}
-            >
-              Copiar código
+            {alta.invitationSent ? (
+              <Alert severity="success">
+                Se creó la cuenta de {alta.email} y le enviamos un correo con el
+                enlace para elegir su contraseña. El enlace vence en 24 horas y
+                sirve una sola vez.
+              </Alert>
+            ) : (
+              <Alert severity="warning">
+                Se creó la cuenta de {alta.email}, pero no pudimos enviarle el
+                correo de invitación. Probá reenviarlo.
+              </Alert>
+            )}
+            {errorDeReenvio && <Alert severity="error">{errorDeReenvio}</Alert>}
+            <Button onClick={reenviar} disabled={reenviando}>
+              {reenviando ? "Enviando…" : "Reenviar invitación"}
             </Button>
-            {copyMessage && <Alert severity="info">{copyMessage}</Alert>}
-            <Typography>
-              Debe entrar a {window.location.origin}/primera-password con su
-              correo y este código.
-            </Typography>
             <Button
               variant="contained"
               onClick={() => {
-                setInvitation(null);
-                setCopyMessage("");
+                setAlta(null);
+                setErrorDeReenvio("");
               }}
             >
               Registrar otro usuario
             </Button>
-            <Button component={Link} to="/dashboard">
-              Volver al dashboard
+            <Button component={Link} to="/admin/usuarios">
+              Ir al listado de usuarios
             </Button>
           </Stack>
         </Paper>
@@ -317,9 +315,9 @@ export function NewUserPage() {
   return (
     <AuthForm
       title="Registrar usuario"
-      description="El usuario establecerá su contraseña mediante una invitación."
+      description="Le vamos a enviar un correo para que elija su contraseña."
       submitLabel="Crear usuario"
-      onSubmit={async (data) => setInvitation(await createUser(data))}
+      onSubmit={async (data) => setAlta(await createUser(data))}
       footer={
         <Button component={Link} to="/dashboard">
           Volver al dashboard

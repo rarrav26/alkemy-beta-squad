@@ -231,8 +231,8 @@ La contraseña debe tener al menos ocho caracteres, mayúscula, minúscula, núm
 | GET /api/usuarios | Administrador | 200: listado paginado de usuarios regulares, con ?page, ?pageSize y ?busqueda |
 | GET /api/usuarios/{id} | Administrador | 200: detalle del usuario, o 404 si no existe |
 | PATCH /api/usuarios/{id} | Administrador | 200: edita nombre, apellido y email; no toca documento ni saldo |
-| POST /api/usuarios | Administrador | 201: crea sin contraseña; devuelve usuarioId, invitationToken, requiresPasswordSetup y expiresInSeconds |
-| POST /api/usuarios/{id}/invitation | Administrador | Renueva invitación e invalida la anterior |
+| POST /api/usuarios | Administrador | 201: crea sin contraseña y envía la invitación por correo; devuelve usuarioId, requiresPasswordSetup, invitationSent y expiresInSeconds (nunca el token) |
+| POST /api/usuarios/{id}/invitation | Administrador | Reenvía la invitación por correo e invalida la anterior; devuelve invitationSent |
 | PATCH /api/usuarios/{id}/active | Administrador | 204 sin cuerpo: activa/desactiva con { "isActive": false }; 404 si no existe |
 | GET /api/tiposdemovimientos | JWT | 200: catálogo completo de tipos de movimiento |
 | GET /api/tiposdemovimientos/{id} | JWT | 200: un tipo, o 404 si no existe |
@@ -449,8 +449,8 @@ Usuario inexistente, password incorrecta o cuenta bloqueada:
 401 con code INVALID_CREDENTIALS y el mismo mensaje genérico.
 Cuenta creada por el administrador que todavía no definió contraseña:
 409 con code PASSWORD_SETUP_REQUIRED, para que el frontend la derive a
-/primera-password en lugar de mostrarle un error. Esa pantalla sigue exigiendo
-el código de invitación, así que el 409 no alcanza para entrar.
+/primera-password en lugar de mostrarle un error. Para definir la contraseña hace
+falta el token que llega por correo, así que el 409 no alcanza para entrar.
 Usuario desactivado con contraseña correcta: 403 con code USER_INACTIVE y mensaje claro.
 La API no revela el estado de una cuenta antes de validar sus credenciales.
 Cinco fallos de contraseña bloquean temporalmente el login por 15 minutos.
@@ -459,10 +459,13 @@ Los endpoints Auth tienen límite de 20 solicitudes por IP por minuto (429 al ex
 **Alta administrativa y primer acceso:**
 
 1. El administrador envía el mismo perfil del registro, sin password, a POST /api/usuarios.
-2. Entrega al usuario el email y invitationToken devueltos. No se genera un JWT en este paso.
-3. React deberá abrir la pantalla de primera contraseña a partir de esa invitación.
-   El login ordinario sin contraseña nunca concede acceso ni entrega invitaciones.
-4. El usuario envía a POST /api/auth/initial-password:
+2. La API genera la invitación y la manda **por correo** a la persona, con un enlace a
+   `/primera-password?email=...&token=...` del frontend. El token no viaja en la respuesta:
+   el administrador nunca lo conoce. No se genera un JWT en este paso.
+   Si el correo no sale, el usuario queda creado igual y la respuesta trae invitationSent: false.
+3. La pantalla de primera contraseña toma el email y el token del enlace; la persona solo
+   elige la contraseña. El login ordinario sin contraseña nunca concede acceso ni entrega invitaciones.
+4. El frontend envía a POST /api/auth/initial-password:
 
 ```json
 {
@@ -475,7 +478,14 @@ Los endpoints Auth tienen límite de 20 solicitudes por IP por minuto (429 al ex
 
 5. Solo tras guardar el hash se devuelve el JWT y puede abrirse el dashboard.
    Una invitación inválida, vencida o ya usada devuelve 400. No permite reemplazar una contraseña existente.
-6. Para reenviar una invitación vencida, usar el endpoint administrativo de renovación.
+6. Para reenviar una invitación vencida o que no llegó, usar el endpoint administrativo de
+   renovación: manda un correo nuevo y el enlace anterior deja de servir.
+
+**Correo:** SmtpEnviadorDeInvitaciones entrega el mensaje por SMTP según la sección `Email`
+(EmailOptions). En desarrollo apunta a smtp4dev, en localhost:2525, que atrapa los correos y los
+muestra en http://localhost:5050 (ver el README de la raíz). En producción alcanza con cambiar
+esa sección por la de un proveedor real; las credenciales van en user-secrets. El log registra
+el destinatario de un envío fallido, nunca el token ni el enlace.
 
 La desactivación se comprueba contra la base en cada petición protegida.
 El cambio de estado también rota el security stamp, por lo que tokens previos no vuelven a servir al reactivar.

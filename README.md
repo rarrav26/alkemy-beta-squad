@@ -11,6 +11,7 @@ Tener instalados:
 - Visual Studio Code, para el frontend.
 - SQL Server y SQL Server Management Studio.
 - Node.js 24, que incluye npm.
+- smtp4dev, el SMTP de desarrollo que recibe los correos de invitación (se instala en el punto 7).
 
 Traigan los últimos cambios con `git pull`. Trabajen sobre la rama que indique el equipo.
 
@@ -155,16 +156,43 @@ Abrir:
 
 Mantener la API y el frontend ejecutándose al mismo tiempo.
 
+### SMTP de desarrollo (smtp4dev)
+
+Cuando el administrador crea un usuario, la API le manda un correo con el enlace para elegir su
+contraseña. En desarrollo ese correo no sale a Internet: lo atrapa **smtp4dev**, que lo muestra
+en una bandeja web. Sin smtp4dev el alta funciona igual, pero el correo no llega a ningún lado.
+
+La primera vez, instalarlo (sirve en Windows y en Mac):
+
+```powershell
+dotnet tool install -g Rnwood.Smtp4dev
+```
+
+Si después la terminal no encuentra el comando `smtp4dev`, cerrarla y abrir una nueva.
+
+Iniciarlo, en una terminal aparte:
+
+```powershell
+smtp4dev --smtpport=2525 --urls=http://localhost:5050
+```
+
+- La API manda los correos al puerto **2525** (sección `Email` de `appsettings.Development.json`).
+- La bandeja queda en **http://localhost:5050**.
+- No usar el puerto 5000 que trae por defecto: en Mac lo ocupa el Receptor AirPlay.
+
 ## 8. Probar el flujo
 
 1. Iniciar sesión con `admin@digitalars.com` / `Admin123!`.
 2. Comprobar que abre el dashboard.
-3. Elegir **Registrar usuario**.
-4. Completar datos distintos a los del administrador.
-5. Copiar la invitación obtenida.
-6. Cerrar sesión o abrir una ventana privada.
-7. Entrar a **Tengo una invitación**, completar el correo y el código, y elegir una contraseña.
+3. Ir a **Listado de usuarios → Crear nuevo usuario**.
+4. Completar datos distintos a los del administrador. La pantalla confirma que se envió la
+   invitación y **no muestra ningún código**: el administrador nunca lo conoce.
+5. Abrir la bandeja de smtp4dev (**http://localhost:5050**) y abrir el correo
+   "Creá tu contraseña de DigitalArs".
+6. Cerrar sesión o abrir una ventana privada, y abrir el enlace del correo.
+7. Elegir una contraseña: la pantalla ya trae el correo cargado.
 8. Comprobar que el nuevo usuario entra al dashboard con rol `Usuario`.
+9. Abrir el mismo enlace otra vez: tiene que responder que la invitación es inválida o venció.
 
 También pueden probar **Crear una cuenta**, que registra directamente un usuario común con contraseña.
 
@@ -177,6 +205,7 @@ Solo necesitan:
 1. Tener SQL Server iniciado.
 2. Abrir `backend/DigitalArs.Api.slnx` en Visual Studio y ejecutar con F5.
 3. Ejecutar `npm run dev` en el frontend, desde VS Code.
+4. Ejecutar `smtp4dev --smtpport=2525 --urls=http://localhost:5050` si van a crear usuarios desde el administrador.
 
 No hay que repetir los scripts SQL ni configurar nuevamente los secretos: los datos existentes se conservan.
 
@@ -191,3 +220,5 @@ No hay que repetir los scripts SQL ni configurar nuevamente los secretos: los da
 - **Registro devuelve 400:** revisar el mensaje; el email y el documento no pueden repetirse.
 - **Frontend no conecta:** verificar que Swagger abra, que el certificado sea válido y que `.env.local` tenga la dirección correcta. Reiniciar React si cambiaron ese archivo.
 - **Puerto 5173 ocupado:** cerrar la otra instancia del frontend.
+- **El alta avisa que no pudo enviar el correo de invitación:** smtp4dev no está corriendo o usa otro puerto. Iniciarlo como indica el punto 7 y usar **Reenviar invitación**.
+- **El enlace del correo dice "Invitación inválida o vencida":** vence a las 24 horas, sirve una sola vez y queda anulado si se reenvió la invitación. Reenviarla desde el administrador.

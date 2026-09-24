@@ -109,6 +109,6 @@ public class AuthController(IAuthService auth, IAccountService accounts) : Contr
         Conflict(new ErrorResponse
         {
             Code = "PASSWORD_SETUP_REQUIRED",
-            Message = "Todavía no definiste tu contraseña. Usá el código de invitación que te dio el administrador."
+            Message = "Todavía no definiste tu contraseña. Revisá tu correo: te enviamos un enlace para crearla."
         });
 }
