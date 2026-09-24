@@ -174,3 +174,28 @@ export function normalizarRespuestaMovimientos(respuesta) {
     totalPages: Math.max(1, respuesta?.totalPages ?? 1)
   }
 }
+
+// --- Historial mobile: la lista crece con "Cargar más" en vez de cambiar de página. ---
+
+// Los que todavía no están en la lista. Hace falta porque las páginas se corren: si entra un
+// movimiento nuevo entre dos "Cargar más", todos bajan un lugar y la página siguiente repite
+// el último de la anterior. Nunca faltan movimientos (solo se agregan arriba), solo se repiten.
+function sinLosQueYaEstan(actuales, candidatos) {
+  const idsActuales = new Set(actuales.map(movimiento => movimiento.id))
+  return candidatos.filter(movimiento => !idsActuales.has(movimiento.id))
+}
+
+// "Cargar más": la página nueva va abajo, sin repetir los que ya se ven.
+export function unirPaginasSinRepetidos(actuales, paginaNueva) {
+  return [...actuales, ...sinLosQueYaEstan(actuales, paginaNueva)]
+}
+
+// Entró dinero: de la primera página solo interesan los que son nuevos, y van arriba. Así el
+// usuario no pierde las páginas viejas que ya había cargado.
+export function sumarNuevosAlPrincipio(actuales, primeraPagina) {
+  return [...sinLosQueYaEstan(actuales, primeraPagina), ...actuales]
+}
+
+export function hayMasPaginas(paginaCargada, totalPaginas) {
+  return paginaCargada < totalPaginas
+}
