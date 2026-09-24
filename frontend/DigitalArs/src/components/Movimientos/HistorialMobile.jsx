@@ -12,9 +12,11 @@ import { useNavigate } from 'react-router-dom'
 
 import useHistorialMobile from '../../hooks/useHistorialMobile'
 import { hayFiltrosAplicados } from '../../routes/movimientosUtils'
+import BotonDeFiltrosDeFecha from './BotonDeFiltrosDeFecha'
 import BuscadorDeMovimientos from './BuscadorDeMovimientos'
 import ChipsDeTipo from './ChipsDeTipo'
 import FilaDeMovimientoCompacta from './FilaDeMovimientoCompacta'
+import HojaDeFiltrosDeFecha from './HojaDeFiltrosDeFecha'
 
 // React Router guarda en el historial del navegador cuántas pantallas se recorrieron dentro
 // de la app (idx). Si es 0, se entró directo a esta URL: "volver" con el navegador sacaría al
@@ -105,6 +107,10 @@ export default function HistorialMobile() {
   const navegar = useNavigate()
   const historial = useHistorialMobile()
   const [textoDeBusqueda, setTextoDeBusqueda] = useState('')
+  const [hojaDeFechasAbierta, setHojaDeFechasAbierta] = useState(false)
+
+  const { desde, hasta } = historial.filtrosAplicados
+  const cantidadDeFechas = [desde, hasta].filter(Boolean).length
 
   function limpiarFiltros() {
     setTextoDeBusqueda('')
@@ -130,11 +136,17 @@ export default function HistorialMobile() {
       </Typography>
 
       <Stack spacing={2} sx={{ mb: 1 }}>
-        <BuscadorDeMovimientos
-          texto={textoDeBusqueda}
-          onCambiarTexto={setTextoDeBusqueda}
-          onBuscar={historial.aplicarBusqueda}
-        />
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+          <BuscadorDeMovimientos
+            texto={textoDeBusqueda}
+            onCambiarTexto={setTextoDeBusqueda}
+            onBuscar={historial.aplicarBusqueda}
+          />
+          <BotonDeFiltrosDeFecha
+            cantidadDeFechas={cantidadDeFechas}
+            onClick={() => setHojaDeFechasAbierta(true)}
+          />
+        </Stack>
         <ChipsDeTipo tipoElegido={historial.filtrosAplicados.tipo} onElegir={historial.elegirTipo} />
       </Stack>
 
@@ -143,6 +155,14 @@ export default function HistorialMobile() {
       </Box>
 
       <CargarMas historial={historial} />
+
+      <HojaDeFiltrosDeFecha
+        open={hojaDeFechasAbierta}
+        onClose={() => setHojaDeFechasAbierta(false)}
+        desde={desde}
+        hasta={hasta}
+        onAplicar={historial.aplicarFechas}
+      />
     </Box>
   )
 }

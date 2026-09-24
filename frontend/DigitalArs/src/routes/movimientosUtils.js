@@ -199,3 +199,11 @@ export function sumarNuevosAlPrincipio(actuales, primeraPagina) {
 export function hayMasPaginas(paginaCargada, totalPaginas) {
   return paginaCargada < totalPaginas
 }
+
+// El rango "desde / hasta" de la hoja de filtros. Una fecha sola siempre vale; con las dos,
+// "desde" no puede ser posterior a "hasta". Las fechas llegan como AAAA-MM-DD (lo que da el
+// input date), y en ese formato comparar el texto es lo mismo que comparar las fechas.
+export function rangoDeFechasValido(desde, hasta) {
+  if (!desde || !hasta) return true
+  return desde <= hasta
+}

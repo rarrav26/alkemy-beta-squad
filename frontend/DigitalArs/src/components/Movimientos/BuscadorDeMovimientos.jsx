@@ -31,7 +31,8 @@ export default function BuscadorDeMovimientos({ texto, onCambiarTexto, onBuscar 
       <TextField
         fullWidth
         type="search"
-        placeholder="Buscá por tipo de movimiento"
+        // Corto a propósito: con el botón de filtros al lado, a 360–375px no entra más texto.
+        placeholder="Buscá por tipo"
         value={texto}
         onChange={cambiarTexto}
         slotProps={{

@@ -7,6 +7,7 @@ import {
   formatearFechaCorta,
   hayMasPaginas,
   prefijoDelImporte,
+  rangoDeFechasValido,
   sumarNuevosAlPrincipio,
   textoDelImporte,
   unirPaginasSinRepetidos
@@ -147,4 +148,16 @@ test('hay mas paginas solo si la cargada no es la ultima', () => {
   assert.equal(hayMasPaginas(1, 3), true)
   assert.equal(hayMasPaginas(3, 3), false)
   assert.equal(hayMasPaginas(1, 1), false)
+})
+
+test('el rango de fechas vale con una sola fecha o con desde antes que hasta', () => {
+  assert.equal(rangoDeFechasValido('', ''), true)
+  assert.equal(rangoDeFechasValido('2026-09-01', ''), true)
+  assert.equal(rangoDeFechasValido('', '2026-09-30'), true)
+  assert.equal(rangoDeFechasValido('2026-09-01', '2026-09-30'), true)
+  assert.equal(rangoDeFechasValido('2026-09-30', '2026-09-30'), true)
+})
+
+test('el rango de fechas no vale si desde es posterior a hasta', () => {
+  assert.equal(rangoDeFechasValido('2026-09-30', '2026-09-01'), false)
 })
