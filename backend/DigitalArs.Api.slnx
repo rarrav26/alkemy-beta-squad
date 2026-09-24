@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="DigitalArs.Api/DigitalArs.Api.csproj" />
+  <Project Path="DigitalArs.Tests/DigitalArs.Tests.csproj" Id="41fc6f1d-0b9b-4690-b935-e9405fefb55c" />
 </Solution>
