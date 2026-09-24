@@ -1,4 +1,5 @@
 import Avatar from '@mui/material/Avatar'
+import Badge from '@mui/material/Badge'
 import ButtonBase from '@mui/material/ButtonBase'
 import Typography from '@mui/material/Typography'
 
@@ -6,8 +7,9 @@ import Typography from '@mui/material/Typography'
 // saldo y la grilla de atajos, así las dos se ven y responden igual al tocarlas.
 //
 // Es un botón con texto visible, así que el lector de pantalla lee la etiqueta: el ícono es
-// decorativo y se oculta.
-export default function Atajo({ etiqueta, Icono, onClick }) {
+// decorativo y se oculta. La insignia es opcional (por ejemplo "20%"): sin ella, el Badge no
+// se dibuja.
+export default function Atajo({ etiqueta, Icono, insignia, onClick }) {
   return (
     <ButtonBase
       onClick={onClick}
@@ -24,9 +26,11 @@ export default function Atajo({ etiqueta, Icono, onClick }) {
         '&.Mui-focusVisible': { outline: '2px solid', outlineColor: 'primary.main' }
       }}
     >
-      <Avatar sx={{ width: 48, height: 48, bgcolor: 'action.hover', color: 'primary.main' }}>
-        <Icono aria-hidden="true" />
-      </Avatar>
+      <Badge badgeContent={insignia} color="success" overlap="circular">
+        <Avatar sx={{ width: 48, height: 48, bgcolor: 'action.hover', color: 'primary.main' }}>
+          <Icono aria-hidden="true" />
+        </Avatar>
+      </Badge>
 
       <Typography variant="caption" sx={{ color: 'text.primary', textAlign: 'center', lineHeight: 1.2 }}>
         {etiqueta}

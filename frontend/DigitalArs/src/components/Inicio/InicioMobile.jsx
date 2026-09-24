@@ -4,10 +4,18 @@ import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
+import AddRounded from '@mui/icons-material/AddRounded'
+import PersonRounded from '@mui/icons-material/PersonRounded'
+import ReceiptLongRounded from '@mui/icons-material/ReceiptLongRounded'
+import SwapHorizRounded from '@mui/icons-material/SwapHorizRounded'
+import { useNavigate } from 'react-router-dom'
 
 import { MovimientosPreview } from '../../routes/Movimientos'
 import AliasYCvuDialog from '../Cuentas/AliasYCvuDialog'
 import EstadoDeCargaDeCuenta from '../Cuentas/EstadoDeCargaDeCuenta'
+import AvisoProximamente from '../Proximamente/AvisoProximamente'
+import { ATAJOS_DE_MUESTRA } from './datosDeMuestra'
+import GrillaDeAtajos from './GrillaDeAtajos'
 import TarjetaDeSaldo from './TarjetaDeSaldo'
 
 // El título de la página existe para el lector de pantalla, pero no se dibuja: en mobile el
@@ -35,7 +43,21 @@ export default function InicioMobile({
   onAgregar,
   onTransferir
 }) {
+  const navegar = useNavigate()
   const [aliasYCvuAbierto, setAliasYCvuAbierto] = useState(false)
+  const [avisoAbierto, setAvisoAbierto] = useState(false)
+
+  const atajosReales = [
+    { id: 'ingresar', etiqueta: 'Ingresar', Icono: AddRounded, onClick: onAgregar },
+    { id: 'transferir', etiqueta: 'Transferir', Icono: SwapHorizRounded, onClick: onTransferir },
+    { id: 'movimientos', etiqueta: 'Movimientos', Icono: ReceiptLongRounded, onClick: () => navegar('/movimientos') },
+    { id: 'perfil', etiqueta: 'Mi perfil', Icono: PersonRounded, onClick: () => navegar('/perfil') }
+  ]
+
+  const atajosDeMuestra = ATAJOS_DE_MUESTRA.map(atajo => ({
+    ...atajo,
+    onClick: () => setAvisoAbierto(true)
+  }))
 
   return (
     <Box sx={{ px: 2, pt: 1, pb: 2 }} aria-busy={cargando}>
@@ -46,7 +68,7 @@ export default function InicioMobile({
       <EstadoDeCargaDeCuenta cargando={cargando} error={error} onReintentar={onReintentar} />
 
       {cuenta && (
-        <Stack spacing={2}>
+        <Stack spacing={3}>
           {mensajeExito && (
             <Alert severity="success" onClose={onCerrarMensajeExito}>
               {mensajeExito}
@@ -59,6 +81,8 @@ export default function InicioMobile({
             onTransferir={onTransferir}
             onVerAliasYCvu={() => setAliasYCvuAbierto(true)}
           />
+
+          <GrillaDeAtajos atajos={[...atajosReales, ...atajosDeMuestra]} />
         </Stack>
       )}
 
@@ -72,6 +96,8 @@ export default function InicioMobile({
           cvu={cuenta.cvu}
         />
       )}
+
+      <AvisoProximamente open={avisoAbierto} onClose={() => setAvisoAbierto(false)} />
     </Box>
   )
 }
