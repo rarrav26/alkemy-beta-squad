@@ -13,6 +13,8 @@ public class DepositoService(
     IUsuarioRepository usuarios,
     ICuentaRepository cuentas,
     IMovimientoRepository movimientos,
+    INotificacionRepository notificaciones,
+    INotificadorEnTiempoReal notificador,
     ITipoMovimientoRepository tipos) : IDepositoService
 {
     public async Task<Resultado<DepositoResponse>> DepositarAsync(
@@ -102,6 +104,20 @@ public class DepositoService(
 
         await movimientos.AddAsync(movimiento, cancellationToken);
 
+        // El aviso se guarda DENTRO de la misma transacción que el movimiento: si el depósito
+        // se revierte, la notificación se va con él y nadie queda avisado de dinero que no
+        // entró. Reusa la fecha del movimiento para que los dos digan lo mismo.
+        var notificacion = new Notificacion
+        {
+            usuario_id = usuario.id,
+            movimiento_id = movimiento.id,
+            titulo = MensajesDeNotificacion.TituloDeposito,
+            mensaje = MensajesDeNotificacion.Deposito(importe),
+            fecha = movimiento.fecha
+        };
+
+        await notificaciones.AddAsync(notificacion, cancellationToken);
+
         // Leemos el saldo de la base después de incrementarlo.
         var cuentaActualizada = await cuentas.GetByUsuarioIdAsync(
             usuario.id, cancellationToken);
@@ -120,6 +136,14 @@ public class DepositoService(
             Fecha: HoraDeArgentina.DesdeUtc(movimiento.fecha));
 
         await transaccion.CommitAsync(cancellationToken);
+
+        // Recién con el depósito confirmado. Si se avisara antes del commit y la transacción se
+        // revirtiera, el usuario habría visto entrar plata que no entró.
+        //
+        // No se le pasa el cancellationToken: si quien llamó cortó la conexión justo después de
+        // que el depósito se confirmó, el aviso igual tiene que salir. Y si falla, no rompe
+        // nada: el notificador se traga su propia excepción.
+        await notificador.EnviarAsync(identityUserId, notificacion);
 
         return Resultado<DepositoResponse>.Exito(respuesta);
     }

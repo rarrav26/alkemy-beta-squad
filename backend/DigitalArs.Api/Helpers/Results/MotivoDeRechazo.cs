@@ -29,5 +29,10 @@ public enum MotivoDeRechazo
     // Se agotaron los intentos de sortear un número libre.
     NoSePudoGenerarTarjeta,
     // Demasiados intentos fallidos de contraseña sobre el revelado del código.
-    DemasiadosIntentos
+    DemasiadosIntentos,
+
+    // --- Notificaciones ---
+    // Valor propio y no NoEncontrado: ese ya significa "no existe el usuario del token" y los
+    // controllers lo traducen a 401. Una notificación que no existe tiene que dar 404.
+    NotificacionNoEncontrada
 }

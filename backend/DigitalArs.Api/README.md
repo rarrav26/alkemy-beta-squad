@@ -98,11 +98,21 @@ El modelo de datos se genera **desde la base** (Database First), no con migracio
 carpeta `backend/DigitalArs.Api`, con la variable de entorno exportada como se muestra arriba:
 
 ```powershell
-dotnet ef dbcontext scaffold "$env:ConnectionStrings__DefaultConnection" Microsoft.EntityFrameworkCore.SqlServer --project "DigitalArs.Api.csproj" --startup-project "DigitalArs.Api.csproj" --context DigitalArsDbContext --context-dir Data/Context --output-dir Data/Entities --namespace DigitalArs.Api.Data.Entities --context-namespace DigitalArs.Api.Data.Context --no-onconfiguring --use-database-names --force
+dotnet ef dbcontext scaffold "$env:ConnectionStrings__DefaultConnection" Microsoft.EntityFrameworkCore.SqlServer --project "DigitalArs.Api.csproj" --startup-project "DigitalArs.Api.csproj" --context DigitalArsDbContext --context-dir Data/Context --output-dir Data/Entities --namespace DigitalArs.Api.Data.Entities --context-namespace DigitalArs.Api.Data.Context --no-onconfiguring --use-database-names --force --table Usuarios --table Cuentas --table Movimientos --table Tipo_Movimiento
 ```
 
 `--no-onconfiguring` es importante: evita que el scaffolding escriba la cadena de conexión
 hardcodeada dentro del `DbContext`.
+
+Los `--table` también: sin ellos el scaffolding trae las siete tablas `AspNet*` al
+`DigitalArsDbContext`, donde chocan con `AuthDbContext`, que ya las mapea. El proyecto deja de
+compilar.
+
+**`Notificaciones` no va en esa lista.** Su entidad y su configuración se mantienen a mano en
+`Data/Entities/Notificacion.cs` y `Data/Context/DigitalArsDbContext.Notificaciones.cs` (una
+clase `partial` que implementa `OnModelCreatingPartial`). Si se la agrega a los `--table`, el
+generador crea una entidad y un `DbSet` duplicados para la misma tabla. El motivo completo está
+comentado arriba de esa clase `partial`.
 
 ## Estructura
 

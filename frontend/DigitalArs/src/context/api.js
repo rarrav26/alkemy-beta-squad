@@ -115,6 +115,17 @@ export async function cambiarEstadoUsuarioAdmin({ token, id, isActive, signal } 
     signal
   })
 }
+
+// Detalle de un usuario para el administrador: trae datos personales, cuenta, alias, CVU y
+// estado. Si no existe, apiRequest rechaza con un error cuyo .message ya trae el mensaje que
+// mandó el backend (ver mensajePara).
+export async function obtenerUsuarioPorId({ token, id, signal } = {}) {
+  return apiRequest(`/api/Usuarios/${id}`, {
+    method: 'GET',
+    token,
+    signal
+  })
+}
 export async function obtenerMiPerfil({ token, signal } = {}) {
   // 1. Obtenemos los datos personales desde /api/Auth/me
   const usuario = await apiRequest('/api/Auth/me', {

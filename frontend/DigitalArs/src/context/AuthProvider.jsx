@@ -243,6 +243,32 @@ export default function AuthProvider({ children }) {
       }),
     [authenticatedRequest]
   )
+
+  // Devuelve { noLeidas, items }: las 30 más recientes ya ordenadas de la más nueva a la más
+  // vieja, y el total de no leídas, que puede ser mayor que la cantidad de items.
+  const obtenerNotificaciones = useCallback(
+    signal => authenticatedRequest('/api/notificaciones', { signal }),
+    [authenticatedRequest]
+  )
+
+  // Los dos marcados responden 204 sin cuerpo, así que apiRequest devuelve null.
+  // Marcar una que ya estaba leída no es un error: el endpoint es idempotente.
+  const marcarNotificacionLeida = useCallback(
+    id =>
+      authenticatedRequest(`/api/notificaciones/${id}/leida`, {
+        method: 'PATCH'
+      }),
+    [authenticatedRequest]
+  )
+
+  const marcarTodasLasNotificacionesLeidas = useCallback(
+    () =>
+      authenticatedRequest('/api/notificaciones/leidas', {
+        method: 'PATCH'
+      }),
+    [authenticatedRequest]
+  )
+
   function createUser(data) {
     return authenticatedRequest('/api/usuarios', { method: 'POST', body: data })
   }
@@ -297,7 +323,10 @@ export default function AuthProvider({ children }) {
         obtenerMovimientos,
         ingresarDinero,
         resolverDestinoDeTransferencia,
-        transferir
+        transferir,
+        obtenerNotificaciones,
+        marcarNotificacionLeida,
+        marcarTodasLasNotificacionesLeidas
       }}
     >
       {children}

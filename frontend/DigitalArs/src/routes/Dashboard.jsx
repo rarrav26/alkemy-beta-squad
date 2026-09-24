@@ -11,21 +11,19 @@ import {
 } from "@mui/material";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/authContext";
+import { useNotificaciones } from "../context/notificacionesContext";
 import AuthForm, { ProfileFields } from "../components/Auth/AuthForm";
 import DepositoModal from "../components/Cuentas/DepositoModal";
+import SaldoAnimado from "../components/Cuentas/SaldoAnimado";
 import TransferenciaModal from "../components/Cuentas/TransferenciaModal";
 import TarjetaVirtual from "../components/Cuentas/TarjetaVirtual";
 import { MovimientosPreview } from "./Movimientos";
 import { getSessionUser } from "./dashboardUtils";
 import { esAdministrador } from "./rolesUtils";
 
-const formatoPesos = new Intl.NumberFormat("es-AR", {
-  style: "currency",
-  currency: "ARS",
-});
-
 export default function Dashboard() {
   const { session, obtenerMiCuenta } = useAuth();
+  const { avisosRecibidos } = useNotificaciones();
   const usuario = getSessionUser(session);
   const [cuenta, setCuenta] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -81,6 +79,26 @@ export default function Dashboard() {
 
     return () => controller.abort();
   }, [obtenerMiCuenta, esAdmin, intento]);
+
+  // Cuando entra dinero, el mensaje del socket trae la notificación, no el saldo: hay que volver
+  // a pedirlo. Va en un efecto aparte y NO reusa el contador "intento" de arriba, porque ese
+  // efecto pone la cuenta en null y la tarjeta mostraría "Cargando tu cuenta…" cada vez que
+  // llega una transferencia. Acá el saldo se cambia sin que se note el reemplazo.
+  useEffect(() => {
+    if (esAdmin || avisosRecibidos === 0) return;
+
+    const controller = new AbortController();
+
+    obtenerMiCuenta(controller.signal)
+      .then((datos) => {
+        if (!controller.signal.aborted) setCuenta(datos);
+      })
+      // Si el refresco de fondo falla, se deja el saldo anterior en pantalla: es preferible a
+      // romper la tarjeta por algo que el usuario no pidió.
+      .catch(() => {});
+
+    return () => controller.abort();
+  }, [avisosRecibidos, esAdmin, obtenerMiCuenta]);
 
   function depositoRealizado(resultado) {
     setCuenta((actual) =>
@@ -162,9 +180,7 @@ export default function Dashboard() {
                       Saldo disponible en pesos
                     </Typography>
 
-                    <Typography variant="h4" fontWeight={700}>
-                      {formatoPesos.format(cuenta.saldo)}
-                    </Typography>
+                    <SaldoAnimado valor={cuenta.saldo} />
                   </Box>
 
                   {mensajeExito && (

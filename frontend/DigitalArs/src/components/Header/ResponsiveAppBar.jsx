@@ -15,6 +15,7 @@ import MenuIcon from '@mui/icons-material/Menu'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/authContext'
 import { esAdministrador } from '../../routes/rolesUtils'
+import CampanaDeNotificaciones from '../Notificaciones/CampanaDeNotificaciones'
 import ChangeTheme from './ChangeTheme'
 
 export default function ResponsiveAppBar() {
@@ -87,6 +88,11 @@ export default function ResponsiveAppBar() {
               </Button>
             </Box>
           )}
+
+          {/* Va FUERA del bloque de arriba, que desaparece por debajo de "md": la campana tiene
+              que verse también en el teléfono, que es donde más se usa. El administrador no la
+              tiene porque no tiene billetera, y la API le responde 403. */}
+          {sesionActiva && !esAdmin && <CampanaDeNotificaciones />}
 
           <ChangeTheme />
 
