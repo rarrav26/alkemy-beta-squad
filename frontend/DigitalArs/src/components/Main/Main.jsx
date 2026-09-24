@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from '../../context/authContext'
 import { InitialPasswordPage, LoginPage, RegisterPage } from '../../routes/AuthPages'
 import CuentasPage from '../../routes/Cuentas'
+import TarjetasPage from '../../routes/Tarjetas'
 import Dashboard, { NewUserPage } from '../../routes/Dashboard'
 import { MovimientosPage } from '../../routes/Movimientos'
 import PerfilPage from '../../routes/Perfil'
@@ -70,6 +71,7 @@ export default function Main() {
         {/* Rutas exclusivas del usuario regular: el administrador no tiene billetera */}
         <Route path="/movimientos" element={<Protected rol={ROL_USUARIO}><MovimientosPage /></Protected>} />
         <Route path="/cuentas" element={<Protected rol={ROL_USUARIO}><CuentasPage /></Protected>} />
+        <Route path="/tarjetas" element={<Protected rol={ROL_USUARIO}><TarjetasPage /></Protected>} />
 
         {/* Rutas exclusivas de Administrador */}
         <Route path="/usuarios/nuevo" element={<Protected rol={ROL_ADMINISTRADOR}><NewUserPage /></Protected>} />
