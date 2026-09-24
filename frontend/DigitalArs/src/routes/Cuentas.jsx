@@ -7,13 +7,15 @@ import Typography from '@mui/material/Typography'
 
 import BalanceMensual from '../components/Cuentas/BalanceMensual'
 import EstadoDeCargaDeCuenta from '../components/Cuentas/EstadoDeCargaDeCuenta'
+import GestionaTuCuenta from '../components/Cuentas/GestionaTuCuenta'
 import ModalesDeDinero from '../components/Cuentas/ModalesDeDinero'
 import TarjetaDeSaldo from '../components/Inicio/TarjetaDeSaldo'
 import UltimosMovimientos from '../components/Movimientos/UltimosMovimientos'
 import AvisoProximamente from '../components/Proximamente/AvisoProximamente'
 import {
   BALANCE_MENSUAL_DE_MUESTRA,
-  ETIQUETA_DE_VARIACION_DE_MUESTRA
+  ETIQUETA_DE_VARIACION_DE_MUESTRA,
+  OPCIONES_DE_GESTION_DE_MUESTRA
 } from '../components/Proximamente/datosDeMuestra'
 import useMiCuenta from '../hooks/useMiCuenta'
 import useOperacionesDeDinero from '../hooks/useOperacionesDeDinero'
@@ -62,6 +64,8 @@ export default function CuentasPage() {
           <UltimosMovimientos saldo={cuenta.saldo} cantidad={4} />
 
           <BalanceMensual balance={BALANCE_MENSUAL_DE_MUESTRA} onElegir={mostrarAviso} />
+
+          <GestionaTuCuenta opciones={OPCIONES_DE_GESTION_DE_MUESTRA} onElegir={mostrarAviso} />
         </Stack>
       )}
 

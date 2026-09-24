@@ -1,9 +1,13 @@
+import AccountBalanceWalletRounded from '@mui/icons-material/AccountBalanceWalletRounded'
 import AttachMoneyRounded from '@mui/icons-material/AttachMoneyRounded'
+import DescriptionRounded from '@mui/icons-material/DescriptionRounded'
 import EuroRounded from '@mui/icons-material/EuroRounded'
+import LinkRounded from '@mui/icons-material/LinkRounded'
 import PhoneIphoneRounded from '@mui/icons-material/PhoneIphoneRounded'
 import ReceiptRounded from '@mui/icons-material/ReceiptRounded'
 import RequestQuoteRounded from '@mui/icons-material/RequestQuoteRounded'
 import SavingsRounded from '@mui/icons-material/SavingsRounded'
+import SpeedRounded from '@mui/icons-material/SpeedRounded'
 
 // ÚNICO lugar con datos inventados de toda la app (Inicio, Cuentas...). Todo lo de acá es de
 // muestra: la API no tiene nada de esto todavía, y en pantalla se marca como "Próximamente".
@@ -49,3 +53,32 @@ export const BALANCE_MENSUAL_DE_MUESTRA = {
   ingresos: 185000,
   gastos: 128500
 }
+
+// Opciones de "Gestioná tu cuenta" en la pantalla Cuentas. Ninguna existe todavía; no hay
+// "límites en dólares" porque el MVP no tiene cuenta en USD.
+export const OPCIONES_DE_GESTION_DE_MUESTRA = [
+  {
+    id: 'retirar',
+    titulo: 'Retirar dinero',
+    descripcion: 'Pasá tu saldo a una cuenta bancaria.',
+    Icono: AccountBalanceWalletRounded
+  },
+  {
+    id: 'documentos',
+    titulo: 'Documentos de la cuenta',
+    descripcion: 'Descargá resúmenes y comprobantes de tus movimientos.',
+    Icono: DescriptionRounded
+  },
+  {
+    id: 'limites',
+    titulo: 'Límites de la cuenta',
+    descripcion: 'Mirá cuánto podés ingresar y transferir.',
+    Icono: SpeedRounded
+  },
+  {
+    id: 'vinculadas',
+    titulo: 'Cuentas vinculadas',
+    descripcion: 'Conectá otras cuentas para ingresar dinero más rápido.',
+    Icono: LinkRounded
+  }
+]
