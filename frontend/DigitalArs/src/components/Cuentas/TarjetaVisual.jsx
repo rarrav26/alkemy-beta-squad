@@ -10,6 +10,19 @@ const ANCHO_MAXIMO = 380;
 
 const DURACION_DEL_GIRO = "600ms";
 
+// Los colores del plástico. Son la ÚNICA excepción a "los colores salen del tema": la tarjeta
+// es un producto con identidad propia (como el plástico de un banco), y tiene que verse igual
+// en modo día y en modo noche. Congelada o dada de baja pasa a gris.
+const COLORES_DEL_PLASTICO = {
+  activa: "linear-gradient(135deg, #7b2ff7 0%, #4a1fb8 55%, #2d1275 100%)",
+  inactiva: "linear-gradient(135deg, #4a4f57 0%, #2e3238 100%)",
+  chip: "linear-gradient(135deg, #e8c86a 0%, #b98f2e 100%)",
+  texto: "#fff",
+  bandaMagnetica: "#1a1a1a",
+  franjaDelCodigo: "#fff",
+  textoDelCodigo: "#111",
+};
+
 /**
  * La tarjeta dibujada, con giro 3D para ver el dorso.
  *
@@ -141,11 +154,10 @@ function Cara({ children, rotada = false }) {
 
 // Fondo común a las dos caras, para que el frente y el dorso sean la misma tarjeta.
 function fondo(inactiva) {
-  return inactiva
-    ? // Congelada o dada de baja: se apaga a gris. El color es lo que comunica el estado de
-      // un vistazo, antes de leer cualquier texto.
-      "linear-gradient(135deg, #4a4f57 0%, #2e3238 100%)"
-    : "linear-gradient(135deg, #7b2ff7 0%, #4a1fb8 55%, #2d1275 100%)";
+  // Congelada o dada de baja: se apaga a gris. El color es lo que comunica el estado de un
+  // vistazo, antes de leer cualquier texto.
+  if (inactiva) return COLORES_DEL_PLASTICO.inactiva;
+  return COLORES_DEL_PLASTICO.activa;
 }
 
 function Frente({ tarjeta, numeroMostrado, inactiva, congelada, dadaDeBaja }) {
@@ -155,7 +167,7 @@ function Frente({ tarjeta, numeroMostrado, inactiva, congelada, dadaDeBaja }) {
         width: "100%",
         height: "100%",
         background: fondo(inactiva),
-        color: "#fff",
+        color: COLORES_DEL_PLASTICO.texto,
         p: 2.5,
         display: "flex",
         flexDirection: "column",
@@ -194,7 +206,7 @@ function Frente({ tarjeta, numeroMostrado, inactiva, congelada, dadaDeBaja }) {
           width: 42,
           height: 32,
           borderRadius: 1,
-          background: "linear-gradient(135deg, #e8c86a 0%, #b98f2e 100%)",
+          background: COLORES_DEL_PLASTICO.chip,
         }}
       />
 
@@ -274,14 +286,14 @@ function Dorso({ secreto, inactiva }) {
         width: "100%",
         height: "100%",
         background: fondo(inactiva),
-        color: "#fff",
+        color: COLORES_DEL_PLASTICO.texto,
         display: "flex",
         flexDirection: "column",
         opacity: inactiva ? 0.75 : 1,
       }}
     >
       {/* La banda magnética, como en una tarjeta real. */}
-      <Box aria-hidden="true" sx={{ height: 44, mt: 2.5, background: "#1a1a1a" }} />
+      <Box aria-hidden="true" sx={{ height: 44, mt: 2.5, background: COLORES_DEL_PLASTICO.bandaMagnetica }} />
 
       <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", gap: 2, flexGrow: 1 }}>
         <Stack direction="row" spacing={2} sx={{ alignItems: "flex-end" }}>
@@ -294,8 +306,8 @@ function Dorso({ secreto, inactiva }) {
             <Box
               sx={{
                 mt: 0.5,
-                background: "#fff",
-                color: "#111",
+                background: COLORES_DEL_PLASTICO.franjaDelCodigo,
+                color: COLORES_DEL_PLASTICO.textoDelCodigo,
                 borderRadius: 0.5,
                 px: 1.5,
                 py: 0.75,
