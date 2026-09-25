@@ -118,7 +118,7 @@ Dentro de **backend/DigitalArs.Api/**:
 | DTOs/DepositoDto.cs                        | Importe a depositar, con su validación.                              |
 | DTOs/DepositoResponseDto.cs                | Respuesta del depósito: saldo actualizado y fecha argentina.         |
 | DTOs/HistorialMovimientosDto.cs            | Filtros del historial que llegan por query string.                   |
-| DTOs/MovimientoResponse.cs                 | Una fila del historial, con su signo y la fecha en hora argentina.   |
+| DTOs/MovimientoResponse.cs                 | Una fila del historial, con su signo, la fecha en hora argentina, la tarjeta de un pago y la contraparte de una transferencia. |
 | DTOs/PaginaResponse.cs                     | Envoltorio común de cualquier listado paginado de la API.            |
 | DTOs/TransferenciaDto.cs                   | Destino (alias o CVU) e importe a transferir, con su validación.     |
 | DTOs/DestinoResponseDto.cs                 | Respuesta del destino resuelto: id, alias, CVU y titular.            |
@@ -656,21 +656,26 @@ Dentro de **frontend/DigitalArs/**:
 | Archivo                                    | Función                                                |
 | ------------------------------------------ | ------------------------------------------------------ |
 | src/main.jsx                               | Monta BrowserRouter y ambos providers.                 |
-| src/App.jsx                                | Tema, cabecera, contenido y pie.                       |
+| src/App.jsx                                | Tema y estructura: la de escritorio o la mobile.       |
 | src/context/ElementosGlobales.jsx          | Tema claro/oscuro y tema MUI.                          |
 | src/context/authContext.js                 | AuthContext y hook useAuth.                            |
 | src/context/AuthProvider.jsx               | Sesión y operaciones de autenticación/alta.            |
 | src/context/api.js                         | Cliente Axios: headers, JSON y traducción de errores.  |
 | src/components/Auth/AuthForm.jsx           | Formulario común, carga, errores y campos compartidos. |
 | src/routes/AuthPages.jsx                   | LoginPage, RegisterPage e InitialPasswordPage.         |
-| src/routes/Dashboard.jsx                   | Dashboard (saldo o panel admin) y NewUserPage con invitación. |
+| src/routes/Dashboard.jsx                   | Dashboard (escritorio, Inicio mobile o panel admin) y NewUserPage con invitación. |
+| src/routes/Cuentas.jsx                     | "Tus cuentas" en mobile: saldo, movimientos, balance y gestión. |
+| src/routes/Tarjetas.jsx                    | "Tus tarjetas" en mobile: tarjeta virtual, pagos y gestión. |
 | src/routes/Perfil.jsx                      | Perfil propio: datos personales y alias.               |
-| src/routes/Movimientos.jsx                 | Historial paginado con filtros.                        |
+| src/routes/Movimientos.jsx                 | Historial: paginado en escritorio, con "Cargar más" en mobile. |
+| src/hooks/                                 | Lógica compartida entre escritorio y mobile: cuenta, operaciones de dinero, tarjeta, listas de movimientos y si se usa la vista mobile. |
+| src/components/Navegacion/, Inicio/, Movimientos/, Tarjetas/ | Piezas de la vista mobile (ver "Vista mobile" en el README del frontend). |
+| src/components/Proximamente/datosDeMuestra.js | Único archivo con datos inventados: todo lo "Próximamente". |
 | src/routes/UsuariosAdmin.jsx               | Listado, búsqueda y activación de usuarios (admin).    |
 | src/components/Admin/EditarUsuarioModal.jsx | Edición de un usuario por el admin.                   |
 | src/components/Cuentas/DepositoModal.jsx   | Ingreso de dinero.                                     |
 | src/components/Cuentas/TransferenciaModal.jsx | Transferencia en dos pasos: resolver destino y confirmar. |
-| src/routes/dashboardUtils.js, movimientosUtils.js, perfilUtils.js | Funciones puras de cada pantalla, probadas en tests/. |
+| src/routes/dashboardUtils.js, movimientosUtils.js, navegacionUtils.js, perfilUtils.js | Funciones puras de cada pantalla, probadas en tests/. |
 | src/components/Main/Main.jsx               | Rutas y protección de navegación por rol.              |
 | src/routes/rolesUtils.js                   | Único lugar que lee el rol de la sesión.               |
 | src/components/Header/Header.jsx           | Envuelve a ResponsiveAppBar.                           |
@@ -692,7 +697,9 @@ Al vencer el token, un temporizador borra la sesión. Un 401 en authenticatedReq
 
 La protección de rutas de React organiza la interfaz. La autorización real la hace la API.
 
-Cada ruta declara el rol que pide: `/movimientos` es solo para Usuario (el administrador no tiene billetera), `/admin/usuarios` y `/usuarios/nuevo` son solo para Administrador, y `/dashboard` y `/perfil` son para los dos. Quien no tiene el rol vuelve a `/dashboard`.
+En el teléfono, un usuario regular ve otra estructura: encabezado propio y barra inferior (Inicio, Cuentas, QR, Tarjetas, Más) en lugar del AppBar y el pie. Lo decide un solo hook, `useNavegacionMobile`; el detalle está en la sección **Vista mobile** de `frontend/DigitalArs/README.md`.
+
+Cada ruta declara el rol que pide: `/movimientos`, `/cuentas` y `/tarjetas` son solo para Usuario (el administrador no tiene billetera), `/admin/usuarios` y `/usuarios/nuevo` son solo para Administrador, y `/dashboard` y `/perfil` son para los dos. Quien no tiene el rol vuelve a `/dashboard`.
 
 Un usuario desactivado no llega a ninguna pantalla protegida: el login le responde 403 `USER_INACTIVE` con el motivo, y si ya tenía la sesión abierta, su próxima llamada a la API recibe 401 y la sesión se cierra.
 
@@ -774,9 +781,10 @@ Git no replica automáticamente la base local de cada compañero.
 | Tests/AuthenticationChecks/Program.cs           | Hashing, contraseñas, invitaciones, emisión/validación de JWT y alias. |
 | Tests/MovimientosChecks/Program.cs              | Normalización de la búsqueda y signo de cada tipo de movimiento.     |
 | frontend/DigitalArs/tests/api.test.mjs          | Headers, JSON y manejo de errores HTTP.                              |
-| frontend/DigitalArs/tests/roles.test.mjs        | Qué rutas ve cada rol.                                               |
+| frontend/DigitalArs/tests/roles.test.mjs        | Qué rutas ve cada rol y cuándo la sesión cuenta como activa.         |
 | frontend/DigitalArs/tests/dashboard.test.mjs    | Usuario de la sesión y armado de los pedidos de perfil y alias.      |
-| frontend/DigitalArs/tests/movimientosUtils.test.mjs | Armado de la consulta del historial y conteo de filtros.         |
+| frontend/DigitalArs/tests/movimientosUtils.test.mjs | Consulta del historial, filtros, fecha corta, importe, contraparte y unión de páginas. |
+| frontend/DigitalArs/tests/navegacion.test.mjs   | Qué pestaña de la barra inferior se marca en cada ruta.              |
 
 Las invitaciones se ejercitan contra el AuthService real, con Identity y los perfiles en memoria: no hace falta SQL Server porque el servicio depende de interfaces, no de un DbContext.
 

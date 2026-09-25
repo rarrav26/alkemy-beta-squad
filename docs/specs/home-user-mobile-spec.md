@@ -1,5 +1,12 @@
 # Spec — Home (estilo Naranja X) · DigitalArs Billetera Virtual
 
+> **Estado (2026-09-24): implementado** en la rama `feature/mejoras-ux-ui-pantalla-usuario-mobile`,
+> junto con las pantallas que este spec dejaba para después: Cuentas (`/cuentas`), Tarjetas
+> (`/tarjetas`) y el historial completo en mobile (`/movimientos`). La forma en que quedó armado
+> (estructura mobile, hooks compartidos, datos de muestra) está documentada en la sección
+> **Vista mobile** de `frontend/DigitalArs/README.md`. Este archivo queda como registro de las
+> decisiones de diseño; la sección 0.1 es la que manda sobre el resto.
+
 > Sugerencia de ubicación en el repo: `docs/frontend/home-spec.md`
 > Rama sugerida: `feature/ux-home-mui-reactbits` (desde `dev`, según el flujo del repo)
 

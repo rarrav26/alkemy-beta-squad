@@ -282,9 +282,10 @@ movimiento guardado a las `2026-09-15T01:00Z` es el 14 a las 22:00 en Argentina 
 entra en `?hasta=2026-09-14`.
 
 `signo` no es una columna de la base: se deriva del tipo
-(`Helpers/Domain/SignoDeMovimiento.cs`). `DEPOSITO` y `TRANSFERENCIA_RECIBIDA` son
-`CREDITO`, `TRANSFERENCIA_ENVIADA` es `DEBITO`. Por eso `?tipo=credito` se
-traduce a un `IN` sobre los tipos que suman, y no a un filtro en memoria.
+(`Helpers/Domain/SignoDeMovimiento.cs`). `DEPOSITO`, `TRANSFERENCIA_RECIBIDA` y
+`PAGO_RECIBIDO` son `CREDITO`; `TRANSFERENCIA_ENVIADA` y `PAGO_CON_TARJETA` son
+`DEBITO`. Por eso `?tipo=credito` se traduce a un `IN` sobre los tipos que suman, y
+no a un filtro en memoria.
 
 Hay un tercer valor, `DESCONOCIDO`: un tipo que está cargado en la base pero que
 `SignoDeMovimiento` todavía no clasifica sale con ese signo, y el front lo muestra
@@ -327,15 +328,34 @@ Respuesta 200:
 ```json
 {
   "items": [
-    { "id": 18, "fecha": "2026-09-14T10:05:22-03:00", "tipo": "DEPOSITO", "signo": "CREDITO", "importe": 1500.00 },
-    { "id": 17, "fecha": "2026-09-13T18:41:07-03:00", "tipo": "TRANSFERENCIA_ENVIADA", "signo": "DEBITO", "importe": 320.50 }
+    { "id": 19, "fecha": "2026-09-14T11:20:03-03:00", "tipo": "PAGO_CON_TARJETA", "signo": "DEBITO", "importe": 800.00, "ultimosCuatro": "3435", "contraparte": null },
+    { "id": 18, "fecha": "2026-09-14T10:05:22-03:00", "tipo": "DEPOSITO", "signo": "CREDITO", "importe": 1500.00, "ultimosCuatro": null, "contraparte": null },
+    { "id": 17, "fecha": "2026-09-13T18:41:07-03:00", "tipo": "TRANSFERENCIA_ENVIADA", "signo": "DEBITO", "importe": 320.50, "ultimosCuatro": null, "contraparte": "Tomas Destino" }
   ],
   "page": 1,
   "pageSize": 5,
-  "totalItems": 18,
+  "totalItems": 19,
   "totalPages": 4
 }
 ```
+
+Dos campos dependen del tipo de movimiento y son `null` en los demás:
+
+- `ultimosCuatro`: solo en `PAGO_CON_TARJETA`, los últimos 4 dígitos de la tarjeta con la
+  que se pagó. Salen de un join contra `Tarjetas` y se recortan con `SUBSTRING` en la
+  base: el número completo nunca viaja en una consulta de historial.
+- `contraparte`: solo en transferencias, el nombre y apellido del titular de la otra
+  cuenta. En una `TRANSFERENCIA_ENVIADA` es a quién se le mandó; en una
+  `TRANSFERENCIA_RECIBIDA`, quién la mandó. Una transferencia se guarda como dos
+  movimientos que comparten `transferencia_id`, y la contraparte es el titular del
+  **otro** movimiento con ese mismo id. El formato del nombre es el de
+  `Helpers/Domain/NombreDelTitular.cs`, el mismo que usan la confirmación de la
+  transferencia y los avisos.
+
+Las dos se resuelven como subconsultas dentro de la misma consulta de la página
+(`OUTER APPLY`), no con un pedido por fila. Un pago con tarjeta no tiene `contraparte`:
+el pago y el cobro se guardan con `transferencia_id` en `null`, así que no hay forma de
+enlazarlos.
 
 `fecha` viaja en hora argentina con el huso incluido. Es la forma única de toda la
 API: el depósito devuelve su `fecha` igual. En la base se guarda siempre UTC y la
