@@ -13,12 +13,12 @@ import {
   TextField,
   Typography
 } from '@mui/material'
-import { apiRequest } from '../../context/api'
 import { useAuth } from '../../context/authContext'
 
 export default function TransferenciaModal({ open, onClose, onTransferenciaRealizada, saldoDisponible = 0 }) {
-  const { session } = useAuth()
-  const token = session?.token || session?.accessToken || session?.jwt
+  // Las llamadas pasan por el AuthProvider para que un 401 cierre la sesión igual que en el
+  // resto de la app, en vez de quedar como un error más dentro del modal.
+  const { resolverDestinoDeTransferencia, transferir } = useAuth()
 
   // Estados del formulario
   const [destino, setDestino] = useState('')
@@ -53,15 +53,7 @@ export default function TransferenciaModal({ open, onClose, onTransferenciaReali
     setCuentaDestino(null)
 
     try {
-      // Mandamos 1 para superar la regla > 0 del DTO compartido del backend
-      const data = await apiRequest('/api/Transferencias/resolver-destino', {
-        method: 'POST',
-        token,
-        body: {
-          destino: term,
-          importe: 1
-        }
-      })
+      const data = await resolverDestinoDeTransferencia(term)
       setCuentaDestino(data)
     } catch (err) {
       const mensajeCrudo = err.message || 'No se encontró la cuenta destino.'
@@ -102,15 +94,12 @@ export default function TransferenciaModal({ open, onClose, onTransferenciaReali
     setError('')
 
     try {
-      const resultado = await apiRequest('/api/Transferencias', {
-        method: 'POST',
-        token,
-        body: {
-          destino: destino.trim(),
-          importe: valor
-        }
-      })
+      const resultado = await transferir(destino.trim(), valor)
 
+      // El envío ya terminó: se libera ANTES de salir. limpiarYSalir no hace nada mientras hay
+      // un envío en curso, así que si se esperaba al finally el modal quedaba abierto, con el
+      // formulario cargado y listo para mandar la misma transferencia otra vez.
+      envioEnCurso.current = false
       limpiarYSalir()
       if (onTransferenciaRealizada) onTransferenciaRealizada(resultado)
     } catch (err) {

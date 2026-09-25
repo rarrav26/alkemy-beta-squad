@@ -1,7 +1,7 @@
 ﻿using DigitalArs.Api.Data.Context;
 using DigitalArs.Api.Data.Entities;
+using DigitalArs.Api.Helpers.Domain;
 using DigitalArs.Api.Interfaces;
-using DigitalArs.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace DigitalArs.Api.Repositories;
@@ -67,5 +67,15 @@ public class CuentaRepository(DigitalArsDbContext context) : ICuentaRepository
             .SingleOrDefaultAsync(
                 cuenta => cuenta.alias == destino || cuenta.cvu == destino,
                 cancellationToken);
+    }
+
+    public async Task<bool> UpdateAliasAsync(int usuarioId, string newAlias, CancellationToken cancellationToken = default)
+    {
+        var cuenta = await context.Cuentas.SingleOrDefaultAsync(c => c.usuario_id == usuarioId, cancellationToken);
+        if (cuenta is null) return false;
+
+        cuenta.alias = newAlias;
+        await context.SaveChangesAsync(cancellationToken);
+        return true;
     }
 }

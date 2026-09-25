@@ -1,8 +1,8 @@
 import { useContext } from 'react'
 
 import IconButton from '@mui/material/IconButton'
-import LightModeIcon from '@mui/icons-material/LightMode'
-import DarkModeIcon from '@mui/icons-material/DarkMode'
+import LightModeRounded from '@mui/icons-material/LightModeRounded'
+import DarkModeRounded from '@mui/icons-material/DarkModeRounded'
 
 import { ElementosGlobales } from '../../context/ElementosGlobales'
 
@@ -15,7 +15,7 @@ function ChangeTheme() {
 
   return (
     <IconButton color='inherit' onClick={changeTheme} aria-label='Cambiar tema'>
-      {darkMode ? <LightModeIcon /> : <DarkModeIcon />}
+      {darkMode ? <LightModeRounded /> : <DarkModeRounded />}
     </IconButton>
   )
 }

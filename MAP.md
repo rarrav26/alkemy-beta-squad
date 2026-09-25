@@ -47,8 +47,14 @@ En DigitalArs se incorporaron:
 - Swagger con soporte Bearer y CORS para React.
 - Login, registro, dashboard y alta de usuarios desde el frontend.
 - Llamadas a la API centralizadas en AuthProvider.
+- Protección de endpoints y rutas de React por rol, y bloqueo de usuarios desactivados.
 
-La entrega implementa la base de acceso. No implementa toda la operatoria financiera de una billetera.
+Sobre esa base de acceso se sumó la operatoria de la billetera y la gestión del administrador:
+
+- Usuario regular: ver y editar su perfil, cambiar su alias, consultar saldo, ingresar dinero,
+  transferir a otra cuenta activa y ver su historial de movimientos.
+- Administrador: listar usuarios regulares, editar su nombre, apellido y email, y activarlos o
+  desactivarlos.
 
 ## 2. Conceptos básicos
 
@@ -83,12 +89,12 @@ Dentro de **backend/DigitalArs.Api/**:
 | Program.cs                                 | Configuración, arranque y recorrido de peticiones.                   |
 | DigitalArs.Api.csproj                      | Versión de .NET, paquetes y recursos SQL incluidos en el ensamblado. |
 | Controllers/AuthController.cs              | Registro, login, primera contraseña, sesión y prueba protegida.      |
-| Controllers/UsuariosController.cs          | Crear usuarios con invitación, renovarla y cambiar estado.           |
+| Controllers/UsuariosController.cs          | Administración de usuarios (listado, detalle, edición, alta con invitación, renovación y estado) y perfil propio (`me`). |
 | Controllers/SetupController.cs             | Estado del alta inicial: informa si ya existe un administrador.      |
 | Controllers/TiposDeMovimientosController.cs | Catálogo de tipos de movimiento: listado y detalle por id.          |
-| Controllers/CuentasController.cs           | Consulta de la cuenta propia: alias, CVU y saldo.                    |
-| Controllers/MovimientosController.cs       | Depósitos sobre la cuenta propia.                                    |
-| Controllers/RespuestaDeError.cs            | Arma el ErrorResponse desde un Resultado, compartido por controllers.|
+| Controllers/CuentasController.cs           | Consulta de la cuenta propia (alias, CVU y saldo) y cambio de alias. |
+| Controllers/MovimientosController.cs       | Depósitos e historial sobre la cuenta propia.                        |
+| Controllers/TransferenciasController.cs    | Resolución del destino y transferencia entre cuentas.                |
 | Data/Context/DigitalArsDbContext.cs        | Modelo de las tablas del negocio.                                    |
 | Data/Context/AuthDbContext.cs              | Modelo de las tablas Identity.                                       |
 | Data/Entities/Usuario.cs                   | Perfil del usuario de negocio.                                       |
@@ -111,45 +117,61 @@ Dentro de **backend/DigitalArs.Api/**:
 | DTOs/CuentaResponse.cs                     | Respuesta de la cuenta propia: id, alias, CVU y saldo.               |
 | DTOs/DepositoDto.cs                        | Importe a depositar, con su validación.                              |
 | DTOs/DepositoResponseDto.cs                | Respuesta del depósito: saldo actualizado y fecha argentina.         |
-| DTOs/ErrorResponse.cs                      | Forma única de los errores HTTP: code, message y errors.             |
 | DTOs/HistorialMovimientosDto.cs            | Filtros del historial que llegan por query string.                   |
-| DTOs/MovimientoResponse.cs                 | Una fila del historial, con su signo y la fecha en hora argentina.   |
+| DTOs/MovimientoResponse.cs                 | Una fila del historial, con su signo, la fecha en hora argentina, la tarjeta de un pago y la contraparte de una transferencia. |
 | DTOs/PaginaResponse.cs                     | Envoltorio común de cualquier listado paginado de la API.            |
+| DTOs/TransferenciaDto.cs                   | Destino (alias o CVU) e importe a transferir, con su validación.     |
+| DTOs/DestinoResponseDto.cs                 | Respuesta del destino resuelto: id, alias, CVU y titular.            |
+| DTOs/TransferenciaResponseDto.cs           | Respuesta de la transferencia: saldo actualizado y mensaje.          |
+| DTOs/UpdateProfileDto.cs                   | Edición del perfil propio; pide la contraseña actual si cambia el email. |
+| DTOs/UpdateAliasDto.cs                     | Alias nuevo, validado con el patrón de DatosDeCuenta.                |
+| DTOs/AdminUpdateUsuarioDto.cs              | Edición de otro usuario por el admin: solo nombre, apellido y email. |
+| DTOs/UsuarioResponse.cs                    | Perfil de un usuario con su cuenta, si tiene.                        |
+| DTOs/Class.cs                              | UsuarioAdminItemDto, una fila del listado del admin. El archivo no sigue la regla de nombre de la sección 6. |
 | Interfaces/ITokenService.cs                | Contrato de generación del JWT.                                      |
 | Interfaces/IAuthService.cs                 | Contrato de login, primera contraseña y perfil de la sesión.         |
-| Interfaces/IAccountService.cs              | Contrato del alta, la invitación y el estado de un usuario.          |
+| Interfaces/IAccountService.cs              | Contrato del alta, la invitación, el estado, el perfil y el alias.   |
 | Interfaces/ICuentaService.cs               | Contrato de la consulta de la cuenta propia.                         |
 | Interfaces/IDepositoService.cs             | Contrato del depósito.                                               |
 | Interfaces/IHistorialService.cs            | Contrato de la consulta del historial propio paginado.               |
+| Interfaces/ITransferenciaService.cs        | Contrato de la resolución del destino y de la transferencia.         |
 | Interfaces/IUsuarioRepository.cs           | Contrato de acceso a los perfiles de usuario.                        |
 | Interfaces/ITipoMovimientoRepository.cs    | Contrato de acceso al catálogo de tipos de movimiento.               |
-| Interfaces/ICuentaRepository.cs            | Contrato de acceso a las cuentas y a la acreditación de saldo.       |
-| Interfaces/IMovimientoRepository.cs        | Contrato de alta de movimientos.                                     |
+| Interfaces/ICuentaRepository.cs            | Contrato de acceso a las cuentas: saldo, búsqueda por alias/CVU y alias. |
+| Interfaces/IMovimientoRepository.cs        | Contrato de alta de movimientos y consulta paginada.                 |
+| Interfaces/FiltroDeMovimientos.cs          | Lo que el servicio le pide al repositorio para filtrar el historial. |
+| Interfaces/MovimientoLeido.cs              | Una fila tal como la devuelve el repositorio, con la fecha en UTC.   |
+| Interfaces/PaginaDeMovimientos.cs          | Lo que devuelve el repositorio: las filas y el total con los filtros.|
 | Repositories/UsuarioRepository.cs          | Consultas de perfiles sobre DigitalArsDbContext.                     |
 | Repositories/TipoMovimientoRepository.cs   | Consultas del catálogo sobre DigitalArsDbContext.                    |
 | Repositories/CuentaRepository.cs           | Consulta de la cuenta y acreditación atómica del saldo.              |
 | Repositories/MovimientoRepository.cs       | Alta de un movimiento y consulta paginada del historial.             |
 | Services/AuthService.cs                    | Reglas de login, primera contraseña y consulta del perfil.           |
-| Services/AccountService.cs                 | Creación de cuentas/perfiles, invitaciones y estado activo.          |
+| Services/AccountService.cs                 | Altas, invitaciones, estado activo, edición de perfil y alias, y listado del admin. |
 | Services/CuentaService.cs                  | Resuelve la cuenta del usuario logueado y arma su respuesta.         |
 | Services/DepositoService.cs                | Reglas del depósito: valida, acredita y registra el movimiento.      |
 | Services/HistorialService.cs               | Resuelve la cuenta del token y arma la página del historial.         |
-| Services/SignoDeMovimiento.cs              | Traduce el filtro ?tipo= al signo del movimiento (CREDITO/DEBITO).   |
-| Services/HoraDeArgentina.cs                | Convierte entre el UTC de la base y el huso -03:00 del front.        |
-| Services/LimitesDeImporte.cs               | Regla única del importe de un movimiento, sin base de datos.         |
-| Services/Resultado.cs                      | Lo que devuelve un servicio: la respuesta lista o el motivo.         |
-| Services/MotivoDeRechazo.cs                | Los motivos de negocio por los que un servicio rechaza.              |
-| Services/Invitacion.cs                     | Propósito y duración de la invitación, compartidos.                  |
-| Services/RolPrincipal.cs                   | Regla única del rol que se informa al frontend.                      |
-| Services/MensajesDeIdentity.cs             | Traduce los errores de Identity a mensajes mostrables.               |
-| Services/ResultadoDeAlta.cs                | Resultado interno del alta: los registros creados o los errores.     |
-| Services/DatosDeCuenta.cs                  | Sorteo del alias y armado del CVU, sin base de datos.                |
+| Services/TransferenciaService.cs           | Reglas de la transferencia: valida el destino y mueve el saldo.      |
 | Services/JwtTokenService.cs                | Generación y firma de JWT.                                           |
-| Services/JwtOptions.cs                     | Opciones y valores predeterminados del JWT.                          |
-| Middleware/GlobalExceptionHandler.cs       | Convierte una excepción no controlada en un 500 con ErrorResponse.   |
+| Helpers/Domain/SignoDeMovimiento.cs        | Traduce el filtro ?tipo= al signo del movimiento (CREDITO/DEBITO).   |
+| Helpers/Domain/LimitesDeImporte.cs         | Regla única del importe de un movimiento, sin base de datos.         |
+| Helpers/Domain/DatosDeCuenta.cs            | Sorteo del alias y armado del CVU, sin base de datos.                |
+| Helpers/Domain/RolPrincipal.cs             | Regla única del rol que se informa al frontend.                      |
+| Helpers/Common/HoraDeArgentina.cs          | Convierte entre el UTC de la base y el huso -03:00 del front.        |
+| Helpers/Common/TextoDeBusqueda.cs          | Normaliza texto (minúsculas, sin acentos) para poder compararlo.     |
+| Helpers/Common/MensajesDeIdentity.cs       | Traduce los errores de Identity a mensajes mostrables.               |
+| Helpers/Results/Resultado.cs               | Lo que devuelve un servicio: la respuesta lista o el motivo.         |
+| Helpers/Results/MotivoDeRechazo.cs         | Los motivos de negocio por los que un servicio rechaza.              |
+| Helpers/Results/ResultadoDeAlta.cs         | Resultado interno del alta: los registros creados o los errores.     |
+| Helpers/Configuration/JwtOptions.cs        | Opciones y valores predeterminados del JWT.                          |
+| Helpers/Configuration/Invitacion.cs        | Propósito y duración de la invitación, compartidos.                  |
+| Errors/ErrorResponse.cs                    | Forma única de los errores HTTP: code, message y errors.             |
+| Errors/RespuestaDeError.cs                 | Arma el ErrorResponse desde un Resultado, compartido por controllers.|
+| Errors/GlobalExceptionHandler.cs           | Convierte una excepción no controlada en un 500 con ErrorResponse.   |
 | OpenApi/BearerSecuritySchemeTransformer.cs | Documentación de autenticación en Swagger.                           |
 | Properties/launchSettings.json             | Perfiles, puertos y entorno de desarrollo.                           |
-| Tests/AuthenticationChecks/                | Ejecutable de verificaciones del backend.                            |
+| Tests/AuthenticationChecks/                | Verificaciones de Identity, invitaciones, JWT y alias.               |
+| Tests/MovimientosChecks/                   | Verificaciones de la búsqueda y el signo de los movimientos.         |
 
 En **database/** están todos los scripts SQL (Init, Create, Identity y Seed en sus distintas versiones) junto al diagrama entidad-relación. El frontend está en **frontend/DigitalArs/** y se detalla en la sección 14.
 
@@ -171,7 +193,7 @@ Program.cs es el punto de entrada. Primero registra servicios; después construy
 | AddIdentityCore                             | Configura Identity, contraseña mínima y bloqueo por intentos.  |
 | AddRoles / AddEntityFrameworkStores         | Agrega roles y almacenamiento en SQL mediante EF.              |
 | AddDefaultTokenProviders                    | Habilita los proveedores usados para invitaciones.             |
-| AddScoped de IAccountService, IAuthService e ITokenService | Registra servicios propios por su interfaz. |
+| AddScoped de IAccountService, IAuthService, ITokenService y el resto de los servicios | Registra servicios propios por su interfaz. |
 | AddExceptionHandler / AddProblemDetails     | Registra el manejo global de errores.                          |
 | AddOptions de JwtOptions                    | Lee y valida las opciones JWT.                                 |
 | AddAuthentication / AddJwtBearer            | Configura autenticación mediante JWT.                          |
@@ -259,12 +281,12 @@ Cada recurso tiene su propia interfaz en **Interfaces/** y su implementación en
 
 | Interfaz | Métodos | Quién la usa |
 | ---------------------------- | ------------------------------------------------------------------- | ------------------------------ |
-| IUsuarioRepository           | GetByIdAsync, GetByIdentityUserIdAsync, ActualizarEstadoActivoAsync  | AuthService y AccountService.  |
+| IUsuarioRepository           | GetByIdAsync, GetByIdentityUserIdAsync, ActualizarEstadoActivoAsync, UpdateProfileAsync | Todos los servicios salvo JwtTokenService. |
 | ITipoMovimientoRepository    | GetAllAsync, GetByIdAsync, GetByDescripcionAsync                     | TiposDeMovimientosController y DepositoService. |
-| ICuentaRepository            | GetByUsuarioIdAsync, IncrementarSaldoAsync                           | CuentaService y DepositoService. |
-| IMovimientoRepository        | AddAsync                                                             | DepositoService.               |
+| ICuentaRepository            | GetByUsuarioIdAsync, GetByAliasOCvuAsync, IncrementarSaldoAsync, DecrementarSaldoAsync, UpdateAliasAsync | AccountService, CuentaService, DepositoService, HistorialService y TransferenciaService. |
+| IMovimientoRepository        | AddAsync, ListarPaginaAsync                                          | DepositoService y HistorialService. |
 
-En IUsuarioRepository las dos consultas usan AsNoTracking, porque solo leen. La única escritura sobre un perfil es el estado activo, y la hace `ActualizarEstadoActivoAsync`, que busca con seguimiento y guarda adentro. El repositorio no expone `SaveChangesAsync`: quien lo llama pide una operación con nombre, no maneja la unidad de trabajo.
+En IUsuarioRepository las dos consultas usan AsNoTracking, porque solo leen. Las escrituras sobre un perfil son dos: el estado activo (`ActualizarEstadoActivoAsync`) y los datos personales (`UpdateProfileAsync`). Cada una busca con seguimiento y guarda adentro. El repositorio no expone `SaveChangesAsync`: quien lo llama pide una operación con nombre, no maneja la unidad de trabajo.
 
 ITipoMovimientoRepository devuelve `TipoMovimientoResponse` y no la entidad. Es un catálogo de solo lectura sin reglas propias, así que proyecta dentro de la consulta: trae solo las dos columnas que se publican y el controlador no necesita conocer `Tipo_Movimiento`. Mismo criterio que ITokenService, que devuelve `SesionResponse`.
 
@@ -275,6 +297,8 @@ El reparto queda así: el **servicio** aplica las reglas y devuelve un `Resultad
 Dos servicios son la excepción deliberada, y por el mismo motivo: necesitan `db.Database.BeginTransactionAsync()`, que ningún repositorio expone. **AccountService** abre una transacción que abarca los dos contextos (Identity y negocio), así que si el alta del perfil falla tampoco queda creada la cuenta de acceso. **DepositoService** abre una sobre el contexto de negocio para que la acreditación del saldo y el alta del movimiento se confirmen juntas o no se confirme ninguna. Los dos usan repositorios para todo lo que no es transaccional. Tampoco hay que implementar hashing ni altas de Identity mediante un repositorio: de eso se encarga UserManager.
 
 La regla, entonces: se inyecta el DbContext solo para manejar una transacción. Cualquier otra consulta o escritura va por su repositorio.
+
+**TransferenciaService todavía no sigue esa regla.** Inyecta `DigitalArsDbContext` y, en `TransferirAsync`, consulta las dos cuentas y agrega los dos movimientos directo sobre el contexto. El débito, el crédito y los dos movimientos se confirman juntos porque salen en un mismo `SaveChangesAsync`. Después, un segundo `SaveChangesAsync` completa `transferencia_id`. Pasarlo a repositorios y a una transacción explícita, como DepositoService, queda pendiente.
 
 En ese reparto, el repositorio no valida reglas de negocio. `CuentaRepository.IncrementarSaldoAsync` no revisa el importe —eso ya lo hizo `LimitesDeImporte` en el DTO y en el servicio—, pero sí lleva las condiciones del saldo y del usuario activo dentro del `UPDATE`: no son una validación más, son lo que evita que dos depósitos simultáneos se pasen del tope entre los dos.
 
@@ -367,9 +391,9 @@ El caso PASSWORD_SETUP_REQUIRED cubre al usuario que creó el administrador y
 todavía no eligió contraseña. Es la única desviación deliberada del error
 genérico: sin ella, esa persona recibiría el mismo 401 que un intento fallido y
 nunca sabría que debe definir su contraseña. Lo que se revela es acotado, porque
-la pantalla de primera contraseña sigue exigiendo el código de invitación que
-solo tiene el administrador. LoginPage lee el campo code y deriva a
-/primera-password con el correo ya cargado.
+para definir la contraseña hace falta el token de invitación, que solo llega al
+correo de la persona. LoginPage lee el campo code y deriva a /primera-password,
+que le indica revisar su correo.
 
 Ejemplo de respuesta; el vencimiento real se calcula al emitir:
 
@@ -388,7 +412,7 @@ Ejemplo de respuesta; el vencimiento real se calcula al emitir:
 
 **Interfaces/ITokenService.cs** define el contrato.  
 **Services/JwtTokenService.cs** lo implementa.  
-**Services/JwtOptions.cs** define su configuración.
+**Helpers/Configuration/JwtOptions.cs** define su configuración.
 
 CrearToken lee roles desde Identity, construye claims, calcula el vencimiento y firma con HS256 y Jwt:Key.
 
@@ -429,7 +453,9 @@ El security stamp no es una contraseña ni la clave JWT: cambia al realizar dete
 
 ### Autorización
 
-UsuariosController tiene Authorize(Roles = "Administrador"). Las rutas públicas declaran AllowAnonymous. La política general exige autenticación.
+La política general (FallbackPolicy) exige estar autenticado. Las rutas públicas declaran AllowAnonymous.
+
+En UsuariosController el rol se declara **en cada acción**, no en la clase, porque los endpoints `me` son de cualquier usuario logueado. Cada endpoint de administración lleva `[Authorize(Roles = RolPrincipal.Administrador)]`. Si a uno nuevo le falta, la FallbackPolicy solo pide estar logueado y cualquier usuario podría usarlo.
 
 | Caso                           | Respuesta habitual               |
 | ------------------------------ | -------------------------------- |
@@ -438,18 +464,22 @@ UsuariosController tiene Authorize(Roles = "Administrador"). Las rutas públicas
 | Token válido sin rol requerido | 403                              |
 | Token válido con permiso       | Respuesta normal de la operación |
 
+Ese 401 y ese 403 los genera el framework **sin cuerpo JSON**. El frontend lo resuelve con su propio mensaje (`mensajePara` en `api.js`), y como la respuesta no trae `code`, un 403 por rol no cierra la sesión: solo lo hace el 403 con `USER_INACTIVE` o `UsuarioDesactivado` (el mismo caso con los dos formatos de `code` que usa la API).
+
 Los roles del JWT reflejan el momento de emisión. Si se agrega una función para cambiar roles, debe coordinarse con revocación o renovación: modificar la tabla de roles no actualiza el token entregado.
 
 ## 10. Invitaciones y usuarios desactivados
 
 ### Usuario creado por un administrador
 
-POST /api/usuarios recibe PerfilUsuarioDto, sin contraseña. AccountService crea Identity y perfil, y devuelve una invitación:
+POST /api/usuarios recibe PerfilUsuarioDto, sin contraseña. AccountService crea Identity y perfil, genera la invitación y la manda por correo con IEnviadorDeInvitaciones (SmtpEnviadorDeInvitaciones). El enlace, armado por Helpers/Domain/CorreoDeInvitacion, abre /primera-password?email=...&token=... en el frontend. La respuesta trae:
 
 - usuarioId y email;
 - requiresPasswordSetup: true;
-- invitationToken;
+- invitationSent: si el correo salió (false no deshace el alta: se reenvía con POST /api/usuarios/{id}/invitation);
 - expiresInSeconds: 86400.
+
+El token no viaja en la respuesta: el administrador nunca lo conoce.
 
 La invitación usa proveedores de Identity y Data Protection con el propósito DigitalArs.InitialPassword.v1. **No sirve como JWT para acceder a endpoints.**
 
@@ -485,6 +515,8 @@ Toda la preparación de datos vive en `database/` y se ejecuta a mano en SSMS, e
 | database/Create(v.002).sql   | Tablas de negocio, restricciones y el catálogo de tipos.  |
 | database/Identity(v.001).sql | Las siete tablas Identity cuando faltan.                  |
 | database/Seed(v.003).sql     | Roles, administrador inicial y datos de ejemplo.          |
+
+**database/Seed(v.004).sql** es opcional: carga 20 movimientos para probar el historial y su paginación. Los carga sobre la cuenta de `test.etapa2@example.com`, así que ese usuario tiene que existir antes (por ejemplo, creado con el registro). Seed(v.001) y Seed(v.002) son versiones anteriores y no se usan.
 
 El catálogo de tipos de movimiento se inserta dentro de **Create(v.002).sql**, no en un script aparte.
 
@@ -569,21 +601,31 @@ Las instancias que emiten y validan tokens necesitan una configuración de firma
 | POST /api/auth/initial-password    | Exige invitación válida | 200: contraseña definida y JWT.          |
 | GET /api/auth/me                   | Autenticado             | Perfil y rol consultado en la base.      |
 | GET /api/auth/test-protegido       | Autenticado             | 200: confirma acceso, no lista usuarios. |
+| GET /api/usuarios                  | Administrador           | 200: listado paginado de usuarios regulares, con búsqueda. |
+| GET /api/usuarios/{id}             | Administrador           | 200: detalle de un usuario, o 404.       |
+| PATCH /api/usuarios/{id}           | Administrador           | 200: edita nombre, apellido y email.     |
 | POST /api/usuarios                 | Administrador           | 201: alta con invitación.                |
 | POST /api/usuarios/{id}/invitation | Administrador           | 200: renovación.                         |
 | PATCH /api/usuarios/{id}/active    | Administrador           | 204: cambio de estado.                   |
 | GET /api/tiposdemovimientos        | Autenticado             | 200: catálogo completo de tipos.         |
 | GET /api/tiposdemovimientos/{id}   | Autenticado             | 200: un tipo, o 404 si no existe.        |
+| GET /api/usuarios/me               | Autenticado             | 200: perfil propio con su cuenta, si tiene. |
+| PATCH /api/usuarios/me             | Autenticado             | 200: edita nombre, apellido y email propios; cambiar el email pide la contraseña actual. |
 | GET /api/cuentas/me                | Autenticado             | 200: alias, CVU y saldo propios; 404 si no tiene cuenta. |
+| PATCH /api/cuentas/me/alias        | Autenticado             | 200: cambia el alias propio; 409 si ya existe. |
 | POST /api/movimientos/depositos    | Autenticado             | 200: acredita el importe y devuelve el saldo actualizado. |
 | GET /api/movimientos               | Autenticado             | 200: historial propio paginado, leído de la tabla Movimientos. |
+| POST /api/transferencias/resolver-destino | Autenticado      | 200: valida el alias o CVU destino y devuelve el titular, antes de confirmar. |
+| POST /api/transferencias           | Autenticado             | 200: transfiere a otra cuenta activa y devuelve el saldo actualizado. |
 | GET /api/setup/status              | Público                 | Estado de existencia del administrador.  |
 
-No existe GET /api/usuarios para listar usuarios en esta entrega.
+Un usuario sin rol Administrador que llame a cualquiera de los endpoints de Administrador recibe 403.
 
-Los dos endpoints de cuenta y depósito no reciben ningún identificador: resuelven la cuenta desde el claim del token. Por eso no hay forma de pedir el saldo de otra persona, ni siquiera cambiando un parámetro.
+Los endpoints de cuenta, movimientos y transferencias no reciben el identificador de la cuenta propia: la resuelven desde el claim del token. Por eso no hay forma de pedir el saldo o el historial de otra persona, ni siquiera cambiando un parámetro.
 
-Todos los errores comparten la forma `ErrorResponse` (`code`, `message`, `errors`), incluidos los 400 de validación de DTO: `Program.cs` reemplaza con `InvalidModelStateResponseFactory` el ValidationProblemDetails que `[ApiController]` devolvería por su cuenta. Si el cuerpo no se puede deserializar el mensaje es genérico a propósito, porque el texto que arma el framework nombra los tipos internos del DTO.
+Los endpoints de billetera no exigen el rol Usuario, solo estar logueado. El administrador no tiene cuenta (el seed no se la crea), así que si los llama recibe 404.
+
+Todos los errores que arma la API comparten la forma `ErrorResponse` (`code`, `message`, `errors`), incluidos los 400 de validación de DTO. La excepción son el 401 y el 403 que genera el framework al autenticar y autorizar, que salen sin cuerpo (ver la sección 9). `Program.cs` reemplaza con `InvalidModelStateResponseFactory` el ValidationProblemDetails que `[ApiController]` devolvería por su cuenta. Si el cuerpo no se puede deserializar el mensaje es genérico a propósito, porque el texto que arma el framework nombra los tipos internos del DTO. El `code` tiene dos formatos (`USER_INACTIVE` escrito a mano, `UsuarioDesactivado` copiado del enum); la tabla completa, con qué endpoint devuelve cada uno y qué respuestas salen sin cuerpo, está en la sección "Códigos de error" del README del backend.
 
 La política auth limita a 20 solicitudes por IP/minuto donde se aplica, como AuthController. No es un límite global de toda la API. El exceso devuelve 429.
 
@@ -616,15 +658,28 @@ Dentro de **frontend/DigitalArs/**:
 | Archivo                                    | Función                                                |
 | ------------------------------------------ | ------------------------------------------------------ |
 | src/main.jsx                               | Monta BrowserRouter y ambos providers.                 |
-| src/App.jsx                                | Tema, cabecera, contenido y pie.                       |
+| src/App.jsx                                | Tema y estructura: la de escritorio o la mobile.       |
 | src/context/ElementosGlobales.jsx          | Tema claro/oscuro y tema MUI.                          |
 | src/context/authContext.js                 | AuthContext y hook useAuth.                            |
 | src/context/AuthProvider.jsx               | Sesión y operaciones de autenticación/alta.            |
 | src/context/api.js                         | Cliente Axios: headers, JSON y traducción de errores.  |
 | src/components/Auth/AuthForm.jsx           | Formulario común, carga, errores y campos compartidos. |
 | src/routes/AuthPages.jsx                   | LoginPage, RegisterPage e InitialPasswordPage.         |
-| src/routes/Dashboard.jsx                   | Dashboard y NewUserPage con invitación.                |
-| src/components/Main/Main.jsx               | Rutas y protección de navegación.                      |
+| src/routes/Dashboard.jsx                   | Dashboard (escritorio, Inicio mobile o panel admin) y NewUserPage con invitación. |
+| src/routes/Cuentas.jsx                     | "Tus cuentas" en mobile: saldo, movimientos, balance y gestión. |
+| src/routes/Tarjetas.jsx                    | "Tus tarjetas" en mobile: tarjeta virtual, pagos y gestión. |
+| src/routes/Perfil.jsx                      | Perfil propio: datos personales y alias.               |
+| src/routes/Movimientos.jsx                 | Historial: paginado en escritorio, con "Cargar más" en mobile. |
+| src/hooks/                                 | Lógica compartida entre escritorio y mobile: cuenta, operaciones de dinero, tarjeta, listas de movimientos y si se usa la vista mobile. |
+| src/components/Navegacion/, Inicio/, Movimientos/, Tarjetas/ | Piezas de la vista mobile (ver "Vista mobile" en el README del frontend). |
+| src/components/Proximamente/datosDeMuestra.js | Único archivo con datos inventados: todo lo "Próximamente". |
+| src/routes/UsuariosAdmin.jsx               | Listado, búsqueda y activación de usuarios (admin).    |
+| src/components/Admin/EditarUsuarioModal.jsx | Edición de un usuario por el admin.                   |
+| src/components/Cuentas/DepositoModal.jsx   | Ingreso de dinero.                                     |
+| src/components/Cuentas/TransferenciaModal.jsx | Transferencia en dos pasos: resolver destino y confirmar. |
+| src/routes/dashboardUtils.js, movimientosUtils.js, navegacionUtils.js, perfilUtils.js | Funciones puras de cada pantalla, probadas en tests/. |
+| src/components/Main/Main.jsx               | Rutas y protección de navegación por rol.              |
+| src/routes/rolesUtils.js                   | Único lugar que lee el rol de la sesión.               |
 | src/components/Header/Header.jsx           | Envuelve a ResponsiveAppBar.                           |
 | src/components/Header/ResponsiveAppBar.jsx | Navegación y cierre de sesión.                         |
 | src/components/Header/ChangeTheme.jsx      | Cambia el tema.                                        |
@@ -634,7 +689,7 @@ Dentro de **frontend/DigitalArs/**:
 | vite.config.js                             | Plugin React y puerto 5173 fijo.                       |
 | vercel.json                                | Configuración del frontend; no despliega la API .NET.  |
 
-Los componentes usan useAuth, sin llamar fetch directamente.
+Los componentes llaman a la API a través de useAuth, sin usar fetch ni Axios directamente. La excepción es la gestión de usuarios del administrador: UsuariosAdmin.jsx y EditarUsuarioModal.jsx usan funciones de api.js y les pasan el token a mano, así que un 401 ahí muestra un error pero no cierra la sesión.
 
 AuthProvider restaura la sesión al recargar y verifica /api/auth/me. Guarda token, vencimiento y usuario en sessionStorage; no guarda contraseñas ni invitaciones.
 
@@ -643,6 +698,12 @@ Al vencer el token, un temporizador borra la sesión. Un 401 en authenticatedReq
 **Logout elimina la copia local**, no incorpora revocación individual del JWT en el servidor. Una copia del token podría seguir siendo válida hasta vencer o cambiar el stamp.
 
 La protección de rutas de React organiza la interfaz. La autorización real la hace la API.
+
+En el teléfono, un usuario regular ve otra estructura: encabezado propio y barra inferior (Inicio, Cuentas, QR, Tarjetas, Más) en lugar del AppBar y el pie. Lo decide un solo hook, `useNavegacionMobile`; el detalle está en la sección **Vista mobile** de `frontend/DigitalArs/README.md`.
+
+Cada ruta declara el rol que pide: `/movimientos`, `/cuentas` y `/tarjetas` son solo para Usuario (el administrador no tiene billetera), `/admin/usuarios` y `/usuarios/nuevo` son solo para Administrador, y `/dashboard` y `/perfil` son para los dos. Quien no tiene el rol vuelve a `/dashboard`.
+
+Un usuario desactivado no llega a ninguna pantalla protegida: el login le responde 403 `USER_INACTIVE` con el motivo, y si ya tenía la sesión abierta, su próxima llamada a la API recibe 401 y la sesión se cierra.
 
 routes/Home.jsx y routes/ProductId.jsx quedaron del template original y ninguna ruta los importa: son archivos muertos. El antiguo components/Home/Login.jsx se eliminó: era una segunda pantalla de login que tampoco se usaba. La pantalla real es LoginPage, en routes/AuthPages.jsx. Se retiraron del flujo las llamadas de ejemplo a DummyJSON.
 
@@ -719,8 +780,13 @@ Git no replica automáticamente la base local de cada compañero.
 
 | Archivo                                         | Verifica                                                             |
 | ----------------------------------------------- | -------------------------------------------------------------------- |
-| Tests/AuthenticationChecks/Program.cs           | Hashing, contraseñas, invitaciones y emisión/validación de JWT.      |
+| Tests/AuthenticationChecks/Program.cs           | Hashing, contraseñas, invitaciones, emisión/validación de JWT y alias. |
+| Tests/MovimientosChecks/Program.cs              | Normalización de la búsqueda y signo de cada tipo de movimiento.     |
 | frontend/DigitalArs/tests/api.test.mjs          | Headers, JSON y manejo de errores HTTP.                              |
+| frontend/DigitalArs/tests/roles.test.mjs        | Qué rutas ve cada rol y cuándo la sesión cuenta como activa.         |
+| frontend/DigitalArs/tests/dashboard.test.mjs    | Usuario de la sesión y armado de los pedidos de perfil y alias.      |
+| frontend/DigitalArs/tests/movimientosUtils.test.mjs | Consulta del historial, filtros, fecha corta, importe, contraparte y unión de páginas. |
+| frontend/DigitalArs/tests/navegacion.test.mjs   | Qué pestaña de la barra inferior se marca en cada ruta.              |
 
 Las invitaciones se ejercitan contra el AuthService real, con Identity y los perfiles en memoria: no hace falta SQL Server porque el servicio depende de interfaces, no de un DbContext.
 
@@ -728,6 +794,7 @@ Las invitaciones se ejercitan contra el AuthService real, con Identity y los per
 # Carpeta de la API:
 dotnet build
 dotnet run --project Tests/AuthenticationChecks/AuthenticationChecks.csproj
+dotnet run --project Tests/MovimientosChecks/MovimientosChecks.csproj
 
 # Carpeta del frontend:
 npm run build
@@ -735,7 +802,7 @@ npm run lint
 npm test
 ```
 
-La entrega pasa **19 verificaciones .NET y 8 del cliente HTTP**.
+La entrega pasa **51 verificaciones .NET** (36 de AuthenticationChecks y 15 de MovimientosChecks) y **25 pruebas del frontend** en 4 archivos.
 Varias usan almacenamiento en memoria o respuestas simuladas; no equivalen a integración completa con SQL Server.
 
 ### Prueba manual
@@ -810,7 +877,7 @@ No compartir contraseñas en capturas ni habilitar indiscriminadamente logs de d
 | Claims                   | JwtTokenService.CrearToken.                                                        |
 | Revocación por cuenta    | OnTokenValidated y security stamp.                                                 |
 | Endpoint nuevo           | Controllers, DTOs y servicios.                                                     |
-| Llamada desde React      | Función en AuthProvider que use apiRequest.                                        |
+| Llamada desde React      | Función en AuthProvider que use authenticatedRequest (las del admin hoy están en api.js). |
 | Campos de formularios    | AuthForm/ProfileFields y DTO correspondiente.                                      |
 | Pantallas                | AuthPages, Dashboard y Main.                                                       |
 
@@ -820,32 +887,30 @@ Cambiar `@AdminHash` en Seed(v.003).sql después de crear al administrador no ca
 
 No están implementados en esta entrega:
 
-- Listado de usuarios.
-- Interfaz para todas las operaciones administrativas de la API.
+- Pantallas para renovar una invitación y para ver el detalle de un usuario. La API tiene
+  los dos endpoints (`POST /api/usuarios/{id}/invitation` y `GET /api/usuarios/{id}`), pero
+  React todavía no los usa.
 - Refresh tokens.
 - Recuperación de contraseña de cuentas que ya tienen una.
 - Confirmación de email, correo automático, segundo factor y login externo.
-- Transferencias entre cuentas.
 - Despliegue de la API y gestor de secretos de producción.
 - Rotación de claves con transición.
 - Integración automatizada completa con SQL Server.
 
-CuentasController resuelve la consulta de saldo y MovimientosController el depósito
-y el historial.
-De la operatoria pendiente queda la transferencia entre cuentas, que va a necesitar mover
-saldo en dos cuentas y registrar dos movimientos dentro de la misma transacción.
+CuentasController resuelve la consulta de saldo y el cambio de alias, MovimientosController
+el depósito y el historial, y TransferenciasController la transferencia entre cuentas.
 
-El historial ya lee la tabla Movimientos. Queda una decisión de modelo pendiente
-para la transferencia: dónde se guarda la relación entre sus dos patas.
-`Movimientos.transferencia_id` existe pero está siempre en NULL y apunta a una
-tabla `Transferencias` que todavía no se creó.
+La transferencia guarda en `Movimientos.transferencia_id`, en sus dos patas, el id del
+movimiento débito: así se sabe qué envío y qué recepción van juntos. La tabla
+`Transferencias` que anunciaba esa columna no se creó, y la columna no tiene FK. Dónde
+guardar la relación entre las dos patas sigue siendo una decisión de modelo abierta.
 
 Sobre eso hay una propuesta a discutir en el squad: reducir el catálogo a dos
 tipos (`DEBITO` / `CREDITO`) y deducir la operación de `transferencia_id`, en
 lugar de los tres tipos actuales. Hoy el signo está implícito en la descripción
 del tipo (`SignoDeMovimiento.DeTipo`) y la etiqueta que muestra el front sale de
 esa misma descripción; cambiarlo obligaría a migrar las filas existentes,
-re-scaffoldear la entidad y tocar `DepositoService` y el front.
+re-scaffoldear la entidad y tocar `DepositoService`, `TransferenciaService` y el front.
 Tener tablas y entidades no implica tener sus operaciones HTTP implementadas.
 
 **Orden sugerido para estudiar:** AuthPages → AuthProvider → AuthController → AuthService → IUsuarioRepository/UsuarioRepository → AccountService → contextos → JwtTokenService → Program.cs. Así se sigue una acción desde la pantalla hasta la base y los controles de acceso, y se ve el corte entre el controlador que traduce HTTP y el servicio que aplica las reglas.

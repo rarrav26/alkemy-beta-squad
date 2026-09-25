@@ -12,9 +12,10 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
 using DigitalArs.Api.Data.Context;
-using DigitalArs.Api.DTOs;
+using DigitalArs.Api.Errors;
+using DigitalArs.Api.Helpers.Configuration;
+using DigitalArs.Api.Hubs;
 using DigitalArs.Api.Interfaces;
-using DigitalArs.Api.Middleware;
 using DigitalArs.Api.OpenApi;
 using DigitalArs.Api.Repositories;
 using DigitalArs.Api.Services;
@@ -70,6 +71,7 @@ builder.Services.AddScoped<ITipoMovimientoRepository, TipoMovimientoRepository>(
 builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
 builder.Services.AddScoped<ICuentaRepository, CuentaRepository>();
 builder.Services.AddScoped<IMovimientoRepository, MovimientoRepository>();
+builder.Services.AddScoped<INotificacionRepository, NotificacionRepository>();
 
 // -----------------------------------------------------------------------------
 // 3. Identity: cuentas, contraseñas, roles e invitaciones
@@ -108,6 +110,26 @@ builder.Services.AddScoped<ICuentaService, CuentaService>();
 builder.Services.AddScoped<IDepositoService, DepositoService>();
 builder.Services.AddScoped<ITransferenciaService, TransferenciaService>();
 builder.Services.AddScoped<IHistorialService, HistorialService>();
+builder.Services.AddScoped<ITarjetaService, TarjetaService>();
+builder.Services.AddScoped<INotificacionService, NotificacionService>();
+
+// TarjetaService lleva en memoria los intentos fallidos de contraseña sobre el revelado del
+// código de seguridad. Es estado efímero y por eso no va a la base: se reinicia solo con el
+// tiempo. Con varias instancias de la API cada una llevaría su propia cuenta, lo cual es
+// aceptable acá porque corre una sola.
+builder.Services.AddMemoryCache();
+
+// SignalR mantiene abierta una conexión con cada usuario para avisarle de sus movimientos en el
+// momento. Viene incluido en ASP.NET Core: no hace falta instalar ningún paquete.
+// Los servicios de negocio no lo usan directamente, sino a través de INotificadorEnTiempoReal.
+builder.Services.AddSignalR();
+builder.Services.AddScoped<INotificadorEnTiempoReal, NotificadorSignalR>();
+
+// La invitación de primera contraseña llega por correo: el token nunca pasa por el
+// administrador. La sección "Email" dice a qué SMTP conectarse; sin ella se usan los
+// valores de smtp4dev (localhost:2525), el SMTP de desarrollo del README.
+builder.Services.AddOptions<EmailOptions>().BindConfiguration("Email").ValidateDataAnnotations().ValidateOnStart();
+builder.Services.AddScoped<IEnviadorDeInvitaciones, SmtpEnviadorDeInvitaciones>();
 
 // -----------------------------------------------------------------------------
 // 5. Manejo global de errores
@@ -161,7 +183,9 @@ async Task<bool> ElTokenSigueSiendoValido(TokenValidatedContext context)
     var stampDelToken = context.Principal?.FindFirstValue("security_stamp");
     if (stampDelToken != await users.GetSecurityStampAsync(user)) return false;
 
-    return await db.Usuarios.AnyAsync(u => u.identity_user_id == identityUserId);
+    // Desactivar a alguien rota su stamp, pero si la baja se hace directo en la base eso no
+    // pasa: por eso el estado se vuelve a mirar acá, en cada petición.
+    return await db.Usuarios.AnyAsync(u => u.identity_user_id == identityUserId && u.is_active);
 }
 
 // TokenValidationParameters es lo que se comprueba del token en sí: que lo haya
@@ -191,6 +215,34 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
         {
             if (!await ElTokenSigueSiendoValido(context))
                 context.Fail("Token inválido o usuario desactivado.");
+        },
+
+        // El navegador no deja mandar headers propios al abrir un WebSocket, así que el cliente
+        // de SignalR manda el JWT en la query string (?access_token=...). Acá se lo levanta de
+        // ahí y se lo entrega al resto de la validación, que sigue siendo exactamente la misma:
+        // este evento no valida nada, solo dice DÓNDE está el token.
+        //
+        // Se acepta únicamente en la ruta del hub. Si se aceptara en cualquier ruta, cualquier
+        // endpoint podría autenticarse con un token pegado en la URL, y las URLs quedan
+        // guardadas en el historial del navegador y en los logs de acceso del servidor.
+        //
+        // OJO al editar: este evento va DENTRO de este mismo objeto, al lado de
+        // OnTokenValidated. Escribir un segundo "options.Events = new JwtBearerEvents {...}"
+        // reemplaza a este y se pierde la comprobación de usuario desactivado en TODA la API.
+        OnMessageReceived = context =>
+        {
+            var esLaRutaDelHub = context.HttpContext.Request.Path
+                .StartsWithSegments("/hubs/notificaciones");
+
+            if (!esLaRutaDelHub)
+                return Task.CompletedTask;
+
+            var tokenDeLaQuery = context.Request.Query["access_token"].ToString();
+
+            if (!string.IsNullOrEmpty(tokenDeLaQuery))
+                context.Token = tokenDeLaQuery;
+
+            return Task.CompletedTask;
         }
     };
 });
@@ -271,8 +323,12 @@ if (allowedOrigins.Length == 0 && builder.Environment.IsDevelopment())
 {
     allowedOrigins = ["http://localhost:5173"];
 }
+// AllowCredentials es obligatorio para SignalR: el navegador lo exige para abrir el WebSocket.
+// Se puede usar porque los orígenes están enumerados uno por uno con WithOrigins. Es
+// incompatible con AllowAnyOrigin, así que si alguna vez se cambia a "cualquier origen", el
+// hub deja de conectar.
 builder.Services.AddCors(options => options.AddPolicy("Frontend", policy =>
-    policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod()));
+    policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
 
 // CORS es una política del navegador: evita que otro sitio llame a esta API desde
 // la pestaña de un usuario. No reemplaza a la autenticación ni frena a un cliente
@@ -328,7 +384,8 @@ app.UseCors("Frontend");     // antes de autenticar: el preflight OPTIONS viaja 
 app.UseAuthentication();     // ¿quién sos? lee el Bearer y arma la identidad
 app.UseAuthorization();      // ¿podés? aplica [Authorize] y la FallbackPolicy
 app.UseRateLimiter();        // aplica la política "auth" donde el controller la pide
-app.MapControllers();        // último: recién acá se ejecuta el endpoint
+app.MapControllers();        // los endpoints REST
+app.MapHub<NotificacionesHub>("/hubs/notificaciones"); // el WebSocket de las notificaciones
 
 // Nota sobre el orden: el rate limiter quedó después de la autorización, así que un
 // 401 o un 403 se responde sin consumir cuota. Para el login, que es [AllowAnonymous]

@@ -98,11 +98,21 @@ El modelo de datos se genera **desde la base** (Database First), no con migracio
 carpeta `backend/DigitalArs.Api`, con la variable de entorno exportada como se muestra arriba:
 
 ```powershell
-dotnet ef dbcontext scaffold "$env:ConnectionStrings__DefaultConnection" Microsoft.EntityFrameworkCore.SqlServer --project "DigitalArs.Api.csproj" --startup-project "DigitalArs.Api.csproj" --context DigitalArsDbContext --context-dir Data/Context --output-dir Data/Entities --namespace DigitalArs.Api.Data.Entities --context-namespace DigitalArs.Api.Data.Context --no-onconfiguring --use-database-names --force
+dotnet ef dbcontext scaffold "$env:ConnectionStrings__DefaultConnection" Microsoft.EntityFrameworkCore.SqlServer --project "DigitalArs.Api.csproj" --startup-project "DigitalArs.Api.csproj" --context DigitalArsDbContext --context-dir Data/Context --output-dir Data/Entities --namespace DigitalArs.Api.Data.Entities --context-namespace DigitalArs.Api.Data.Context --no-onconfiguring --use-database-names --force --table Usuarios --table Cuentas --table Movimientos --table Tipo_Movimiento
 ```
 
 `--no-onconfiguring` es importante: evita que el scaffolding escriba la cadena de conexión
 hardcodeada dentro del `DbContext`.
+
+Los `--table` también: sin ellos el scaffolding trae las siete tablas `AspNet*` al
+`DigitalArsDbContext`, donde chocan con `AuthDbContext`, que ya las mapea. El proyecto deja de
+compilar.
+
+**`Notificaciones` no va en esa lista.** Su entidad y su configuración se mantienen a mano en
+`Data/Entities/Notificacion.cs` y `Data/Context/DigitalArsDbContext.Notificaciones.cs` (una
+clase `partial` que implementa `OnModelCreatingPartial`). Si se la agrega a los `--table`, el
+generador crea una entidad y un `DbSet` duplicados para la misma tabla. El motivo completo está
+comentado arriba de esa clase `partial`.
 
 ## Estructura
 
@@ -110,13 +120,39 @@ hardcodeada dentro del `DbContext`.
 Controllers/      endpoints HTTP: reciben el request y traducen el resultado a un status
 DTOs/             lo que cada operación acepta y devuelve; nunca se expone una entidad
 Interfaces/       contratos, tanto de repositorios como de servicios
-Services/         las reglas de negocio (login, alta, invitaciones, JWT)
+Services/         las reglas de negocio (login, alta, invitaciones, JWT, cuenta, depósito,
+                  historial y transferencia)
 Repositories/     acceso a datos vía DbContext
-Middleware/       GlobalExceptionHandler: convierte una excepción no controlada en un 500 con ErrorResponse
+Helpers/          lo compartido que no depende de una petición HTTP:
+  Domain/           reglas de negocio puras: importes, alias/CVU, signos, roles
+  Common/           utilidades técnicas: fechas, normalización de texto, mensajes de Identity
+  Results/          Resultado<T> y MotivoDeRechazo: el contrato servicio → controller
+  Configuration/    opciones y constantes de configuración: JWT e invitación
+Errors/           la capa de errores, junta en un solo lugar: ErrorResponse (la forma),
+                  RespuestaDeError (la arma desde un Resultado) y GlobalExceptionHandler
+                  (convierte una excepción no controlada en un 500 con esa misma forma)
 OpenApi/          documentación del esquema Bearer en Swagger
 Data/Context/     DigitalArsDbContext (generado por scaffolding) y AuthDbContext (Identity)
 Data/Entities/    entidades (generadas por scaffolding)
 ```
+
+### Cada carpeta contiene una sola clase de archivo
+
+Esta regla es la que mantiene el proyecto navegable, y ya se rompió una vez: `Services/`
+llegó a tener 19 archivos de los cuales solo 7 eran servicios.
+
+- En `Services/` va **solo una clase que se registra en `Program.cs`** y recibe sus
+  dependencias por constructor. Si la clase es `static`, si no tiene dependencias, o si
+  no se registra en el contenedor, **no es un servicio**: va en `Helpers/`.
+- En `Controllers/` va **solo un `<Recurso>Controller`**. Un helper compartido entre
+  controllers no va ahí.
+- Antes de crear un archivo nuevo, preguntate **qué es**, no quién lo usa. Una regla de
+  negocio pura que usan un DTO y un repositorio va en `Helpers/Domain/`, aunque el
+  servicio también la use.
+
+Por qué importa: cuando una regla pura vive en `Services/`, un repositorio que la necesita
+termina haciendo `using ...Services`, y **la capa de datos pasa a depender de la de
+negocio**, al revés del flujo que describe la sección de abajo.
 
 Flujo de una lectura simple: `Controller` → `Interface` → `Repository` → `DbContext`.
 Flujo cuando hay reglas de por medio: `Controller` → `Interface` → `Service` → `Repository` / `UserManager`.
@@ -192,17 +228,31 @@ La contraseña debe tener al menos ocho caracteres, mayúscula, minúscula, núm
 | POST /api/auth/initial-password | Invitación válida | Define primera contraseña y devuelve JWT |
 | GET /api/auth/me | JWT | 200: perfil y rol consultados en la base, no en el token |
 | GET /api/auth/test-protegido | JWT | 200 autorizado, 401 sin token válido |
-| POST /api/usuarios | Administrador | Crea sin contraseña; devuelve invitationToken y requiresPasswordSetup |
-| POST /api/usuarios/{id}/invitation | Administrador | Renueva invitación e invalida la anterior |
-| PATCH /api/usuarios/{id}/active | Administrador | Activa/desactiva con { "isActive": false } |
+| GET /api/usuarios | Administrador | 200: listado paginado de usuarios regulares, con ?page, ?pageSize y ?busqueda |
+| GET /api/usuarios/{id} | Administrador | 200: detalle del usuario, o 404 si no existe |
+| PATCH /api/usuarios/{id} | Administrador | 200: edita nombre, apellido y email; no toca documento ni saldo |
+| POST /api/usuarios | Administrador | 201: crea sin contraseña y envía la invitación por correo; devuelve usuarioId, requiresPasswordSetup, invitationSent y expiresInSeconds (nunca el token) |
+| POST /api/usuarios/{id}/invitation | Administrador | Reenvía la invitación por correo e invalida la anterior; devuelve invitationSent |
+| PATCH /api/usuarios/{id}/active | Administrador | 204 sin cuerpo: activa/desactiva con { "isActive": false }; 404 si no existe |
 | GET /api/tiposdemovimientos | JWT | 200: catálogo completo de tipos de movimiento |
 | GET /api/tiposdemovimientos/{id} | JWT | 200: un tipo, o 404 si no existe |
+| GET /api/usuarios/me | JWT | 200: perfil propio con su cuenta, si tiene |
+| PATCH /api/usuarios/me | JWT | 200: edita nombre, apellido y email propios; si cambia el email pide `currentPassword` |
 | GET /api/cuentas/me | JWT | 200: id, alias, CVU y saldo de la cuenta propia; 404 si no tiene |
+| PATCH /api/cuentas/me/alias | JWT | 200: cambia el alias propio con { "alias": "mariagonzalez" } (solo letras, 3 a 50; el formato con puntos es solo el autogenerado); 400 si el formato no sirve; 409 si ya existe |
 | POST /api/movimientos/depositos | JWT | 200: acredita { "importe": 500 } y devuelve el saldo actualizado y la fecha en hora argentina |
 | GET /api/movimientos | JWT | 200: historial propio paginado, con filtros de fecha y tipo y búsqueda por nombre de tipo |
+| POST /api/transferencias/resolver-destino | JWT | 200: valida { "destino", "importe" } y devuelve id, alias, CVU y titular del destino; `importe` es obligatorio y si no alcanza el saldo responde 409 |
+| POST /api/transferencias | JWT | 200: transfiere a otra cuenta activa y devuelve saldoActual y message |
 | GET /api/setup/status | Público | Informa si la instalación ya tiene administrador |
 
-No existe GET /api/usuarios para listar usuarios en esta entrega.
+Un usuario sin rol Administrador que llame a un endpoint de Administrador recibe 403 sin cuerpo
+JSON, que es la respuesta por defecto del framework. En `UsuariosController` el rol va en cada
+acción, porque los endpoints `me` son de cualquier usuario logueado: un endpoint de
+administración nuevo tiene que llevar su `[Authorize(Roles = RolPrincipal.Administrador)]`.
+
+Los endpoints de billetera (cuenta, movimientos y transferencias) piden solo JWT, no el rol
+Usuario. El administrador no tiene cuenta, así que si los llama recibe 404.
 
 ### GET /api/movimientos — historial paginado
 
@@ -232,9 +282,10 @@ movimiento guardado a las `2026-09-15T01:00Z` es el 14 a las 22:00 en Argentina 
 entra en `?hasta=2026-09-14`.
 
 `signo` no es una columna de la base: se deriva del tipo
-(`Services/SignoDeMovimiento.cs`). `DEPOSITO` y `TRANSFERENCIA_RECIBIDA` son
-`CREDITO`, `TRANSFERENCIA_ENVIADA` es `DEBITO`. Por eso `?tipo=credito` se
-traduce a un `IN` sobre los tipos que suman, y no a un filtro en memoria.
+(`Helpers/Domain/SignoDeMovimiento.cs`). `DEPOSITO`, `TRANSFERENCIA_RECIBIDA` y
+`PAGO_RECIBIDO` son `CREDITO`; `TRANSFERENCIA_ENVIADA` y `PAGO_CON_TARJETA` son
+`DEBITO`. Por eso `?tipo=credito` se traduce a un `IN` sobre los tipos que suman, y
+no a un filtro en memoria.
 
 Hay un tercer valor, `DESCONOCIDO`: un tipo que está cargado en la base pero que
 `SignoDeMovimiento` todavía no clasifica sale con ese signo, y el front lo muestra
@@ -242,13 +293,13 @@ sin signo en vez de romper el historial entero con un 500. Es un texto y no `nul
 a propósito, así `signo` nunca falta en la respuesta. El movimiento se lista igual
 en `?tipo=todas`, pero queda afuera de `?tipo=credito` y de `?tipo=debito`, porque
 no se sabe para qué lado suma. Clasificarlo es agregar una línea al diccionario de
-`Services/SignoDeMovimiento.cs`, nada más.
+`Helpers/Domain/SignoDeMovimiento.cs`, nada más.
 
 `busqueda` filtra por el **nombre del tipo de movimiento**, no por importe ni por
 fecha: es el buscador de la pantalla de historial, y lo que compara es la
 `descripcion` de `Tipo_Movimiento`. Ignora mayúsculas y acentos, así que `depósito`,
 `deposito` y `DEPÓSITO` traen lo mismo. Normalizar los dos lados
-(`Services/TextoDeBusqueda.cs`) hace falta porque la collation de la base es
+(`Helpers/Common/TextoDeBusqueda.cs`) hace falta porque la collation de la base es
 `Modern_Spanish_CI_AS`: ignora las mayúsculas pero **sí distingue los acentos**, y
 sin eso el `depósito` que escribe el usuario no encontraría el `DEPOSITO` guardado.
 
@@ -277,19 +328,38 @@ Respuesta 200:
 ```json
 {
   "items": [
-    { "id": 18, "fecha": "2026-09-14T10:05:22-03:00", "tipo": "DEPOSITO", "signo": "CREDITO", "importe": 1500.00 },
-    { "id": 17, "fecha": "2026-09-13T18:41:07-03:00", "tipo": "TRANSFERENCIA_ENVIADA", "signo": "DEBITO", "importe": 320.50 }
+    { "id": 19, "fecha": "2026-09-14T11:20:03-03:00", "tipo": "PAGO_CON_TARJETA", "signo": "DEBITO", "importe": 800.00, "ultimosCuatro": "3435", "contraparte": null },
+    { "id": 18, "fecha": "2026-09-14T10:05:22-03:00", "tipo": "DEPOSITO", "signo": "CREDITO", "importe": 1500.00, "ultimosCuatro": null, "contraparte": null },
+    { "id": 17, "fecha": "2026-09-13T18:41:07-03:00", "tipo": "TRANSFERENCIA_ENVIADA", "signo": "DEBITO", "importe": 320.50, "ultimosCuatro": null, "contraparte": "Tomas Destino" }
   ],
   "page": 1,
   "pageSize": 5,
-  "totalItems": 18,
+  "totalItems": 19,
   "totalPages": 4
 }
 ```
 
+Dos campos dependen del tipo de movimiento y son `null` en los demás:
+
+- `ultimosCuatro`: solo en `PAGO_CON_TARJETA`, los últimos 4 dígitos de la tarjeta con la
+  que se pagó. Salen de un join contra `Tarjetas` y se recortan con `SUBSTRING` en la
+  base: el número completo nunca viaja en una consulta de historial.
+- `contraparte`: solo en transferencias, el nombre y apellido del titular de la otra
+  cuenta. En una `TRANSFERENCIA_ENVIADA` es a quién se le mandó; en una
+  `TRANSFERENCIA_RECIBIDA`, quién la mandó. Una transferencia se guarda como dos
+  movimientos que comparten `transferencia_id`, y la contraparte es el titular del
+  **otro** movimiento con ese mismo id. El formato del nombre es el de
+  `Helpers/Domain/NombreDelTitular.cs`, el mismo que usan la confirmación de la
+  transferencia y los avisos.
+
+Las dos se resuelven como subconsultas dentro de la misma consulta de la página
+(`OUTER APPLY`), no con un pedido por fila. Un pago con tarjeta no tiene `contraparte`:
+el pago y el cobro se guardan con `transferencia_id` en `null`, así que no hay forma de
+enlazarlos.
+
 `fecha` viaja en hora argentina con el huso incluido. Es la forma única de toda la
 API: el depósito devuelve su `fecha` igual. En la base se guarda siempre UTC y la
-conversión a -03:00 vive en un solo lugar (`Services/HoraDeArgentina.cs`).
+conversión a -03:00 vive en un solo lugar (`Helpers/Common/HoraDeArgentina.cs`).
 
 El front igual tiene que fijar el huso al formatear (`timeZone:
 'America/Argentina/Buenos_Aires'`): `Intl.DateTimeFormat` usa el del navegador, y
@@ -314,11 +384,63 @@ En la práctica un usuario desactivado ve un `401` y no el `403`: `Program.cs`
 revalida `is_active` contra la base en cada request y descarta el token antes de
 que llegue al servicio. La rama `403` queda como red de seguridad.
 
-Todos los errores usan la misma forma, `ErrorResponse`: `{ "code", "message", "errors" }`,
+Todo error que trae cuerpo usa la misma forma, `ErrorResponse`: `{ "code", "message", "errors" }`,
 donde `code` y `errors` se omiten cuando no aplican. Eso incluye los 400 de validación de
 DTO, que salen con `code` VALIDATION_ERROR: `Program.cs` reemplaza el ValidationProblemDetails
 que `[ApiController]` devolvería por su cuenta. Cuando el cuerpo no se puede deserializar
 el mensaje es genérico a propósito, porque el texto del framework nombra los tipos internos.
+
+### Códigos de error
+
+El `code` tiene **dos formatos**, según quién arma el error. Hay que tenerlo en cuenta al
+comparar en el front o en una prueba de Apidog.
+
+Escritos a mano, en MAYÚSCULAS (Auth, Usuarios y el manejador global):
+
+| code | Status | Cuándo |
+|---|---|---|
+| VALIDATION_ERROR | 400 | Cualquier DTO inválido, en cualquier endpoint |
+| INVALID_CREDENTIALS | 401 | Login: email o contraseña incorrectos, o cuenta bloqueada |
+| USER_INACTIVE | 403 | Login o primera contraseña de un usuario desactivado; `GET`/`PATCH /api/usuarios/me` y `PATCH /api/cuentas/me/alias` |
+| PASSWORD_SETUP_REQUIRED | 409 | Login de una cuenta creada por el administrador que todavía no definió contraseña |
+| INVALID_INVITATION | 400 | Primera contraseña con invitación inválida, vencida o ya usada |
+| INTERNAL_ERROR | 500 | Cualquier excepción no controlada (`GlobalExceptionHandler`) |
+
+Nombre del motivo, en PascalCase (Cuentas, Movimientos y Transferencias, vía
+`RespuestaDeError.Desde`, que copia el nombre de `MotivoDeRechazo`):
+
+| code | Status | Cuándo |
+|---|---|---|
+| MismaCuenta | 400 | Transferencia a la cuenta propia |
+| UsuarioDesactivado | 400 | Transferencia a una cuenta cuyo titular está desactivado |
+| UsuarioDesactivado | 403 | `GET /api/cuentas/me`, historial o depósito de un usuario desactivado (red de seguridad, ver arriba) |
+| CuentaNoEncontrada | 404 | El usuario no tiene cuenta (por ejemplo, el administrador) |
+| DestinoNoEncontrado | 404 | Ninguna cuenta con ese alias o CVU |
+| SaldoInsuficiente | 409 | La transferencia o el `resolver-destino` superan el saldo |
+| SaldoMaximoSuperado | 409 | El depósito deja la cuenta por encima del saldo máximo |
+| NoSePudoActualizar | 409 | El depósito no se pudo acreditar |
+| TipoMovimientoNoConfigurado | 500 | Falta el tipo DEPOSITO en la base |
+
+Por eso un usuario desactivado puede llegar como `USER_INACTIVE` o como `UsuarioDesactivado`, y
+el front acepta los dos.
+
+Salen **sin `code`**, solo con `message` y a veces `errors`: los 400 del registro (email o
+documento repetidos, contraseña rechazada por Identity) y del alta administrativa, los 400 de
+`PATCH /api/usuarios/me` y `PATCH /api/usuarios/{id}`, los 404/409 de `PATCH /api/cuentas/me/alias`
+y los 400/409 de invitación y estado en `UsuariosController`.
+
+Salen **sin cuerpo**: el 401 de los endpoints protegidos (token ausente, inválido, vencido o de un
+usuario desactivado; el único 401 con cuerpo es el `INVALID_CREDENTIALS` del login), el 403 por
+falta de rol, el 429 del límite de solicitudes y los 404 de `UsuariosController` y de
+`GET /api/tiposdemovimientos/{id}`.
+
+### Ejemplos en Swagger
+
+Cada cuerpo de request trae un ejemplo en Swagger (botón **Try it out**). Salen de los
+comentarios `/// <example>` de las propiedades de cada DTO: `GenerateDocumentationFile` en el
+`.csproj` hace que `Microsoft.AspNetCore.OpenApi` los publique. Un DTO nuevo tiene que llevar los
+suyos, con valores que pasen su propia validación. Un ejemplo que parece número pero es texto
+(un DNI) va entre comillas: `/// <example>"12345678"</example>`.
 
 Todos los endpoints nuevos quedan protegidos por defecto salvo los marcados AllowAnonymous.
 Las invitaciones duran 24 horas y se consumen al definir la contraseña.
@@ -347,8 +469,8 @@ Usuario inexistente, password incorrecta o cuenta bloqueada:
 401 con code INVALID_CREDENTIALS y el mismo mensaje genérico.
 Cuenta creada por el administrador que todavía no definió contraseña:
 409 con code PASSWORD_SETUP_REQUIRED, para que el frontend la derive a
-/primera-password en lugar de mostrarle un error. Esa pantalla sigue exigiendo
-el código de invitación, así que el 409 no alcanza para entrar.
+/primera-password en lugar de mostrarle un error. Para definir la contraseña hace
+falta el token que llega por correo, así que el 409 no alcanza para entrar.
 Usuario desactivado con contraseña correcta: 403 con code USER_INACTIVE y mensaje claro.
 La API no revela el estado de una cuenta antes de validar sus credenciales.
 Cinco fallos de contraseña bloquean temporalmente el login por 15 minutos.
@@ -357,10 +479,13 @@ Los endpoints Auth tienen límite de 20 solicitudes por IP por minuto (429 al ex
 **Alta administrativa y primer acceso:**
 
 1. El administrador envía el mismo perfil del registro, sin password, a POST /api/usuarios.
-2. Entrega al usuario el email y invitationToken devueltos. No se genera un JWT en este paso.
-3. React deberá abrir la pantalla de primera contraseña a partir de esa invitación.
-   El login ordinario sin contraseña nunca concede acceso ni entrega invitaciones.
-4. El usuario envía a POST /api/auth/initial-password:
+2. La API genera la invitación y la manda **por correo** a la persona, con un enlace a
+   `/primera-password?email=...&token=...` del frontend. El token no viaja en la respuesta:
+   el administrador nunca lo conoce. No se genera un JWT en este paso.
+   Si el correo no sale, el usuario queda creado igual y la respuesta trae invitationSent: false.
+3. La pantalla de primera contraseña toma el email y el token del enlace; la persona solo
+   elige la contraseña. El login ordinario sin contraseña nunca concede acceso ni entrega invitaciones.
+4. El frontend envía a POST /api/auth/initial-password:
 
 ```json
 {
@@ -373,7 +498,14 @@ Los endpoints Auth tienen límite de 20 solicitudes por IP por minuto (429 al ex
 
 5. Solo tras guardar el hash se devuelve el JWT y puede abrirse el dashboard.
    Una invitación inválida, vencida o ya usada devuelve 400. No permite reemplazar una contraseña existente.
-6. Para reenviar una invitación vencida, usar el endpoint administrativo de renovación.
+6. Para reenviar una invitación vencida o que no llegó, usar el endpoint administrativo de
+   renovación: manda un correo nuevo y el enlace anterior deja de servir.
+
+**Correo:** SmtpEnviadorDeInvitaciones entrega el mensaje por SMTP según la sección `Email`
+(EmailOptions). En desarrollo apunta a smtp4dev, en localhost:2525, que atrapa los correos y los
+muestra en http://localhost:5050 (ver el README de la raíz). En producción alcanza con cambiar
+esa sección por la de un proveedor real; las credenciales van en user-secrets. El log registra
+el destinatario de un envío fallido, nunca el token ni el enlace.
 
 La desactivación se comprueba contra la base en cada petición protegida.
 El cambio de estado también rota el security stamp, por lo que tokens previos no vuelven a servir al reactivar.
@@ -384,12 +516,19 @@ No hay refresh tokens; al vencer el JWT se debe iniciar sesión nuevamente.
 ```powershell
 dotnet build
 dotnet run --project Tests/AuthenticationChecks/AuthenticationChecks.csproj
+dotnet run --project Tests/MovimientosChecks/MovimientosChecks.csproj
 ```
 
-El ejecutable de verificación usa Identity real y un almacén en memoria exclusivamente para pruebas:
+`AuthenticationChecks` (36 verificaciones) usa Identity real y un almacén en memoria exclusivamente para pruebas:
 hash, contraseña correcta/incorrecta, invitación adulterada, ajena, vencida, revocada y reutilizada,
-y JWT con identidad/rol, firma, emisor, audiencia y vencimiento.
-No reemplaza una prueba de integración con SQL Server.
+JWT con identidad/rol, firma, emisor, audiencia y vencimiento, y el largo mínimo del alias.
+`MovimientosChecks` (15 verificaciones) prueba reglas puras, sin base: la normalización de la
+búsqueda del historial y el signo de cada tipo de movimiento.
+Ninguno reemplaza una prueba de integración con SQL Server.
+
+La prueba de integración contra la API levantada y SQL Server es la colección de Apidog de
+`docs/apidog/`: recorre registro, login, perfil, depósito, transferencia, historial y
+administración con 55 aserciones. Ver `docs/apidog/README.md`.
 
 Prueba manual con SQL Server: registrar un usuario, iniciar sesión, probar test-protegido con/sin JWT;
 crear un invitado desde un administrador, comprobar que no inicia sesión antes de definir password,

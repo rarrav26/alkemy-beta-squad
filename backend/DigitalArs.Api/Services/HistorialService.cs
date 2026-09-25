@@ -1,4 +1,7 @@
 using DigitalArs.Api.DTOs;
+using DigitalArs.Api.Helpers.Common;
+using DigitalArs.Api.Helpers.Domain;
+using DigitalArs.Api.Helpers.Results;
 using DigitalArs.Api.Interfaces;
 
 namespace DigitalArs.Api.Services;
@@ -98,7 +101,18 @@ public class HistorialService(
             Fecha: HoraDeArgentina.DesdeUtc(movimiento.FechaUtc),
             Tipo: movimiento.Tipo,
             Signo: SignoDeMovimiento.DeTipo(movimiento.Tipo),
-            Importe: movimiento.Importe);
+            Importe: movimiento.Importe,
+            UltimosCuatro: movimiento.UltimosCuatro,
+            Contraparte: NombreDeLaContraparte(movimiento.Contraparte));
+
+    // Lo que no es transferencia no tiene contraparte, y viaja como null.
+    private static string? NombreDeLaContraparte(ContraparteLeida? contraparte)
+    {
+        if (contraparte is null)
+            return null;
+
+        return NombreDelTitular.Completo(contraparte.Nombre, contraparte.Apellido);
+    }
 
     private static Resultado<PaginaResponse<MovimientoResponse>> Fallo(
         MotivoDeRechazo motivo,

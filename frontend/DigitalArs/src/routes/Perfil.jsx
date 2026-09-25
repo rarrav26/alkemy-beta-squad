@@ -1,0 +1,501 @@
+import { useEffect, useState } from 'react'
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CircularProgress,
+  Divider,
+  Paper,
+  Stack,
+  TextField,
+  Typography
+} from '@mui/material'
+import { useAuth } from '../context/authContext'
+import { buildAliasPayload, buildProfilePayload } from './perfilUtils'
+import { esAdministrador } from './rolesUtils'
+
+// Espejo de DatosDeCuenta.PatronAliasPersonalizado en el backend: el alias que el usuario
+// elige es SOLO LETRAS. El formato de tres palabras separadas por punto corresponde únicamente
+// al alias autogenerado al crear la cuenta, y no se acepta en la edición.
+// Se valida en el front solo para avisar antes de llamar a la API; la regla que manda sigue
+// siendo la del backend.
+const FORMATO_ALIAS = /^[a-z]+$/
+const LARGO_MINIMO_ALIAS = 3
+const LARGO_MAXIMO_ALIAS = 50
+const AYUDA_ALIAS = 'Solo letras, sin espacios ni números. Por ejemplo: mariagonzalez'
+
+const formatoPesos = new Intl.NumberFormat('es-AR', {
+  style: 'currency',
+  currency: 'ARS'
+})
+
+// Ya no recibe darkMode: los colores salen del tema, que es quien sabe en qué modo está.
+// Una fila de dato: la etiqueta a la izquierda y el valor a la derecha.
+//
+// Se ve como los campos del login: mismo redondeo y solo el borde, sin relleno propio.
+//
+// Antes llevaba `borderRadius: 2` y quedaba tipo píldora, y el motivo es una trampa del tema: un
+// `borderRadius` numérico en `sx` NO son píxeles, MUI lo multiplica por `theme.shape.borderRadius`
+// (createUnaryUnit con 'shape.borderRadius'). Este proyecto lo subió de los 4 que trae MUI a 12,
+// así que ese 2 eran 24px — la mitad del alto de la fila, o sea redondeo completo. Sin el número,
+// el Card usa el radio del tema y coincide con los campos del formulario.
+//
+// Y sin relleno: un `action.hover` encima del panel de vidrio era vidrio sobre vidrio, con dos
+// desenfoques apilados. Transparente deja pasar los rayos del fondo una sola vez y es más barato.
+function InfoCard({ label, value, alignRight = false }) {
+  return (
+    <Card
+      variant="outlined"
+      sx={{
+        height: '100%',
+        borderColor: 'divider',
+        backgroundColor: 'transparent',
+        // El tema le pone vidrio a todo Paper `outlined`; acá no hace falta, porque el panel que la
+        // contiene ya lo tiene. Apilarlos no se ve mejor y cuesta el doble.
+        backdropFilter: 'none',
+        boxShadow: 'none'
+      }}
+    >
+      <CardContent sx={{ py: 0.9, px: 2, '&:last-child': { pb: 0.9 } }}>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 2,
+            minHeight: 22
+          }}
+        >
+          <Typography
+            variant="body1"
+            sx={{
+              fontWeight: 500,
+              whiteSpace: 'nowrap',
+              color: 'text.secondary',
+              fontSize: '1rem',
+              lineHeight: 1.4
+            }}
+          >
+            {label}
+          </Typography>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: alignRight ? 'flex-end' : 'flex-start',
+              overflowWrap: 'anywhere',
+              wordBreak: 'break-word',
+              color: 'text.primary',
+              fontSize: '1rem',
+              lineHeight: 1.4
+            }}
+          >
+            {typeof value === 'string' || typeof value === 'number' ? (
+              <Typography
+                variant="body1"
+                sx={{
+                  fontWeight: 500,
+                  textAlign: alignRight ? 'right' : 'left',
+                  color: 'inherit'
+                }}
+              >
+                {value}
+              </Typography>
+            ) : (
+              value ?? '-'
+            )}
+          </Box>
+        </Box>
+      </CardContent>
+    </Card>
+  )
+}
+
+export default function PerfilPage() {
+  const { obtenerMiPerfil, actualizarMiPerfil, actualizarAliasCuenta, session } = useAuth()
+  const esAdmin = esAdministrador(session)
+  const [perfil, setPerfil] = useState(null)
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState('')
+  // Se distingue el error de CARGA del error de guardado. Solo el de carga justifica
+  // reemplazar la pantalla por un cartel con "Reintentar": si no se pudo traer el perfil no
+  // hay nada que mostrar. Un alias mal escrito, en cambio, no tiene que hacer desaparecer la
+  // página que el usuario está completando.
+  const [errorDeCarga, setErrorDeCarga] = useState('')
+  const [errorAlias, setErrorAlias] = useState('')
+  const [exito, setExito] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [editando, setEditando] = useState(false)
+  const [editandoAlias, setEditandoAlias] = useState(false)
+  const [alias, setAlias] = useState('')
+  const [formulario, setFormulario] = useState({ nombre: '', apellido: '', email: '', currentPassword: '' })
+  const [intento, setIntento] = useState(0)
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    async function cargarPerfil() {
+      setCargando(true)
+      setError('')
+      setErrorDeCarga('')
+      setErrorAlias('')
+      setExito('')
+      setPerfil(null)
+
+      try {
+        const datos = await obtenerMiPerfil(controller.signal)
+        if (!controller.signal.aborted) {
+          setPerfil(datos)
+          setAlias(datos?.cuenta?.alias ?? '')
+          setFormulario({
+            nombre: datos?.nombre ?? '',
+            apellido: datos?.apellido ?? '',
+            email: datos?.email ?? '',
+            currentPassword: ''
+          })
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          const mensajeCrudo = (error.message || '').trim()
+          const frasesUnicas = [
+            ...new Set(
+              mensajeCrudo
+                .split('.')
+                .map(frase => frase.trim())
+                .filter(Boolean)
+            )
+          ]
+          setErrorDeCarga(
+            frasesUnicas.length > 0
+              ? `${frasesUnicas.join('. ')}.`
+              : mensajeCrudo
+          )
+        }
+      } finally {
+        if (!controller.signal.aborted) setCargando(false)
+      }
+    }
+
+    cargarPerfil()
+    return () => controller.abort()
+  }, [obtenerMiPerfil, intento])
+
+  const emailCambio =
+    !!perfil?.email &&
+    !!formulario.email &&
+    formulario.email.trim().toLowerCase() !== perfil.email.trim().toLowerCase()
+
+  const manejarCambio = event => {
+    const { name, value } = event.target
+    setFormulario(actual => ({ ...actual, [name]: value }))
+    setError('')
+    setExito('')
+  }
+
+  const guardarCambios = async event => {
+    event.preventDefault()
+
+    const nombre = formulario.nombre.trim()
+    const apellido = formulario.apellido.trim()
+    const email = formulario.email.trim()
+
+    if (!nombre || !apellido || !email) {
+      setError('Completá nombre, apellido y email.')
+      return
+    }
+
+    if (emailCambio && !formulario.currentPassword.trim()) {
+      setError('Para cambiar el email, ingresá tu contraseña actual.')
+      return
+    }
+
+    setGuardando(true)
+    setError('')
+    setExito('')
+
+    try {
+      const payload = buildProfilePayload(
+        { nombre, apellido, email },
+        perfil?.email ?? '',
+        formulario.currentPassword
+      )
+      const actualizado = await actualizarMiPerfil(payload)
+      setPerfil(actualizado ?? { ...perfil, nombre, apellido, email })
+      setFormulario({
+        nombre: actualizado?.nombre ?? nombre,
+        apellido: actualizado?.apellido ?? apellido,
+        email: actualizado?.email ?? email,
+        currentPassword: ''
+      })
+      setExito('Tus datos se actualizaron correctamente.')
+      setEditando(false)
+    } catch (error) {
+      setError(error.message || 'No se pudo guardar tu perfil.')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  const guardarAlias = async event => {
+    event.preventDefault()
+
+    // Misma regla que el backend (DatosDeCuenta): solo letras. Se valida acá para avisar
+    // junto al campo, sin ir hasta la API para un error de tipeo.
+    const aliasTrim = alias.trim().toLowerCase()
+
+    if (!aliasTrim) {
+      setErrorAlias('El alias no puede estar vacío.')
+      return
+    }
+
+    if (!FORMATO_ALIAS.test(aliasTrim)) {
+      setErrorAlias(AYUDA_ALIAS)
+      return
+    }
+
+    if (aliasTrim.length < LARGO_MINIMO_ALIAS || aliasTrim.length > LARGO_MAXIMO_ALIAS) {
+      setErrorAlias(`El alias debe tener entre ${LARGO_MINIMO_ALIAS} y ${LARGO_MAXIMO_ALIAS} letras.`)
+      return
+    }
+
+    setGuardando(true)
+    setError('')
+    setErrorAlias('')
+    setExito('')
+
+    try {
+      const payload = buildAliasPayload(aliasTrim)
+      const actualizado = await actualizarAliasCuenta(payload.alias)
+      setPerfil(actual => ({
+        ...actual,
+        cuenta: { ...actual?.cuenta, alias: actualizado?.alias ?? payload.alias }
+      }))
+      setAlias(actualizado?.alias ?? payload.alias)
+      setExito('Tu alias se actualizó correctamente.')
+      setEditandoAlias(false)
+    } catch (error) {
+      setErrorAlias(error.message || 'No se pudo guardar el alias.')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  if (cargando) {
+    return (
+      <Box sx={{ maxWidth: 900, mx: 'auto', p: 4, display: 'grid', placeItems: 'center' }}>
+        <Stack sx={{ alignItems: 'center' }} spacing={2}>
+          <CircularProgress />
+          <Typography>Cargando tu perfil…</Typography>
+        </Stack>
+      </Box>
+    )
+  }
+
+  // Solo un fallo de carga reemplaza la pantalla: sin perfil no hay nada que editar. Los
+  // errores de validación y de guardado se muestran en contexto, sin desmontar la página.
+  if (errorDeCarga) {
+    return (
+      <Box sx={{ maxWidth: 700, mx: 'auto', p: 4 }}>
+        <Alert
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={() => setIntento(valor => valor + 1)}>
+              Reintentar
+            </Button>
+          }
+        >
+          {errorDeCarga}
+        </Alert>
+      </Box>
+    )
+  }
+
+  const saldo = perfil?.cuenta?.saldo ?? 0
+  const mostrarSaldo = esAdmin
+  // No todo usuario tiene cuenta de billetera: el administrador inicial se siembra sin una.
+  const tieneCuenta = Boolean(perfil?.cuenta)
+
+  return (
+    // La página aporta su propio espacio alrededor, como hacen Cuentas y Tarjetas. Antes el panel
+    // arrancaba pegado al encabezado y contra los bordes de la pantalla, porque no había ninguna
+    // caja que separara: el contenedor traía su relleno interno pero nada por fuera.
+    <Box sx={{ px: { xs: 2, md: 3 }, pt: { xs: 2, md: 3 }, pb: 4 }}>
+      <Paper
+        // Paper `outlined` y no un Box con colores a mano. El borde y el radio ya los da la
+        // variante, y sobre todo: el vidrio traslúcido del tema se aplica justo a esa variante, así
+        // que esta pantalla deja de ser una excepción y los rayos del fondo también la cruzan.
+        // Antes tenía `backgroundColor: 'background.default'` escrito a mano, que es opaco.
+        variant="outlined"
+        sx={{
+          maxWidth: 1200,
+          mx: 'auto',
+          p: { xs: 2.5, md: 4 },
+          color: 'text.primary'
+        }}
+      >
+      <Typography
+        variant="h4"
+        fontWeight={700}
+        sx={{ mb: 3, color: 'text.primary', fontFamily: 'sans-serif' }}
+      >
+        Datos personales
+      </Typography>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+      {exito && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          {exito}
+        </Alert>
+      )}
+
+      <Stack spacing={3}>
+        {!editando ? (
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr' }, gap: 0.5, width: '100%' }}>
+            <InfoCard label="Nombre" value={perfil?.nombre ?? '-'} alignRight />
+            <InfoCard label="Apellido" value={perfil?.apellido ?? '-'} alignRight />
+            <InfoCard label="Tipo de documento" value={perfil?.tipoDocumento ?? '-'} alignRight />
+            <InfoCard label="Número de documento" value={perfil?.nroDocumento ?? '-'} alignRight />
+            <InfoCard label="Email" value={perfil?.email ?? '-'} alignRight />
+          </Box>
+        ) : (
+          <Box component="form" onSubmit={guardarCambios} sx={{ display: 'grid', gap: 2 }}>
+            <TextField
+              label="Nombre"
+              name="nombre"
+              value={formulario.nombre}
+              onChange={manejarCambio}
+              fullWidth
+              variant="outlined"
+            />
+            <TextField
+              label="Apellido"
+              name="apellido"
+              value={formulario.apellido}
+              onChange={manejarCambio}
+              fullWidth
+              variant="outlined"
+            />
+            <TextField
+              label="Email"
+              name="email"
+              type="email"
+              value={formulario.email}
+              onChange={manejarCambio}
+              fullWidth
+              variant="outlined"
+            />
+            {emailCambio && (
+              <TextField
+                label="Contraseña actual"
+                name="currentPassword"
+                type="password"
+                value={formulario.currentPassword}
+                onChange={manejarCambio}
+                fullWidth
+                variant="outlined"
+                placeholder="Ingresá tu contraseña para cambiar el email"
+              />
+            )}
+            <Stack direction="row" spacing={2} sx={{ justifyContent: 'flex-end' }}>
+              <Button variant="outlined" onClick={() => { setEditando(false); setError(''); setExito(''); setFormulario({ nombre: perfil?.nombre ?? '', apellido: perfil?.apellido ?? '', email: perfil?.email ?? '', currentPassword: '' }) }}>
+                Cancelar
+              </Button>
+              <Button type="submit" variant="contained" disabled={guardando}>
+                {guardando ? 'Guardando...' : 'Guardar cambios'}
+              </Button>
+            </Stack>
+          </Box>
+        )}
+
+        {!editando && (
+          <Button variant="contained" onClick={() => setEditando(true)} sx={{ alignSelf: 'flex-start' }}>
+            Editar datos
+          </Button>
+        )}
+
+        <Divider sx={{ borderColor: 'divider' }} />
+
+        <Box>
+          <Typography variant="h4" fontWeight={700} sx={{ mb: 2, color: 'text.primary' }}>
+            Cuenta
+          </Typography>
+          {/* Sin cuenta no hay nada que mostrar en esta sección: ni alias, ni CVU, ni saldo.
+              El administrador inicial se siembra por SQL sin cuenta, y las cuentas se crean
+              al registrarse un usuario. Mostrar los campos vacíos con guiones solo hace
+              pensar que faltan datos por cargar. */}
+          {!tieneCuenta ? (
+            <Alert severity="info">
+              El Administrador no tiene una billetera asociada, por lo tanto, no hay campos
+              referidos de la cuenta que modificar.
+            </Alert>
+          ) : (
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr' }, gap: 1, width: '100%' }}>
+              {!editandoAlias ? (
+                <>
+                  <InfoCard label="Alias" value={perfil?.cuenta?.alias ?? '-'} alignRight />
+                  <Button variant="contained" onClick={() => setEditandoAlias(true)} sx={{ alignSelf: 'flex-start' }}>
+                    Editar alias
+                  </Button>
+                </>
+              ) : (
+                <Box component="form" onSubmit={guardarAlias} sx={{ display: 'grid', gap: 2 }}>
+                  <TextField
+                    label="Alias"
+                    name="alias"
+                    value={alias}
+                    onChange={event => {
+                      setAlias(event.target.value)
+                      setErrorAlias('')
+                    }}
+                    fullWidth
+                    variant="outlined"
+                    error={Boolean(errorAlias)}
+                    helperText={errorAlias || AYUDA_ALIAS}
+                  />
+                  <Stack direction="row" spacing={2} sx={{ justifyContent: 'flex-end' }}>
+                    <Button
+                      variant="outlined"
+                      onClick={() => {
+                        setEditandoAlias(false)
+                        setAlias(perfil?.cuenta?.alias ?? '')
+                        setError('')
+                        setErrorAlias('')
+                        setExito('')
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button type="submit" variant="contained" disabled={guardando}>
+                      {guardando ? 'Guardando...' : 'Guardar alias'}
+                    </Button>
+                  </Stack>
+                </Box>
+              )}
+              <InfoCard
+                label="CVU"
+                value={perfil?.cuenta?.cvu ?? '-'}
+                alignRight
+               
+              />
+              {mostrarSaldo && (
+                <InfoCard
+                  label="Saldo disponible"
+                  value={formatoPesos.format(saldo)}
+                  alignRight
+                 
+                />
+              )}
+            </Box>
+          )}
+        </Box>
+      </Stack>
+      </Paper>
+    </Box>
+  )
+}

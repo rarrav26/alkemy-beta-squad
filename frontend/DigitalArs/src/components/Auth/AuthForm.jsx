@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Alert, Box, Button, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material'
 
-export default function AuthForm({ title, description, submitLabel, onSubmit, children, footer, success }) {
+export default function AuthForm({ title, description, submitLabel, onSubmit, children, footer, success, aviso }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   async function submit(event) {
@@ -26,9 +26,15 @@ export default function AuthForm({ title, description, submitLabel, onSubmit, ch
           <Typography component="h1" variant="h4" fontWeight={700}>{title}</Typography>
           <Typography color="text.secondary" sx={{ mt: 1 }}>{description}</Typography>
         </Box>
+        {/* Motivo por el que la sesión se cerró sola (por ejemplo, el usuario fue desactivado
+            mientras la tenía abierta). No es un éxito ni un error del formulario: es contexto
+            de por qué se está en esta pantalla. */}
+        {aviso && <Alert severity="warning">{aviso}</Alert>}
         {success && <Alert severity="success">{success}</Alert>}
         {error && <Alert severity="error" role="alert">{error}</Alert>}
-        <Box component="form" onSubmit={submit} aria-busy={loading}>
+        {/* Sin onSubmit la pantalla solo informa (por ejemplo, "revisá tu correo"): no hay
+            formulario ni botón que enviar. */}
+        {onSubmit ? <Box component="form" onSubmit={submit} aria-busy={loading}>
           <Box component="fieldset" disabled={loading} sx={{ border: 0, m: 0, p: 0, minWidth: 0 }}>
             <Stack spacing={2}>
               {children}
@@ -37,7 +43,7 @@ export default function AuthForm({ title, description, submitLabel, onSubmit, ch
               </Button>
             </Stack>
           </Box>
-        </Box>
+        </Box> : children}
         {footer}
       </Stack>
     </Paper>

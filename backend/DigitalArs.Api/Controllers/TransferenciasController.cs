@@ -1,6 +1,7 @@
 using DigitalArs.Api.DTOs;
+using DigitalArs.Api.Errors;
+using DigitalArs.Api.Helpers.Results;
 using DigitalArs.Api.Interfaces;
-using DigitalArs.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -20,6 +21,7 @@ public class TransferenciasController(ITransferenciaService transferencias) : Co
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> ResolverDestino(
         [FromBody] TransferenciaDto dto,
         CancellationToken cancellationToken)
@@ -60,6 +62,7 @@ public class TransferenciasController(ITransferenciaService transferencias) : Co
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Transferir(
         [FromBody] TransferenciaDto dto,
         CancellationToken cancellationToken)
@@ -88,6 +91,9 @@ public class TransferenciasController(ITransferenciaService transferencias) : Co
             MotivoDeRechazo.DatosInvalidos => BadRequest(error),
             MotivoDeRechazo.CuentaNoEncontrada => NotFound(error),
             MotivoDeRechazo.SaldoInsuficiente => Conflict(error),
+            MotivoDeRechazo.SaldoMaximoSuperado => Conflict(error), // Mapeado explícito
+            MotivoDeRechazo.NoSePudoActualizar => StatusCode(StatusCodes.Status500InternalServerError, error), // Mapeado explícito
+            MotivoDeRechazo.TipoMovimientoNoConfigurado => StatusCode(StatusCodes.Status500InternalServerError, error), // Mapeado explícito
             MotivoDeRechazo.NoEncontrado => Unauthorized(),
             _ => StatusCode(StatusCodes.Status500InternalServerError, error)
         };

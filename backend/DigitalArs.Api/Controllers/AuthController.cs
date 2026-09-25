@@ -1,7 +1,8 @@
 using System.Security.Claims;
 using DigitalArs.Api.DTOs;
+using DigitalArs.Api.Errors;
+using DigitalArs.Api.Helpers.Results;
 using DigitalArs.Api.Interfaces;
-using DigitalArs.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -11,6 +12,8 @@ namespace DigitalArs.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [EnableRateLimiting("auth")]
+// El 429 lo responde el rate limiter, sin cuerpo, en cualquier acción de este controller.
+[ProducesResponseType(StatusCodes.Status429TooManyRequests)]
 public class AuthController(IAuthService auth, IAccountService accounts) : ControllerBase
 {
     [AllowAnonymous, HttpPost("register")]
@@ -27,6 +30,7 @@ public class AuthController(IAuthService auth, IAccountService accounts) : Contr
 
     [AllowAnonymous, HttpPost("login")]
     [ProducesResponseType<SesionResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status409Conflict)]
@@ -61,6 +65,7 @@ public class AuthController(IAuthService auth, IAccountService accounts) : Contr
 
     [Authorize, HttpGet("test-protegido")]
     [ProducesResponseType<MensajeResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public IActionResult TestProtegido() => Ok(new MensajeResponse("Acceso autorizado con éxito a la API."));
 
     [Authorize, HttpGet("me")]
@@ -104,6 +109,6 @@ public class AuthController(IAuthService auth, IAccountService accounts) : Contr
         Conflict(new ErrorResponse
         {
             Code = "PASSWORD_SETUP_REQUIRED",
-            Message = "Todavía no definiste tu contraseña. Usá el código de invitación que te dio el administrador."
+            Message = "Todavía no definiste tu contraseña. Revisá tu correo: te enviamos un enlace para crearla."
         });
 }

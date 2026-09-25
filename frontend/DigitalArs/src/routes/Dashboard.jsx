@@ -1,241 +1,94 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Alert,
   Box,
   Button,
-  Chip,
   Paper,
   Stack,
   Typography,
-  TextField,
 } from "@mui/material";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/authContext";
+import useMiCuenta from "../hooks/useMiCuenta";
+import useOperacionesDeDinero from "../hooks/useOperacionesDeDinero";
+import useShell from "../hooks/useShell";
 import AuthForm, { ProfileFields } from "../components/Auth/AuthForm";
-import DepositoModal from "../components/Cuentas/DepositoModal";
-import { MovimientosPreview } from "./Movimientos";
-
-const formatoPesos = new Intl.NumberFormat("es-AR", {
-  style: "currency",
-  currency: "ARS",
-});
+import InicioDelAdmin from "../components/Admin/InicioDelAdmin";
+import InicioEscritorio from "../components/Inicio/InicioEscritorio";
+import InicioMobile from "../components/Inicio/InicioMobile";
+import ModalesDeDinero from "../components/Cuentas/ModalesDeDinero";
+import { esAdministrador } from "./rolesUtils";
+import { SHELL_MOBILE } from "./shellUtils";
 
 export default function Dashboard() {
-  const { session, obtenerMiCuenta } = useAuth();
-  const [cuenta, setCuenta] = useState(null);
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState("");
-  const [intento, setIntento] = useState(0);
-  const [depositoAbierto, setDepositoAbierto] = useState(false);
-  const [mensajeExito, setMensajeExito] = useState("");
+  const { session } = useAuth();
+  const esAdmin = esAdministrador(session);
+  // El administrador usa el panel de gestión: no tiene cuenta que cargar.
+  const { cuenta, cargando, error, reintentar, aplicarDeposito, aplicarTransferencia } =
+    useMiCuenta({ habilitado: !esAdmin });
+  const operaciones = useOperacionesDeDinero({ aplicarDeposito, aplicarTransferencia });
+  const shell = useShell();
 
-  const esAdministrador = session.user.role === "Administrador";
+  // El rol decide antes que el ancho: el administrador ve la misma portada del panel en las dos
+  // cáscaras, porque lo que cambia entre mobile y escritorio es la navegación que la rodea (barra
+  // inferior o barra lateral), no lo que hay adentro. Sus tres acciones caben cómodas en las dos.
+  if (esAdmin) return <InicioDelAdmin />;
 
-  useEffect(() => {
-    // El administrador usa el panel de gestión.
-    if (esAdministrador) return;
+  // Los modales son los mismos para las dos vistas del usuario regular: solo cambia el botón
+  // que los abre.
+  const modalesDeDinero = cuenta && (
+    <ModalesDeDinero operaciones={operaciones} saldoDisponible={cuenta.saldo} />
+  );
 
-    const controller = new AbortController();
+  // Las dos vistas reciben exactamente los mismos datos: la cuenta se carga UNA vez acá y cada
+  // una decide solo cómo mostrarla. Si cada vista pidiera lo suyo, un arreglo en la carga habría
+  // que hacerlo dos veces.
+  const datosDeInicio = {
+    cuenta,
+    cargando,
+    error,
+    onReintentar: reintentar,
+    mensajeExito: operaciones.mensajeExito,
+    onCerrarMensajeExito: operaciones.cerrarMensajeExito,
+    onAgregar: operaciones.abrirDeposito,
+    onTransferir: operaciones.abrirTransferencia,
+  };
 
-    async function cargarCuenta() {
-      setCargando(true);
-      setError("");
-      setCuenta(null);
-
-      try {
-        const datos = await obtenerMiCuenta(controller.signal);
-
-        if (!controller.signal.aborted) {
-          setCuenta(datos);
-        }
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          const mensajeCrudo = (error.message || '').trim()
-          const frasesUnicas = [
-            ...new Set(
-              mensajeCrudo
-                .split('.')
-                .map(frase => frase.trim())
-                .filter(Boolean)
-            )
-          ]
-          const mensajeNormalizado =
-            frasesUnicas.length > 0 ? `${frasesUnicas.join('. ')}.` : mensajeCrudo
-
-          setError(mensajeNormalizado)
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setCargando(false);
-        }
-      }
-    }
-
-    cargarCuenta();
-
-    return () => controller.abort();
-  }, [obtenerMiCuenta, esAdministrador, intento]);
-
-  function depositoRealizado(resultado) {
-    setCuenta((actual) =>
-      actual ? { ...actual, saldo: resultado.saldoActual } : actual,
-    );
-
-    setMensajeExito(resultado.message);
-  }
-
-  function transferenciaRealizada(resultado) {
-    setCuenta(actual => {
-      if (!actual) return actual
-      const nuevoSaldo =
-        resultado?.saldoActual !== undefined
-          ? resultado.saldoActual
-          : actual.saldo - (resultado?.importe || 0)
-      return { ...actual, saldo: nuevoSaldo }
-    })
-    setMensajeExito(resultado?.message || 'Transferencia realizada con éxito.')
-  }
+  // Protected no deja llegar acá sin una sesión verificada, así que lo que no es mobile es
+  // escritorio: la cáscara clásica del usuario regular solo existe mientras se verifica, y en
+  // ese rato esta pantalla todavía no se dibuja.
+  const Inicio = shell === SHELL_MOBILE ? InicioMobile : InicioEscritorio;
 
   return (
-    <Box sx={{ maxWidth: 900, mx: "auto", p: { xs: 3, md: 6 } }}>
-      <Typography variant="overline" color="primary">
-        Tu espacio
-      </Typography>
-
-      <Typography component="h1" variant="h3" fontWeight={700}>
-        Hola, {session.user.nombre}
-      </Typography>
-
-      <Typography color="text.secondary" sx={{ mt: 1, mb: 4 }}>
-        Bienvenido a tu cuenta de DigitalArs.
-      </Typography>
-
-      <Paper variant="outlined" sx={{ p: 3 }}>
-        <Stack spacing={2} alignItems="flex-start">
-          <Chip label={session.user.role} />
-          <Typography>{session.user.email}</Typography>
-
-          {esAdministrador ? (
-            <>
-              <Typography>
-                Registrá usuarios y entregales una invitación para que elijan su
-                contraseña.
-              </Typography>
-
-              <Button component={Link} to="/usuarios/nuevo" variant="contained">
-                Registrar usuario
-              </Button>
-            </>
-          ) : (
-            <Box sx={{ width: "100%" }} aria-busy={cargando}>
-              {cargando && (
-                <Typography role="status">Cargando tu cuenta…</Typography>
-              )}
-
-              {!cargando && error && (
-                <Alert
-                  severity="error"
-                  action={
-                    <Button
-                      color="inherit"
-                      size="small"
-                      onClick={() => setIntento((valor) => valor + 1)}
-                    >
-                      Reintentar
-                    </Button>
-                  }
-                >
-                  {error}
-                </Alert>
-              )}
-
-              {!cargando && !error && cuenta && (
-                <Stack spacing={2}>
-                  <Box>
-                    <Typography color="text.secondary">
-                      Saldo disponible en pesos
-                    </Typography>
-
-                    <Typography variant="h4" fontWeight={700}>
-                      {formatoPesos.format(cuenta.saldo)}
-                    </Typography>
-                  </Box>
-
-                  {mensajeExito && (
-                    <Alert
-                      severity="success"
-                      onClose={() => setMensajeExito("")}
-                    >
-                      {mensajeExito}
-                    </Alert>
-                  )}
-
-                  <Stack direction='row' spacing={2}>
-                    <Button
-                      variant='contained'
-                      onClick={() => {
-                        setMensajeExito('')
-                        setDepositoAbierto(true)
-                      }}
-                    >
-                      Ingresar dinero
-                    </Button>
-
-                    <Button
-                      variant='outlined'
-                      onClick={() => {
-                        setMensajeExito('')
-                        setTransferenciaAbierta(true)
-                      }}
-                    >
-                      Transferir dinero
-                    </Button>
-                  </Stack>
-
-                  <Box>
-                    <Typography color="text.secondary">Alias</Typography>
-                    <Typography sx={{ overflowWrap: "anywhere" }}>
-                      {cuenta.alias}
-                    </Typography>
-                  </Box>
-
-                  <Box>
-                    <Typography color="text.secondary">CVU</Typography>
-                    <Typography sx={{ overflowWrap: "anywhere" }}>
-                      {cuenta.cvu}
-                    </Typography>
-                  </Box>
-                </Stack>
-              )}
-            </Box>
-          )}
-        </Stack>
-      </Paper>
-
-      {!esAdministrador && cuenta && (
-        <>
-          <DepositoModal
-            open={depositoAbierto}
-            onClose={() => setDepositoAbierto(false)}
-            onDepositoRealizado={depositoRealizado}
-          />
-          <TransferenciaModal
-            open={transferenciaAbierta}
-            onClose={() => setTransferenciaAbierta(false)}
-            saldoDisponible={cuenta.saldo}
-            onTransferenciaRealizada={transferenciaRealizada}
-          />
-        </>
-      )}
-    </Box>
+    <>
+      <Inicio {...datosDeInicio} />
+      {modalesDeDinero}
+    </>
   );
 }
 
 export function NewUserPage() {
-  const { createUser } = useAuth();
-  const [invitation, setInvitation] = useState(null);
-  const [copyMessage, setCopyMessage] = useState("");
-  if (invitation)
+  const { createUser, reenviarInvitacion } = useAuth();
+  // El alta ya no trae el código de invitación: viaja solo por correo, así que el
+  // administrador nunca lo ve. Acá se guarda a quién se le mandó y si salió.
+  const [alta, setAlta] = useState(null);
+  const [reenviando, setReenviando] = useState(false);
+  const [errorDeReenvio, setErrorDeReenvio] = useState("");
+
+  async function reenviar() {
+    setReenviando(true);
+    setErrorDeReenvio("");
+    try {
+      const invitacion = await reenviarInvitacion(alta.usuarioId);
+      setAlta({ ...alta, invitationSent: invitacion.invitationSent });
+    } catch (error) {
+      setErrorDeReenvio(error.message);
+    } finally {
+      setReenviando(false);
+    }
+  }
+
+  if (alta)
     return (
       <Box sx={{ maxWidth: 650, mx: "auto", p: 3 }}>
         <Paper variant="outlined" sx={{ p: 3 }}>
@@ -243,51 +96,33 @@ export function NewUserPage() {
             <Typography component="h1" variant="h4">
               Usuario registrado
             </Typography>
-            <Alert severity="success">
-              Se creó la cuenta de {invitation.email}. Todavía debe elegir su
-              contraseña.
-            </Alert>
-            <Typography>
-              Entregale este código por un medio privado. Vence en 24 horas y se
-              usa una sola vez.
-            </Typography>
-            <TextField
-              label="Código de invitación"
-              value={invitation.invitationToken}
-              multiline
-              minRows={3}
-              slotProps={{ input: { readOnly: true } }}
-            />
-            <Button
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(
-                    invitation.invitationToken,
-                  );
-                  setCopyMessage("Código copiado.");
-                } catch {
-                  setCopyMessage("Seleccioná el código y copialo manualmente.");
-                }
-              }}
-            >
-              Copiar código
+            {alta.invitationSent ? (
+              <Alert severity="success">
+                Se creó la cuenta de {alta.email} y le enviamos un correo con el
+                enlace para elegir su contraseña. El enlace vence en 24 horas y
+                sirve una sola vez.
+              </Alert>
+            ) : (
+              <Alert severity="warning">
+                Se creó la cuenta de {alta.email}, pero no pudimos enviarle el
+                correo de invitación. Probá reenviarlo.
+              </Alert>
+            )}
+            {errorDeReenvio && <Alert severity="error">{errorDeReenvio}</Alert>}
+            <Button onClick={reenviar} disabled={reenviando}>
+              {reenviando ? "Enviando…" : "Reenviar invitación"}
             </Button>
-            {copyMessage && <Alert severity="info">{copyMessage}</Alert>}
-            <Typography>
-              Debe entrar a {window.location.origin}/primera-password con su
-              correo y este código.
-            </Typography>
             <Button
               variant="contained"
               onClick={() => {
-                setInvitation(null);
-                setCopyMessage("");
+                setAlta(null);
+                setErrorDeReenvio("");
               }}
             >
               Registrar otro usuario
             </Button>
-            <Button component={Link} to="/dashboard">
-              Volver al dashboard
+            <Button component={Link} to="/admin/usuarios">
+              Ir al listado de usuarios
             </Button>
           </Stack>
         </Paper>
@@ -296,9 +131,9 @@ export function NewUserPage() {
   return (
     <AuthForm
       title="Registrar usuario"
-      description="El usuario establecerá su contraseña mediante una invitación."
+      description="Le vamos a enviar un correo para que elija su contraseña."
       submitLabel="Crear usuario"
-      onSubmit={async (data) => setInvitation(await createUser(data))}
+      onSubmit={async (data) => setAlta(await createUser(data))}
       footer={
         <Button component={Link} to="/dashboard">
           Volver al dashboard

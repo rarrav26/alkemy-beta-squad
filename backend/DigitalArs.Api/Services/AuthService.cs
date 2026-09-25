@@ -1,4 +1,8 @@
 using DigitalArs.Api.DTOs;
+using DigitalArs.Api.Helpers.Common;
+using DigitalArs.Api.Helpers.Configuration;
+using DigitalArs.Api.Helpers.Domain;
+using DigitalArs.Api.Helpers.Results;
 using DigitalArs.Api.Interfaces;
 using Microsoft.AspNetCore.Identity;
 
@@ -27,8 +31,9 @@ public class AuthService(
         var perfil = await usuarios.GetByIdentityUserIdAsync(usuarioIdentity.Id, cancellationToken);
         if (perfil is null) return Rechazo(MotivoDeRechazo.CredencialesInvalidas);
 
-        // Se permite el inicio de sesión aunque el usuario no esté activo;
-        // el bloqueo operativo se gestiona en las acciones individuales.
+        // El estado desactivado solo se le informa a quien ya demostró saber la contraseña: así el
+        // login no revela a un tercero si la cuenta existe o si fue dada de baja.
+        if (!perfil.is_active) return Rechazo(MotivoDeRechazo.UsuarioDesactivado);
 
         await users.ResetAccessFailedCountAsync(usuarioIdentity);
         return Resultado<SesionResponse>.Exito(await tokens.CrearToken(usuarioIdentity, perfil.id));

@@ -1,4 +1,5 @@
-using DigitalArs.Api.Services;
+using DigitalArs.Api.Helpers.Common;
+using DigitalArs.Api.Helpers.Domain;
 
 /* Verificaciones del historial de movimientos. Mismo patron que AuthenticationChecks: una
    consola que lanza si algo no se cumple. No hace falta base de datos ni framework de tests
