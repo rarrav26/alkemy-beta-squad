@@ -19,6 +19,13 @@ public static class SignoDeMovimiento
     public const string TipoTransferenciaEnviada = "TRANSFERENCIA_ENVIADA";
     public const string TipoTransferenciaRecibida = "TRANSFERENCIA_RECIBIDA";
 
+    // Se tiene que escribir igual que la columna descripcion de Tipo_Movimiento (id 4, agregado
+    // en Create(v.004).sql): el servicio busca el tipo por descripción, no por id.
+    public const string TipoPagoConTarjeta = "PAGO_CON_TARJETA";
+
+    // El otro lado del pago: lo que ve quien cobra.
+    public const string TipoPagoRecibido = "PAGO_RECIBIDO";
+
     private const string FiltroCredito = "credito";
     private const string FiltroDebito = "debito";
     private const string FiltroTodas = "todas";
@@ -37,6 +44,13 @@ public static class SignoDeMovimiento
             [TipoDeposito] = Credito,
             [TipoTransferenciaRecibida] = Credito,
             [TipoTransferenciaEnviada] = Debito,
+            // Un pago con tarjeta es plata que sale de la cuenta: mismo signo que una
+            // transferencia enviada. Con esta línea el pago entra solo en el filtro de débitos,
+            // sale con el signo correcto en el historial y es buscable por nombre.
+            [TipoPagoConTarjeta] = Debito,
+            // Quien cobra el pago recibe plata: es un crédito, igual que una transferencia
+            // recibida.
+            [TipoPagoRecibido] = Credito,
         };
 
     public static string ValoresAceptados =>

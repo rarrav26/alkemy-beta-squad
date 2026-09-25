@@ -4,7 +4,9 @@
 export const tipoMovimientoMap = {
   DEPOSITO: 'Depósito',
   TRANSFERENCIA_ENVIADA: 'Transferencia enviada',
-  TRANSFERENCIA_RECIBIDA: 'Transferencia recibida'
+  TRANSFERENCIA_RECIBIDA: 'Transferencia recibida',
+  PAGO_CON_TARJETA: 'Pago con tarjeta',
+  PAGO_RECIBIDO: 'Pago recibido'
 }
 
 export function formatearTipoMovimiento(tipo = '') {
@@ -74,6 +76,16 @@ const formatoFechaCorta = new Intl.DateTimeFormat('es-AR', {
 
 export function formatearFechaCorta(fecha) {
   return formatoFechaCorta.format(new Date(fecha))
+}
+
+// La línea que dice con quién fue la transferencia: "Para Ana Gómez" si la mandó el usuario,
+// "De Ana Gómez" si la recibió. Lo que no es transferencia no tiene contraparte y no lleva
+// línea (null). Si llegara un tipo nuevo con contraparte, se muestra solo el nombre.
+export function detalleDeLaContraparte(movimiento) {
+  if (!movimiento.contraparte) return null
+  if (movimiento.tipoRaw === 'TRANSFERENCIA_ENVIADA') return `Para ${movimiento.contraparte}`
+  if (movimiento.tipoRaw === 'TRANSFERENCIA_RECIBIDA') return `De ${movimiento.contraparte}`
+  return movimiento.contraparte
 }
 
 // El signo que se le pone al importe. Un movimiento que el backend no sabe clasificar (signo
@@ -150,12 +162,32 @@ export function normalizarMovimiento(movimiento) {
     tipo: tipoFormateado,
     tipoRaw: tipo,
     importe: Number(movimiento.importe),
-    descripcion: movimiento.descripcion || tipoMovimientoMap[tipo] || 'Movimiento',
+    // Se usa tipoFormateado y no tipoMovimientoMap[tipo]: el map solo conoce los tipos que
+    // alguien se acordó de agregar, así que un tipo nuevo caía en el literal 'Movimiento'.
+    // tipoFormateado tiene el respaldo que convierte PAGO_CON_TARJETA en "Pago Con Tarjeta",
+    // así que un tipo nuevo se muestra legible aunque nadie toque este archivo.
+    descripcion: movimiento.descripcion || tipoFormateado,
+    // Los últimos cuatro dígitos de la tarjeta, solo en un pago. El backend manda null en los
+    // demás movimientos.
+    ultimosCuatro: movimiento.ultimosCuatro ?? null,
+    // El titular de la otra cuenta en una transferencia; null en todo lo demás.
+    contraparte: movimiento.contraparte ?? null,
     // Dos booleanos y no uno: un movimiento con signo DESCONOCIDO no es crédito ni
     // débito, y con un solo flag caía del lado del débito y se pintaba en rojo.
     esCredito: movimiento.signo === 'CREDITO',
     esDebito: movimiento.signo === 'DEBITO'
   }
+}
+
+// El texto que se muestra en la fila del historial. Para un pago agrega la tarjeta usada:
+// "Pago con tarjeta •••• 5390". Sin esto, con varias tarjetas a lo largo del tiempo no se puede
+// saber con cuál se pagó.
+//
+// Los puntos son el carácter • y no cuatro asteriscos: es lo que usan las tarjetas reales y no
+// se confunde con el marcado de negrita de algunos renderizadores.
+export function descripcionConTarjeta(movimiento) {
+  if (!movimiento?.ultimosCuatro) return movimiento?.descripcion ?? ''
+  return `${movimiento.descripcion} •••• ${movimiento.ultimosCuatro}`
 }
 
 // La API siempre responde con la misma forma (PaginaResponse<MovimientoResponse>),
@@ -173,4 +205,37 @@ export function normalizarRespuestaMovimientos(respuesta) {
     // queda mejor mostrar 1 que 0.
     totalPages: Math.max(1, respuesta?.totalPages ?? 1)
   }
+}
+
+// --- Historial mobile: la lista crece con "Cargar más" en vez de cambiar de página. ---
+
+// Los que todavía no están en la lista. Hace falta porque las páginas se corren: si entra un
+// movimiento nuevo entre dos "Cargar más", todos bajan un lugar y la página siguiente repite
+// el último de la anterior. Nunca faltan movimientos (solo se agregan arriba), solo se repiten.
+function sinLosQueYaEstan(actuales, candidatos) {
+  const idsActuales = new Set(actuales.map(movimiento => movimiento.id))
+  return candidatos.filter(movimiento => !idsActuales.has(movimiento.id))
+}
+
+// "Cargar más": la página nueva va abajo, sin repetir los que ya se ven.
+export function unirPaginasSinRepetidos(actuales, paginaNueva) {
+  return [...actuales, ...sinLosQueYaEstan(actuales, paginaNueva)]
+}
+
+// Entró dinero: de la primera página solo interesan los que son nuevos, y van arriba. Así el
+// usuario no pierde las páginas viejas que ya había cargado.
+export function sumarNuevosAlPrincipio(actuales, primeraPagina) {
+  return [...sinLosQueYaEstan(actuales, primeraPagina), ...actuales]
+}
+
+export function hayMasPaginas(paginaCargada, totalPaginas) {
+  return paginaCargada < totalPaginas
+}
+
+// El rango "desde / hasta" de la hoja de filtros. Una fecha sola siempre vale; con las dos,
+// "desde" no puede ser posterior a "hasta". Las fechas llegan como AAAA-MM-DD (lo que da el
+// input date), y en ese formato comparar el texto es lo mismo que comparar las fechas.
+export function rangoDeFechasValido(desde, hasta) {
+  if (!desde || !hasta) return true
+  return desde <= hasta
 }

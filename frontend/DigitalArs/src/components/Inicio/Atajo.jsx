@@ -8,12 +8,15 @@ import Typography from '@mui/material/Typography'
 //
 // Es un botón con texto visible, así que el lector de pantalla lee la etiqueta: el ícono es
 // decorativo y se oculta. La insignia es opcional (por ejemplo "20%"): sin ella, el Badge no
-// se dibuja.
-export default function Atajo({ etiqueta, Icono, insignia, onClick }) {
+// se dibuja. `disabled` lo apaga mientras hay una operación en curso (por ejemplo, congelando
+// la tarjeta), para que un segundo toque no dispare otra.
+export default function Atajo({ etiqueta, Icono, insignia, onClick, disabled = false }) {
   return (
     <ButtonBase
       onClick={onClick}
+      disabled={disabled}
       sx={{
+        '&.Mui-disabled': { opacity: 0.5 },
         width: '100%',
         flexDirection: 'column',
         gap: 0.75,

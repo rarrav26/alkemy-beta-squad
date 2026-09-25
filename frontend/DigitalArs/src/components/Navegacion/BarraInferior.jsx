@@ -25,8 +25,8 @@ import MenuMas from './MenuMas'
 const HUECO_DEL_BOTON_QR = 'hueco-del-boton-qr'
 
 // Barra de navegación fija abajo, con el botón de QR flotando en el centro. Solo se muestra en
-// mobile y para el usuario regular (ver useNavegacionMobile). Tarjetas y QR todavía no existen
-// en la app: responden con el aviso "Próximamente".
+// mobile y para el usuario regular (ver useNavegacionMobile). El QR todavía no existe en la
+// app: responde con el aviso "Próximamente".
 export default function BarraInferior() {
   const ubicacion = useLocation()
   const navegar = useNavigate()
@@ -47,6 +47,11 @@ export default function BarraInferior() {
 
     if (seccion === SECCION_CUENTAS) {
       navegar('/cuentas')
+      return
+    }
+
+    if (seccion === SECCION_TARJETAS) {
+      navegar('/tarjetas')
       return
     }
 

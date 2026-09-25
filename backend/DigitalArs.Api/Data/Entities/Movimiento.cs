@@ -17,6 +17,15 @@ public partial class Movimiento
 
     public int? transferencia_id { get; set; }
 
+    // Con qué tarjeta se hizo el pago. Nullable porque solo los movimientos de tipo
+    // PAGO_CON_TARJETA lo tienen: un depósito y una transferencia no salen de una tarjeta.
+    // Mismo patrón que transferencia_id.
+    //
+    // Sin propiedad de navegación a Tarjeta a propósito: nadie necesita recorrerla desde acá, y
+    // no declararla evita que este archivo (que lo genera el scaffolding) dependa de una
+    // entidad escrita a mano.
+    public int? tarjeta_id { get; set; }
+
     public virtual Cuenta cuenta { get; set; } = null!;
 
     public virtual Tipo_Movimiento tipo_movimiento { get; set; } = null!;

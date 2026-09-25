@@ -9,7 +9,9 @@ namespace DigitalArs.Api.DTOs;
 // en el historial y en el depósito: el front la muestra tal cual, sin convertir.
 //
 // MovimientoId no lo necesita la campana, pero es lo que va a permitir después llevar al
-// usuario del aviso al detalle del movimiento que lo originó.
+// usuario del aviso al detalle del movimiento que lo originó. Es NULLABLE porque un aviso de
+// tarjeta (congelada, dada de baja) no nace de ningún movimiento de dinero: ahí llega null y el
+// front no tiene que ofrecer el enlace al detalle.
 //
 // POR QUE ESTE DTO TIENE UNA FACTORY Y LOS OTROS NO
 // El resto de los DTOs son records pelados y el mapeo vive en el servicio que los arma. Acá el
@@ -22,7 +24,7 @@ public record NotificacionResponse(
     string Titulo,
     string Mensaje,
     bool Leida,
-    int MovimientoId,
+    int? MovimientoId,
     DateTimeOffset Fecha
 )
 {

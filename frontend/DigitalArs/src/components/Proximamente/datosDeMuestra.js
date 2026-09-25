@@ -3,7 +3,9 @@ import AttachMoneyRounded from '@mui/icons-material/AttachMoneyRounded'
 import DescriptionRounded from '@mui/icons-material/DescriptionRounded'
 import EuroRounded from '@mui/icons-material/EuroRounded'
 import LinkRounded from '@mui/icons-material/LinkRounded'
+import LocalShippingRounded from '@mui/icons-material/LocalShippingRounded'
 import PhoneIphoneRounded from '@mui/icons-material/PhoneIphoneRounded'
+import ReceiptLongRounded from '@mui/icons-material/ReceiptLongRounded'
 import ReceiptRounded from '@mui/icons-material/ReceiptRounded'
 import RequestQuoteRounded from '@mui/icons-material/RequestQuoteRounded'
 import SavingsRounded from '@mui/icons-material/SavingsRounded'
@@ -80,5 +82,29 @@ export const OPCIONES_DE_GESTION_DE_MUESTRA = [
     titulo: 'Cuentas vinculadas',
     descripcion: 'Conectá otras cuentas para ingresar dinero más rápido.',
     Icono: LinkRounded
+  }
+]
+
+// Opciones de "Gestioná tu tarjeta" en la pantalla Tarjetas. Ninguna existe todavía: cada
+// una lleva su chip "Próximamente", porque en esa lista también está "Dar de baja", que sí
+// funciona.
+export const OPCIONES_DE_GESTION_DE_TARJETA_DE_MUESTRA = [
+  {
+    id: 'limites-de-la-tarjeta',
+    titulo: 'Límites de la tarjeta',
+    descripcion: 'Elegí cuánto podés gastar por día.',
+    Icono: SpeedRounded
+  },
+  {
+    id: 'tarjeta-fisica',
+    titulo: 'Pedir tarjeta física',
+    descripcion: 'Recibila en tu casa para usarla en cualquier comercio.',
+    Icono: LocalShippingRounded
+  },
+  {
+    id: 'resumen-de-la-tarjeta',
+    titulo: 'Resumen de la tarjeta',
+    descripcion: 'Mirá tus consumos del mes en un solo lugar.',
+    Icono: ReceiptLongRounded
   }
 ]

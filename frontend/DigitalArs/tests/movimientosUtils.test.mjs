@@ -3,10 +3,16 @@ import assert from 'node:assert/strict'
 import {
   construirConsulta,
   contarFiltrosAplicados,
+  detalleDeLaContraparte,
   filtrosIniciales,
   formatearFechaCorta,
+  hayMasPaginas,
+  normalizarMovimiento,
   prefijoDelImporte,
-  textoDelImporte
+  rangoDeFechasValido,
+  sumarNuevosAlPrincipio,
+  textoDelImporte,
+  unirPaginasSinRepetidos
 } from '../src/routes/movimientosUtils.js'
 
 // Lo que la pantalla le pasa a construirConsulta: los filtros del panel mas la
@@ -115,4 +121,65 @@ test('el texto del importe junta signo y monto en pesos', () => {
   assert.equal(sinEspaciosDuros(textoDelImporte(credito)), '+ $ 57,01')
   assert.equal(sinEspaciosDuros(textoDelImporte(debito)), '- $ 2.000,00')
   assert.equal(sinEspaciosDuros(textoDelImporte(desconocido)), '$ 10,00')
+})
+
+const movimiento = id => ({ id })
+const ids = lista => lista.map(item => item.id)
+
+test('cargar mas suma la pagina nueva abajo', () => {
+  const unidos = unirPaginasSinRepetidos([movimiento(9), movimiento(8)], [movimiento(7), movimiento(6)])
+
+  assert.deepEqual(ids(unidos), [9, 8, 7, 6])
+})
+
+test('cargar mas no repite el movimiento que se corrio de pagina', () => {
+  // Entró uno nuevo: el 8, que era el último de la página 1, ahora encabeza la página 2.
+  const unidos = unirPaginasSinRepetidos([movimiento(9), movimiento(8)], [movimiento(8), movimiento(7)])
+
+  assert.deepEqual(ids(unidos), [9, 8, 7])
+})
+
+test('un movimiento nuevo se suma arriba sin perder lo ya cargado', () => {
+  const actuales = [movimiento(9), movimiento(8), movimiento(7)]
+  const primeraPagina = [movimiento(10), movimiento(9)]
+
+  assert.deepEqual(ids(sumarNuevosAlPrincipio(actuales, primeraPagina)), [10, 9, 8, 7])
+})
+
+test('hay mas paginas solo si la cargada no es la ultima', () => {
+  assert.equal(hayMasPaginas(1, 3), true)
+  assert.equal(hayMasPaginas(3, 3), false)
+  assert.equal(hayMasPaginas(1, 1), false)
+})
+
+test('el rango de fechas vale con una sola fecha o con desde antes que hasta', () => {
+  assert.equal(rangoDeFechasValido('', ''), true)
+  assert.equal(rangoDeFechasValido('2026-09-01', ''), true)
+  assert.equal(rangoDeFechasValido('', '2026-09-30'), true)
+  assert.equal(rangoDeFechasValido('2026-09-01', '2026-09-30'), true)
+  assert.equal(rangoDeFechasValido('2026-09-30', '2026-09-30'), true)
+})
+
+test('el rango de fechas no vale si desde es posterior a hasta', () => {
+  assert.equal(rangoDeFechasValido('2026-09-30', '2026-09-01'), false)
+})
+
+test('una transferencia enviada dice para quien fue y una recibida de quien vino', () => {
+  const enviada = { tipoRaw: 'TRANSFERENCIA_ENVIADA', contraparte: 'Tomas Destino' }
+  const recibida = { tipoRaw: 'TRANSFERENCIA_RECIBIDA', contraparte: 'Lucia Prueba' }
+
+  assert.equal(detalleDeLaContraparte(enviada), 'Para Tomas Destino')
+  assert.equal(detalleDeLaContraparte(recibida), 'De Lucia Prueba')
+})
+
+test('lo que no es transferencia no lleva linea de contraparte', () => {
+  assert.equal(detalleDeLaContraparte({ tipoRaw: 'DEPOSITO', contraparte: null }), null)
+})
+
+test('normalizar un movimiento conserva la contraparte y la deja en null si no viene', () => {
+  const conContraparte = normalizarMovimiento({ id: 1, tipo: 'TRANSFERENCIA_ENVIADA', signo: 'DEBITO', importe: 10, contraparte: 'Tomas Destino' })
+  const sinContraparte = normalizarMovimiento({ id: 2, tipo: 'DEPOSITO', signo: 'CREDITO', importe: 10 })
+
+  assert.equal(conContraparte.contraparte, 'Tomas Destino')
+  assert.equal(sinContraparte.contraparte, null)
 })

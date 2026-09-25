@@ -4,6 +4,7 @@ import {
   SECCION_CUENTAS,
   SECCION_INICIO,
   SECCION_MAS,
+  SECCION_TARJETAS,
   seccionActivaDeLaRuta
 } from '../src/routes/navegacionUtils.js'
 
@@ -22,4 +23,8 @@ test('las rutas del menú Más marcan la pestaña Más', () => {
 
 test('una ruta que no está en la barra no marca ninguna pestaña', () => {
   assert.equal(seccionActivaDeLaRuta('/login'), null)
+})
+
+test('la pantalla de tarjetas marca la pestaña Tarjetas', () => {
+  assert.equal(seccionActivaDeLaRuta('/tarjetas'), SECCION_TARJETAS)
 })

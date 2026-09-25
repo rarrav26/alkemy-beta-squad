@@ -43,6 +43,14 @@ export default function useOperacionesDeDinero({ aplicarDeposito, aplicarTransfe
     setMensajeExito(resultado?.message || 'Transferencia realizada con éxito.')
   }
 
+  // Un pago con tarjeta descuenta del saldo, y el backend devuelve el saldo ya calculado,
+  // igual que un depósito: por eso se aplica con la misma función. No se resta acá, para que
+  // la pantalla diga exactamente lo que quedó guardado.
+  function pagoRealizado(resultado) {
+    aplicarDeposito(resultado)
+    setMensajeExito(resultado.message)
+  }
+
   return {
     depositoAbierto,
     transferenciaAbierta,
@@ -53,6 +61,7 @@ export default function useOperacionesDeDinero({ aplicarDeposito, aplicarTransfe
     cerrarTransferencia,
     cerrarMensajeExito,
     depositoRealizado,
-    transferenciaRealizada
+    transferenciaRealizada,
+    pagoRealizado
   }
 }
