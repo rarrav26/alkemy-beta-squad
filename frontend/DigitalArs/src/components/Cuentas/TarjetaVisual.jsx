@@ -1,6 +1,13 @@
 import { Box, Stack, Typography } from "@mui/material";
 import AcUnitIcon from "@mui/icons-material/AcUnit";
 
+import useInclinacionConElMouse, {
+  VARIABLE_BRILLO_X,
+  VARIABLE_BRILLO_Y,
+  VARIABLE_INCLINACION_X,
+  VARIABLE_INCLINACION_Y,
+} from "../../hooks/useInclinacionConElMouse";
+
 // Proporción de una tarjeta real (ISO/IEC 7810 ID-1): 85.6 x 53.98 mm.
 const PROPORCION = "1.586 / 1";
 
@@ -9,6 +16,18 @@ const PROPORCION = "1.586 / 1";
 const ANCHO_MAXIMO = 380;
 
 const DURACION_DEL_GIRO = "600ms";
+
+// Cuánto tarda la inclinación en acomodarse. Corta a propósito: con más, la tarjeta queda
+// "flotando" atrás del puntero y se siente pesada; con 0 el regreso al reposo es un golpe seco.
+const DURACION_DE_LA_INCLINACION = "120ms";
+
+// Cuánto crece al pasar el puntero por encima. Apenas: lo suficiente para que se sienta que
+// reacciona, no tanto como para que empuje al contenido de al lado.
+const ESCALA_AL_PASAR_POR_ENCIMA = 1.02;
+
+// Clase del brillo. Hace falta un nombre para que el contenedor pueda encenderlo al pasar el
+// puntero: el brillo vive dos niveles más abajo y no hay selector de "padre" en CSS.
+const CLASE_DEL_BRILLO = "brillo-de-la-tarjeta";
 
 // Los colores del plástico. Son la ÚNICA excepción a "los colores salen del tema": la tarjeta
 // es un producto con identidad propia (como el plástico de un banco), y tiene que verse igual
@@ -36,6 +55,11 @@ const COLORES_DEL_PLASTICO = {
  *
  * El giro es CSS puro y no necesita ninguna dependencia: el contenedor aporta la perspectiva,
  * la cara interior rota en Y, y backface-visibility esconde la cara que queda de espaldas.
+ *
+ * La INCLINACIÓN que sigue al puntero va en una capa aparte, entre el contenedor y la que gira.
+ * No podían compartir elemento: un solo `transform` no puede llevar a la vez el giro con su
+ * transición de 600ms y una inclinación que tiene que seguir al mouse al instante, y el que se
+ * escribiera último pisaría al otro.
  */
 export default function TarjetaVisual({
   tarjeta,
@@ -43,6 +67,8 @@ export default function TarjetaVisual({
   girada = false,
   onGirar,
 }) {
+  const { referencia, manejadores } = useInclinacionConElMouse();
+
   const congelada = tarjeta.estado === "CONGELADA";
   const dadaDeBaja = tarjeta.estado === "DADA_DE_BAJA";
   const inactiva = congelada || dadaDeBaja;
@@ -62,6 +88,8 @@ export default function TarjetaVisual({
       type="button"
       onClick={onGirar}
       aria-label={girada ? "Ver el frente de la tarjeta" : "Ver el dorso de la tarjeta"}
+      ref={referencia}
+      {...manejadores}
       sx={{
         // Reset de los estilos que trae un button.
         appearance: "none",
@@ -91,41 +119,76 @@ export default function TarjetaVisual({
           outlineColor: "primary.main",
           outlineOffset: 3,
         },
+
+        // El crecimiento y el brillo son solo para quien tiene puntero: en una pantalla táctil
+        // el navegador deja el estado :hover pegado después de tocar, y la tarjeta quedaría
+        // agrandada y brillando hasta que el usuario toque otra cosa.
+        "@media (hover: hover)": {
+          "&:hover": {
+            "--escala-de-la-tarjeta": ESCALA_AL_PASAR_POR_ENCIMA,
+          },
+          [`&:hover .${CLASE_DEL_BRILLO}`]: { opacity: 1 },
+        },
       }}
     >
+      {/* Capa de la inclinación. Lleva preserve-3d para que el giro de su hija siga existiendo
+          en el espacio 3D: sin eso, la cara de atrás se aplana y se ve encima de la de adelante. */}
       <Box
         sx={{
-          position: "relative",
           width: "100%",
           height: "100%",
-          // preserve-3d es lo que permite que las caras hijas existan en el espacio 3D. Sin
-          // esto, el dorso no se esconde y se ve espejado encima del frente.
           transformStyle: "preserve-3d",
-          transition: `transform ${DURACION_DEL_GIRO} cubic-bezier(0.4, 0.2, 0.2, 1)`,
-          transform: girada ? "rotateY(180deg)" : "rotateY(0deg)",
+          transform: `rotateX(var(${VARIABLE_INCLINACION_X}, 0deg)) rotateY(var(${VARIABLE_INCLINACION_Y}, 0deg)) scale(var(--escala-de-la-tarjeta, 1))`,
+          transition: `transform ${DURACION_DE_LA_INCLINACION} ease-out`,
 
-          // Accesibilidad: una animación 3D es justo el tipo de movimiento que marea a
-          // personas con sensibilidad vestibular. Quien pidió menos movimiento en su sistema
-          // operativo ve el cambio instantáneo, sin perder la funcionalidad.
+          // A propósito SIN `will-change: transform`. Sería la forma habitual de pedirle al
+          // navegador que promueva esta capa, pero acá convive con `transform-style: preserve-3d`,
+          // y varias propiedades que crean contexto de apilado obligan a `transform-style: flat` —
+          // lo que aplanaría el giro de la hija y dejaría el dorso espejado encima del frente. El
+          // giro ya funciona; no vale arriesgarlo por una optimización que no puedo comprobar acá.
+
+          // El hook ya no escribe las variables cuando el sistema pide menos movimiento, pero la
+          // transición y el crecimiento del hover son CSS y hay que apagarlos acá.
           "@media (prefers-reduced-motion: reduce)": {
             transition: "none",
+            transform: "none",
           },
         }}
       >
-        <Cara>
-          <Frente
-            tarjeta={tarjeta}
-            numeroMostrado={numeroMostrado}
-            inactiva={inactiva}
-            congelada={congelada}
-            dadaDeBaja={dadaDeBaja}
-          />
-        </Cara>
+        <Box
+          sx={{
+            position: "relative",
+            width: "100%",
+            height: "100%",
+            // preserve-3d es lo que permite que las caras hijas existan en el espacio 3D. Sin
+            // esto, el dorso no se esconde y se ve espejado encima del frente.
+            transformStyle: "preserve-3d",
+            transition: `transform ${DURACION_DEL_GIRO} cubic-bezier(0.4, 0.2, 0.2, 1)`,
+            transform: girada ? "rotateY(180deg)" : "rotateY(0deg)",
 
-        {/* El dorso ya está rotado 180°, así que cuando el contenedor gira queda de frente. */}
-        <Cara rotada>
-          <Dorso secreto={secreto} inactiva={inactiva} />
-        </Cara>
+            // Accesibilidad: una animación 3D es justo el tipo de movimiento que marea a
+            // personas con sensibilidad vestibular. Quien pidió menos movimiento en su sistema
+            // operativo ve el cambio instantáneo, sin perder la funcionalidad.
+            "@media (prefers-reduced-motion: reduce)": {
+              transition: "none",
+            },
+          }}
+        >
+          <Cara>
+            <Frente
+              tarjeta={tarjeta}
+              numeroMostrado={numeroMostrado}
+              inactiva={inactiva}
+              congelada={congelada}
+              dadaDeBaja={dadaDeBaja}
+            />
+          </Cara>
+
+          {/* El dorso ya está rotado 180°, así que cuando el contenedor gira queda de frente. */}
+          <Cara rotada>
+            <Dorso secreto={secreto} inactiva={inactiva} />
+          </Cara>
+        </Box>
       </Box>
     </Box>
   );
@@ -148,6 +211,25 @@ function Cara({ children, rotada = false }) {
       }}
     >
       {children}
+
+      {/* El brillo que sigue al puntero, como el reflejo sobre el plástico. Va ENCIMA del
+          contenido y no lo tapa (pointerEvents: none), o se comería el click que gira la tarjeta.
+          Su posición sale de las variables que escribe el hook; sin puntero encima queda en 0 y no
+          se dibuja. El blanco semitransparente funciona sobre el violeta y sobre el gris de la
+          tarjeta inactiva, así que no hace falta un color por estado. */}
+      <Box
+        aria-hidden="true"
+        className={CLASE_DEL_BRILLO}
+        sx={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          opacity: 0,
+          transition: "opacity 200ms ease-out",
+          background: `radial-gradient(circle at var(${VARIABLE_BRILLO_X}, 50%) var(${VARIABLE_BRILLO_Y}, 50%), rgba(255,255,255,0.3), rgba(255,255,255,0) 55%)`,
+          "@media (prefers-reduced-motion: reduce)": { transition: "none" },
+        }}
+      />
     </Box>
   );
 }

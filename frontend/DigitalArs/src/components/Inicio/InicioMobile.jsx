@@ -10,6 +10,8 @@ import ReceiptLongRounded from '@mui/icons-material/ReceiptLongRounded'
 import SwapHorizRounded from '@mui/icons-material/SwapHorizRounded'
 import { useNavigate } from 'react-router-dom'
 
+import { OCULTO_A_LA_VISTA } from '../Comunes/ocultoALaVista'
+import Aparicion from '../Comunes/Aparicion'
 import EstadoDeCargaDeCuenta from '../Cuentas/EstadoDeCargaDeCuenta'
 import UltimosMovimientos from '../Movimientos/UltimosMovimientos'
 import AvisoProximamente from '../Proximamente/AvisoProximamente'
@@ -25,18 +27,6 @@ import CuentasEnOtrasMonedas from './CuentasEnOtrasMonedas'
 import GrillaDeAtajos from './GrillaDeAtajos'
 import PromoCredito from './PromoCredito'
 import TarjetaDeSaldo from './TarjetaDeSaldo'
-
-// El título de la página existe para el lector de pantalla, pero no se dibuja: en mobile el
-// encabezado ya saluda al usuario y repetir "Inicio" arriba de la tarjeta solo ocupa lugar.
-const OCULTO_A_LA_VISTA = {
-  position: 'absolute',
-  // En texto y no como número: en sx, `width: 1` significa 100%, no 1px.
-  width: '1px',
-  height: '1px',
-  overflow: 'hidden',
-  clip: 'rect(0 0 0 0)',
-  whiteSpace: 'nowrap'
-}
 
 // La pantalla de Inicio en mobile. No carga datos ni abre los modales de dinero: eso sigue en
 // Dashboard, que se lo pasa por props. Así las dos vistas usan la misma cuenta y los mismos
@@ -84,22 +74,37 @@ export default function InicioMobile({
             </Alert>
           )}
 
-          <TarjetaDeSaldo
-            cuenta={cuenta}
-            etiquetaDeVariacion={ETIQUETA_DE_VARIACION_DE_MUESTRA}
-            onAgregar={onAgregar}
-            onTransferir={onTransferir}
-          />
+          {/* Las secciones se arman una atrás de la otra. El saldo va primero y sin retardo: es
+              lo que el usuario vino a ver, y hacerlo esperar a que aparezca sería cobrarle la
+              animación. El resto entra detrás. */}
+          <Aparicion orden={0}>
+            <TarjetaDeSaldo
+              cuenta={cuenta}
+              etiquetaDeVariacion={ETIQUETA_DE_VARIACION_DE_MUESTRA}
+              onAgregar={onAgregar}
+              onTransferir={onTransferir}
+            />
+          </Aparicion>
 
-          <CuentasEnOtrasMonedas cuentas={CUENTAS_DE_MUESTRA} onElegir={mostrarAviso} />
+          <Aparicion orden={1}>
+            <CuentasEnOtrasMonedas cuentas={CUENTAS_DE_MUESTRA} onElegir={mostrarAviso} />
+          </Aparicion>
 
-          <GrillaDeAtajos atajos={[...atajosReales, ...atajosDeMuestra]} />
+          <Aparicion orden={2}>
+            <GrillaDeAtajos atajos={[...atajosReales, ...atajosDeMuestra]} />
+          </Aparicion>
 
-          <PromoCredito promo={PROMO_DE_CREDITO_DE_MUESTRA} onElegir={mostrarAviso} />
+          <Aparicion orden={3}>
+            <PromoCredito promo={PROMO_DE_CREDITO_DE_MUESTRA} onElegir={mostrarAviso} />
+          </Aparicion>
 
-          <BannerPromocional banner={BANNER_DE_MUESTRA} onElegir={mostrarAviso} />
+          <Aparicion orden={4}>
+            <BannerPromocional banner={BANNER_DE_MUESTRA} onElegir={mostrarAviso} />
+          </Aparicion>
 
-          <UltimosMovimientos saldo={cuenta.saldo} cantidad={4} />
+          <Aparicion orden={5}>
+            <UltimosMovimientos saldo={cuenta.saldo} cantidad={4} />
+          </Aparicion>
         </Stack>
       )}
 

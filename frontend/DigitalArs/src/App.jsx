@@ -10,12 +10,16 @@ import CssBaseline from '@mui/material/CssBaseline'
 import GlobalStyles from '@mui/material/GlobalStyles'
 
 import { useContext } from 'react'
+import { useLocation } from 'react-router-dom'
 import { ElementosGlobales } from './context/ElementosGlobales'
 import ScrollTopButton from './components/Home/ScrollTopButton'
-import EncabezadoMobile from './components/Navegacion/EncabezadoMobile'
+import FondoDelSitio from './components/Fondo/FondoDelSitio'
+import BarraLateral, { ANCHO_DE_LA_BARRA_LATERAL } from './components/Navegacion/BarraLateral'
+import EncabezadoDeSesion from './components/Navegacion/EncabezadoDeSesion'
 import BarraInferior from './components/Navegacion/BarraInferior'
 import AvisoDeNotificacion from './components/Notificaciones/AvisoDeNotificacion'
-import useNavegacionMobile from './hooks/useNavegacionMobile'
+import useShell from './hooks/useShell'
+import { SHELL_ESCRITORIO, SHELL_MOBILE } from './routes/shellUtils'
 
 // Deja lugar abajo para que la barra inferior fija (y el botón de QR que sobresale) no tape el
 // final de la página.
@@ -30,16 +34,17 @@ const SIN_BARRA_DE_SCROLL = {
 }
 
 // Arma la estructura de la página. Está separado de App porque necesita leer el tema propio
-// (los breakpoints de useNavegacionMobile), y ese tema recién existe DENTRO del ThemeProvider.
+// (los breakpoints que consulta useShell), y ese tema recién existe DENTRO del ThemeProvider.
 function EstructuraDeLaPagina() {
-  const usaNavegacionMobile = useNavegacionMobile()
+  const shell = useShell()
+  const { pathname } = useLocation()
 
-  if (usaNavegacionMobile) {
+  if (shell === SHELL_MOBILE) {
     return (
       <>
         <GlobalStyles styles={SIN_BARRA_DE_SCROLL} />
 
-        <EncabezadoMobile />
+        <EncabezadoDeSesion />
 
         <Box sx={{ pb: ESPACIO_DE_LA_BARRA_INFERIOR }}>
           <Main />
@@ -50,6 +55,25 @@ function EstructuraDeLaPagina() {
     )
   }
 
+  if (shell === SHELL_ESCRITORIO) {
+    return (
+      // La barra lateral es un Drawer permanente, así que reserva su propio ancho con
+      // flexShrink: 0 y la columna de contenido se queda con el resto. minWidth: 0 es lo que
+      // deja que el contenido se encoja en vez de desbordar la ventana: sin eso, una tabla
+      // ancha (el historial) empuja la barra fuera de la pantalla.
+      <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+        <BarraLateral />
+
+        <Box sx={{ flexGrow: 1, minWidth: 0, maxWidth: `calc(100% - ${ANCHO_DE_LA_BARRA_LATERAL}px)` }}>
+          <EncabezadoDeSesion />
+          <Main />
+        </Box>
+
+        <ScrollTopButton />
+      </Box>
+    )
+  }
+
   return (
     <>
       <Header />
@@ -57,7 +81,7 @@ function EstructuraDeLaPagina() {
       <Main />
 
       <Footer />
-      <ScrollTopButton />
+      {pathname !== '/' && <ScrollTopButton />}
     </>
   )
 }
@@ -68,7 +92,19 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <EstructuraDeLaPagina />
+
+      {/* Los rayos van detrás de todo. La app entera se envuelve en una capa con zIndex 1 para
+          quedar por encima: sin eso, el fondo es un elemento posicionado y se dibujaría ARRIBA
+          del contenido en flujo, que no lleva z-index.
+          `position: relative` en la envoltura no afecta a la barra inferior ni a la lateral, que
+          son `fixed`: solo un transform, un filter o un will-change crean un marco nuevo para
+          ellas, y esto no es ninguno de los tres. */}
+      <FondoDelSitio />
+
+      <Box sx={{ position: 'relative', zIndex: 1 }}>
+        <EstructuraDeLaPagina />
+      </Box>
+
       <AvisoDeNotificacion />
     </ThemeProvider>
   )

@@ -8,6 +8,7 @@ import Typography from '@mui/material/Typography'
 import DeleteOutlineRounded from '@mui/icons-material/DeleteOutlineRounded'
 
 import ListaDeGestion from '../components/Comunes/ListaDeGestion'
+import Aparicion from '../components/Comunes/Aparicion'
 import ConfirmarBajaDeTarjetaDialog from '../components/Cuentas/ConfirmarBajaDeTarjetaDialog'
 import PagarConTarjetaModal from '../components/Cuentas/PagarConTarjetaModal'
 import RevelarCodigoModal from '../components/Cuentas/RevelarCodigoModal'
@@ -160,30 +161,36 @@ export default function TarjetasPage() {
       </Typography>
 
       <Stack spacing={3}>
-        <Box aria-busy={tarjetaDelUsuario.cargando}>
-          <ContenidoDeTarjetas tarjetaDelUsuario={tarjetaDelUsuario} puedePagar={puedePagar} />
-        </Box>
+        <Aparicion orden={0} sx={{ width: '100%' }}>
+          <Box aria-busy={tarjetaDelUsuario.cargando}>
+            <ContenidoDeTarjetas tarjetaDelUsuario={tarjetaDelUsuario} puedePagar={puedePagar} />
+          </Box>
+        </Aparicion>
 
         {/* Aparece aunque todavía no haya tarjeta: los pagos de una tarjeta dada de baja
             siguen siendo movimientos de la cuenta. */}
         {cuenta && (
-          <UltimosMovimientos
-            saldo={cuenta.saldo}
-            cantidad={4}
-            titulo="Tus pagos con tarjeta"
-            idDelTitulo="titulo-pagos-con-tarjeta"
-            busqueda={BUSQUEDA_DE_PAGOS_CON_TARJETA}
-            rutaDeVerMas={`/movimientos?buscar=${BUSQUEDA_DE_PAGOS_CON_TARJETA}`}
-            mensajeSinMovimientos="Todavía no hiciste pagos con tu tarjeta."
-          />
+          <Aparicion orden={1}>
+            <UltimosMovimientos
+              saldo={cuenta.saldo}
+              cantidad={4}
+              titulo="Tus pagos con tarjeta"
+              idDelTitulo="titulo-pagos-con-tarjeta"
+              busqueda={BUSQUEDA_DE_PAGOS_CON_TARJETA}
+              rutaDeVerMas={`/movimientos?buscar=${BUSQUEDA_DE_PAGOS_CON_TARJETA}`}
+              mensajeSinMovimientos="Todavía no hiciste pagos con tu tarjeta."
+            />
+          </Aparicion>
         )}
 
         {tarjetaDelUsuario.tarjeta && (
-          <ListaDeGestion
-            titulo="Gestioná tu tarjeta"
-            idDelTitulo="titulo-gestiona-tu-tarjeta"
-            opciones={opcionesDeGestion}
-          />
+          <Aparicion orden={2}>
+            <ListaDeGestion
+              titulo="Gestioná tu tarjeta"
+              idDelTitulo="titulo-gestiona-tu-tarjeta"
+              opciones={opcionesDeGestion}
+            />
+          </Aparicion>
         )}
       </Stack>
 

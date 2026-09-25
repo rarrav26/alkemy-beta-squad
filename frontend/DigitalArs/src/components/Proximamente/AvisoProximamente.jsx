@@ -6,6 +6,9 @@ import Snackbar from '@mui/material/Snackbar'
 //
 // Va abajo pero por encima de la barra inferior, para que no quede tapado por ella. El aviso de
 // notificaciones sale arriba, así que los dos nunca se pisan.
+//
+// Los 96px son justo para esquivar esa barra, que solo existe por debajo de "md": desde ahí el
+// aviso vuelve a su separación normal, o quedaría flotando lejos del borde sin motivo.
 export default function AvisoProximamente({ open, onClose }) {
   return (
     <Snackbar
@@ -14,7 +17,7 @@ export default function AvisoProximamente({ open, onClose }) {
       onClose={onClose}
       message="Próximamente disponible"
       anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      sx={{ bottom: { xs: 96 } }}
+      sx={{ bottom: { xs: 96, md: 24 } }}
     />
   )
 }

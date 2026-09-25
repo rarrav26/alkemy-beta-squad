@@ -6,6 +6,7 @@ import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 
 import ListaDeGestion from '../components/Comunes/ListaDeGestion'
+import Aparicion from '../components/Comunes/Aparicion'
 import BalanceMensual from '../components/Cuentas/BalanceMensual'
 import EstadoDeCargaDeCuenta from '../components/Cuentas/EstadoDeCargaDeCuenta'
 import ModalesDeDinero from '../components/Cuentas/ModalesDeDinero'
@@ -55,24 +56,32 @@ export default function CuentasPage() {
             </Alert>
           )}
 
-          <TarjetaDeSaldo
-            cuenta={cuenta}
-            etiquetaDeVariacion={ETIQUETA_DE_VARIACION_DE_MUESTRA}
-            onAgregar={operaciones.abrirDeposito}
-            onTransferir={operaciones.abrirTransferencia}
-          />
+          <Aparicion orden={0}>
+            <TarjetaDeSaldo
+              cuenta={cuenta}
+              etiquetaDeVariacion={ETIQUETA_DE_VARIACION_DE_MUESTRA}
+              onAgregar={operaciones.abrirDeposito}
+              onTransferir={operaciones.abrirTransferencia}
+            />
+          </Aparicion>
 
-          <UltimosMovimientos saldo={cuenta.saldo} cantidad={4} />
+          <Aparicion orden={1}>
+            <UltimosMovimientos saldo={cuenta.saldo} cantidad={4} />
+          </Aparicion>
 
-          <BalanceMensual balance={BALANCE_MENSUAL_DE_MUESTRA} onElegir={mostrarAviso} />
+          <Aparicion orden={2}>
+            <BalanceMensual balance={BALANCE_MENSUAL_DE_MUESTRA} onElegir={mostrarAviso} />
+          </Aparicion>
 
           {/* Toda la sección es de muestra: el chip va una sola vez, junto al título. */}
-          <ListaDeGestion
-            titulo="Gestioná tu cuenta"
-            idDelTitulo="titulo-gestiona-tu-cuenta"
-            complemento={<ChipProximamente />}
-            opciones={OPCIONES_DE_GESTION_DE_MUESTRA.map(opcion => ({ ...opcion, onClick: mostrarAviso }))}
-          />
+          <Aparicion orden={3}>
+            <ListaDeGestion
+              titulo="Gestioná tu cuenta"
+              idDelTitulo="titulo-gestiona-tu-cuenta"
+              complemento={<ChipProximamente />}
+              opciones={OPCIONES_DE_GESTION_DE_MUESTRA.map(opcion => ({ ...opcion, onClick: mostrarAviso }))}
+            />
+          </Aparicion>
         </Stack>
       )}
 
