@@ -14,6 +14,7 @@ import {
   Typography
 } from '@mui/material'
 import { obtenerUsuarioPorId } from '../../context/api'
+import ActividadDeTarjetas from './ActividadDeTarjetas'
 
 const formatoPesos = new Intl.NumberFormat('es-AR', {
   style: 'currency',
@@ -70,8 +71,11 @@ export default function DetalleUsuarioModal({ open, usuarioId, token, onClose })
 
   const documento = usuario ? [usuario.tipoDocumento, usuario.nroDocumento].filter(Boolean).join(' ') : ''
 
+  // maxWidth pasó de xs a sm: la sección de actividad de tarjetas trae una grilla de
+  // contadores y un historial con fecha, y en xs (444px) quedaban apretados contra el borde.
+  // El resto del contenido se ve igual, solo con más aire.
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs" aria-labelledby="detalle-usuario-titulo">
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm" aria-labelledby="detalle-usuario-titulo">
       <DialogTitle id="detalle-usuario-titulo">Detalle del usuario</DialogTitle>
 
       <DialogContent>
@@ -110,6 +114,13 @@ export default function DetalleUsuarioModal({ open, usuarioId, token, onClose })
                 <Dato label="Alias" value={usuario.cuenta.alias} />
                 <Dato label="CVU" value={usuario.cuenta.cvu} />
                 <Dato label="Saldo" value={formatoPesos.format(usuario.cuenta.saldo)} />
+
+                <Divider />
+
+                {/* Solo para quien tiene cuenta: sin billetera no puede haber tarjetas.
+                    Se carga a demanda con un botón, así abrir el detalle no dispara una
+                    consulta que la mayoría de las veces nadie pidió. */}
+                <ActividadDeTarjetas usuarioId={usuarioId} token={token} />
               </>
             ) : (
               <Typography variant="body2" color="text.secondary">

@@ -16,16 +16,21 @@ import {
   useTheme,
 } from "@mui/material";
 import { Link } from "react-router-dom";
+import HistorialMobile from "../components/Movimientos/HistorialMobile";
 import { useAuth } from "../context/authContext";
 import { ElementosGlobales } from "../context/ElementosGlobales";
+import useNavegacionMobile from "../hooks/useNavegacionMobile";
 import {
   construirConsulta,
   contarFiltrosAplicados,
+  descripcionConTarjeta,
+  detalleDeLaContraparte,
   filtrosIniciales,
   formatearFecha,
   normalizarRespuestaMovimientos,
   opcionesTipo,
   paginaVacia,
+  prefijoDelImporte,
 } from "./movimientosUtils";
 
 const formatoPesos = new Intl.NumberFormat("es-AR", {
@@ -35,19 +40,22 @@ const formatoPesos = new Intl.NumberFormat("es-AR", {
 
 const MILISEGUNDOS_ENTRE_REFRESCOS = 15000;
 
-// Un movimiento que el backend no sabe clasificar (signo DESCONOCIDO) se muestra sin
-// signo y en color de texto normal: no sabemos si suma o resta, asi que no lo afirmamos.
+// El signo sale de prefijoDelImporte (compartido con la lista corta del Inicio y Cuentas);
+// acá solo se elige el color. Un movimiento de signo DESCONOCIDO va en color de texto normal.
 function presentacionDelImporte(movimiento) {
-  if (movimiento.esCredito) return { prefijo: "+", color: "success.main" };
-  if (movimiento.esDebito) return { prefijo: "-", color: "error.main" };
+  const prefijo = prefijoDelImporte(movimiento);
 
-  return { prefijo: "", color: "text.primary" };
+  if (movimiento.esCredito) return { prefijo, color: "success.main" };
+  if (movimiento.esDebito) return { prefijo, color: "error.main" };
+
+  return { prefijo, color: "text.primary" };
 }
 
 // Una fila del historial. La usan el preview del dashboard y la pantalla
 // completa, asi que el formato de los montos y las fechas es siempre el mismo.
 function FilaDeMovimiento({ movimiento }) {
   const presentacion = presentacionDelImporte(movimiento);
+  const detalle = detalleDeLaContraparte(movimiento);
   const IconoMovimiento = movimiento.esCredito
     ? ArrowDownwardRoundedIcon
     : ArrowUpwardRoundedIcon;
@@ -86,8 +94,13 @@ function FilaDeMovimiento({ movimiento }) {
 
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography fontWeight={700} sx={{ lineHeight: 1.3 }}>
-            {movimiento.descripcion}
+            {descripcionConTarjeta(movimiento)}
           </Typography>
+          {detalle && (
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              {detalle}
+            </Typography>
+          )}
           <Typography variant="body2" color="text.secondary">
             {formatearFecha(movimiento.fecha)}
           </Typography>
@@ -236,7 +249,8 @@ export function MovimientosPreview() {
   );
 }
 
-export function MovimientosPage() {
+// El historial de escritorio: filtros en un panel y paginación con Anterior / Siguiente.
+function HistorialDeEscritorio() {
   const { obtenerMovimientos } = useAuth();
   const { darkMode } = useContext(ElementosGlobales);
   const theme = useTheme();
@@ -697,6 +711,16 @@ export function MovimientosPage() {
       </Stack>
     </Box>
   );
+}
+
+// Una vista por componente, y no un if en el medio de una sola: cada una tiene sus propios
+// hooks (la de escritorio consulta cada 15 s), y así la que no se ve no corre nada.
+export function MovimientosPage() {
+  const usaNavegacionMobile = useNavegacionMobile();
+
+  if (usaNavegacionMobile) return <HistorialMobile />;
+
+  return <HistorialDeEscritorio />;
 }
 
 export default MovimientosPage;

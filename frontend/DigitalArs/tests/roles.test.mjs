@@ -4,6 +4,7 @@ import {
   ROL_ADMINISTRADOR,
   ROL_USUARIO,
   esAdministrador,
+  esSesionActiva,
   puedeVerRuta
 } from '../src/routes/rolesUtils.js'
 
@@ -34,4 +35,25 @@ test('el administrador no ve las rutas del usuario regular', () => {
 test('esAdministrador distingue los dos roles', () => {
   assert.equal(esAdministrador(sesionDeAdministrador), true)
   assert.equal(esAdministrador(sesionDeUsuario), false)
+})
+
+const estadoVerificado = {
+  ready: true,
+  connectionError: '',
+  session: sesionDeUsuario,
+  sesionVerificada: true
+}
+
+test('la sesión está activa solo si está lista, sin error de conexión y verificada', () => {
+  assert.equal(esSesionActiva(estadoVerificado), true)
+})
+
+test('una sesión guardada pero todavía sin verificar no cuenta como activa', () => {
+  assert.equal(esSesionActiva({ ...estadoVerificado, sesionVerificada: false }), false)
+})
+
+test('sin sesión, antes de estar lista o con error de conexión no hay sesión activa', () => {
+  assert.equal(esSesionActiva({ ...estadoVerificado, session: null }), false)
+  assert.equal(esSesionActiva({ ...estadoVerificado, ready: false }), false)
+  assert.equal(esSesionActiva({ ...estadoVerificado, connectionError: 'Sin conexión' }), false)
 })

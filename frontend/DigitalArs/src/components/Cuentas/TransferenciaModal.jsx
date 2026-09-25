@@ -96,6 +96,10 @@ export default function TransferenciaModal({ open, onClose, onTransferenciaReali
     try {
       const resultado = await transferir(destino.trim(), valor)
 
+      // El envío ya terminó: se libera ANTES de salir. limpiarYSalir no hace nada mientras hay
+      // un envío en curso, así que si se esperaba al finally el modal quedaba abierto, con el
+      // formulario cargado y listo para mandar la misma transferencia otra vez.
+      envioEnCurso.current = false
       limpiarYSalir()
       if (onTransferenciaRealizada) onTransferenciaRealizada(resultado)
     } catch (err) {

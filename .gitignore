@@ -46,3 +46,6 @@ docs/arquitectura.architecture.json
 # son de un solo dev y pesan, asi que no van al repo. Los PNG que si son del proyecto
 # (database/Diagrama_ER.png, frontend/.../assets/hero.png) viven en subcarpetas y no los toca esta regla.
 /*.png
+
+# Artefactos locales del MCP de Playwright (screenshots, trazas de sesiones de prueba)
+.playwright-mcp/

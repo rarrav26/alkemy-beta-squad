@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Alert,
   Box,
@@ -10,112 +10,52 @@ import {
 } from "@mui/material";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/authContext";
-import { useNotificaciones } from "../context/notificacionesContext";
+import useMiCuenta from "../hooks/useMiCuenta";
+import useNavegacionMobile from "../hooks/useNavegacionMobile";
+import useOperacionesDeDinero from "../hooks/useOperacionesDeDinero";
 import AuthForm, { ProfileFields } from "../components/Auth/AuthForm";
-import DepositoModal from "../components/Cuentas/DepositoModal";
+import EstadoDeCargaDeCuenta from "../components/Cuentas/EstadoDeCargaDeCuenta";
+import InicioMobile from "../components/Inicio/InicioMobile";
+import ModalesDeDinero from "../components/Cuentas/ModalesDeDinero";
 import SaldoAnimado from "../components/Cuentas/SaldoAnimado";
-import TransferenciaModal from "../components/Cuentas/TransferenciaModal";
+import TarjetaVirtual from "../components/Cuentas/TarjetaVirtual";
 import { MovimientosPreview } from "./Movimientos";
 import { getSessionUser } from "./dashboardUtils";
 import { esAdministrador } from "./rolesUtils";
 
 export default function Dashboard() {
-  const { session, obtenerMiCuenta } = useAuth();
-  const { avisosRecibidos } = useNotificaciones();
+  const { session } = useAuth();
   const usuario = getSessionUser(session);
-  const [cuenta, setCuenta] = useState(null);
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState("");
-  const [intento, setIntento] = useState(0);
-  const [depositoAbierto, setDepositoAbierto] = useState(false);
-  const [transferenciaAbierta, setTransferenciaAbierta] = useState(false);
-  const [mensajeExito, setMensajeExito] = useState("");
-
   const esAdmin = esAdministrador(session);
+  // El administrador usa el panel de gestión: no tiene cuenta que cargar.
+  const { cuenta, cargando, error, reintentar, aplicarDeposito, aplicarTransferencia } =
+    useMiCuenta({ habilitado: !esAdmin });
+  const operaciones = useOperacionesDeDinero({ aplicarDeposito, aplicarTransferencia });
+  const usaNavegacionMobile = useNavegacionMobile();
 
-  useEffect(() => {
-    // El administrador usa el panel de gestión.
-    if (esAdmin) return;
+  // Los modales son los mismos para la vista de escritorio y la mobile: solo cambia el botón
+  // que los abre.
+  const modalesDeDinero = !esAdmin && cuenta && (
+    <ModalesDeDinero operaciones={operaciones} saldoDisponible={cuenta.saldo} />
+  );
 
-    const controller = new AbortController();
-
-    async function cargarCuenta() {
-      setCargando(true);
-      setError("");
-      setCuenta(null);
-
-      try {
-        const datos = await obtenerMiCuenta(controller.signal);
-
-        if (!controller.signal.aborted) {
-          setCuenta(datos);
-        }
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          const mensajeCrudo = (error.message || '').trim()
-          const frasesUnicas = [
-            ...new Set(
-              mensajeCrudo
-                .split('.')
-                .map(frase => frase.trim())
-                .filter(Boolean)
-            )
-          ]
-          const mensajeNormalizado =
-            frasesUnicas.length > 0 ? `${frasesUnicas.join('. ')}.` : mensajeCrudo
-
-          setError(mensajeNormalizado)
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setCargando(false);
-        }
-      }
-    }
-
-    cargarCuenta();
-
-    return () => controller.abort();
-  }, [obtenerMiCuenta, esAdmin, intento]);
-
-  // Cuando entra dinero, el mensaje del socket trae la notificación, no el saldo: hay que volver
-  // a pedirlo. Va en un efecto aparte y NO reusa el contador "intento" de arriba, porque ese
-  // efecto pone la cuenta en null y la tarjeta mostraría "Cargando tu cuenta…" cada vez que
-  // llega una transferencia. Acá el saldo se cambia sin que se note el reemplazo.
-  useEffect(() => {
-    if (esAdmin || avisosRecibidos === 0) return;
-
-    const controller = new AbortController();
-
-    obtenerMiCuenta(controller.signal)
-      .then((datos) => {
-        if (!controller.signal.aborted) setCuenta(datos);
-      })
-      // Si el refresco de fondo falla, se deja el saldo anterior en pantalla: es preferible a
-      // romper la tarjeta por algo que el usuario no pidió.
-      .catch(() => {});
-
-    return () => controller.abort();
-  }, [avisosRecibidos, esAdmin, obtenerMiCuenta]);
-
-  function depositoRealizado(resultado) {
-    setCuenta((actual) =>
-      actual ? { ...actual, saldo: resultado.saldoActual } : actual,
+  // useNavegacionMobile ya deja afuera al administrador: esta rama es solo del usuario regular.
+  if (usaNavegacionMobile) {
+    return (
+      <>
+        <InicioMobile
+          cuenta={cuenta}
+          cargando={cargando}
+          error={error}
+          onReintentar={reintentar}
+          mensajeExito={operaciones.mensajeExito}
+          onCerrarMensajeExito={operaciones.cerrarMensajeExito}
+          onAgregar={operaciones.abrirDeposito}
+          onTransferir={operaciones.abrirTransferencia}
+        />
+        {modalesDeDinero}
+      </>
     );
-
-    setMensajeExito(resultado.message);
-  }
-
-  function transferenciaRealizada(resultado) {
-    setCuenta(actual => {
-      if (!actual) return actual
-      const nuevoSaldo =
-        resultado?.saldoActual !== undefined
-          ? resultado.saldoActual
-          : actual.saldo - (resultado?.importe || 0)
-      return { ...actual, saldo: nuevoSaldo }
-    })
-    setMensajeExito(resultado?.message || 'Transferencia realizada con éxito.')
   }
 
   return (
@@ -150,26 +90,11 @@ export default function Dashboard() {
             </>
           ) : (
             <Box sx={{ width: "100%" }} aria-busy={cargando}>
-              {cargando && (
-                <Typography role="status">Cargando tu cuenta…</Typography>
-              )}
-
-              {!cargando && error && (
-                <Alert
-                  severity="error"
-                  action={
-                    <Button
-                      color="inherit"
-                      size="small"
-                      onClick={() => setIntento((valor) => valor + 1)}
-                    >
-                      Reintentar
-                    </Button>
-                  }
-                >
-                  {error}
-                </Alert>
-              )}
+              <EstadoDeCargaDeCuenta
+                cargando={cargando}
+                error={error}
+                onReintentar={reintentar}
+              />
 
               {!cargando && !error && cuenta && (
                 <Stack spacing={2}>
@@ -181,33 +106,21 @@ export default function Dashboard() {
                     <SaldoAnimado valor={cuenta.saldo} />
                   </Box>
 
-                  {mensajeExito && (
+                  {operaciones.mensajeExito && (
                     <Alert
                       severity="success"
-                      onClose={() => setMensajeExito("")}
+                      onClose={operaciones.cerrarMensajeExito}
                     >
-                      {mensajeExito}
+                      {operaciones.mensajeExito}
                     </Alert>
                   )}
 
                   <Stack direction='row' spacing={2}>
-                    <Button
-                      variant='contained'
-                      onClick={() => {
-                        setMensajeExito('')
-                        setDepositoAbierto(true)
-                      }}
-                    >
+                    <Button variant='contained' onClick={operaciones.abrirDeposito}>
                       Ingresar dinero
                     </Button>
 
-                    <Button
-                      variant='outlined'
-                      onClick={() => {
-                        setMensajeExito('')
-                        setTransferenciaAbierta(true)
-                      }}
-                    >
+                    <Button variant='outlined' onClick={operaciones.abrirTransferencia}>
                       Transferir dinero
                     </Button>
                   </Stack>
@@ -231,22 +144,17 @@ export default function Dashboard() {
           )}
         </Stack>
       </Paper>
-      {!esAdmin && cuenta && <MovimientosPreview />}
+      {/* La tarjeta va antes del historial: es un dato de la cuenta, no una operación.
+          Solo para quien tiene billetera, así que el admin no la ve.
+          Recibe el saldo porque un pago lo descuenta, y avisa acá para actualizarlo. */}
       {!esAdmin && cuenta && (
-        <>
-          <DepositoModal
-            open={depositoAbierto}
-            onClose={() => setDepositoAbierto(false)}
-            onDepositoRealizado={depositoRealizado}
-          />
-          <TransferenciaModal
-            open={transferenciaAbierta}
-            onClose={() => setTransferenciaAbierta(false)}
-            saldoDisponible={cuenta.saldo}
-            onTransferenciaRealizada={transferenciaRealizada}
-          />
-        </>
+        <TarjetaVirtual
+          saldoDisponible={cuenta.saldo}
+          onPagoRealizado={operaciones.pagoRealizado}
+        />
       )}
+      {!esAdmin && cuenta && <MovimientosPreview />}
+      {modalesDeDinero}
     </Box>
   );
 }
