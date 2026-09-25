@@ -4,7 +4,10 @@ import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr'
 import { NotificacionesContext } from './notificacionesContext'
 import { api } from './api'
 import { useAuth } from './authContext'
-import { esIngresoDeDinero } from '../components/Notificaciones/notificacionesUtils'
+import {
+  esIngresoDeDinero,
+  llegoDeOtraPersona
+} from '../components/Notificaciones/notificacionesUtils'
 import { esAdministrador } from '../routes/rolesUtils'
 
 const SIN_DATOS = { deLaSesion: null, items: [], noLeidas: 0 }
@@ -102,13 +105,20 @@ export default function NotificacionesProvider({ children }) {
       }
     })
 
+    // El contador avisa SIEMPRE: de él dependen el refresco del saldo y de las listas, que
+    // tienen que actualizarse también después de una operación propia.
+    setAvisosRecibidos(actual => actual + 1)
+
+    // El cartel flotante, en cambio, solo cuando el aviso llega de otra persona (ver
+    // llegoDeOtraPersona). Lo propio ya lo confirmó la pantalla donde se hizo.
+    if (!llegoDeOtraPersona(notificacion)) return
+
     // Verde cuando entra dinero, igual que la fila del panel: el color del cartel y el de la
     // lista salen de la misma regla, así no pueden decir cosas distintas del mismo aviso.
     setAviso({
       mensaje: notificacion.mensaje,
       severidad: esIngresoDeDinero(notificacion) ? 'success' : 'info'
     })
-    setAvisosRecibidos(actual => actual + 1)
   }, [])
 
   useEffect(() => {
