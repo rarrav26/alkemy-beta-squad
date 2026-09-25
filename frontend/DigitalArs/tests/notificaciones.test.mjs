@@ -23,3 +23,15 @@ test('un aviso sin titulo no rompe ninguna de las dos reglas', () => {
   assert.equal(llegoDeOtraPersona(null), false)
   assert.equal(esIngresoDeDinero(undefined), false)
 })
+
+test('se pinta de verde todo aviso en el que entra plata', () => {
+  assert.equal(esIngresoDeDinero(aviso('Ingreso de dinero')), true)
+  assert.equal(esIngresoDeDinero(aviso('Transferencia recibida')), true)
+  assert.equal(esIngresoDeDinero(aviso('Pago recibido')), true)
+})
+
+test('lo que no suma plata no se pinta de verde', () => {
+  assert.equal(esIngresoDeDinero(aviso('Transferencia enviada')), false)
+  assert.equal(esIngresoDeDinero(aviso('Pago con tarjeta')), false)
+  assert.equal(esIngresoDeDinero(aviso('Tarjeta generada')), false)
+})
