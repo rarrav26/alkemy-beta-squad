@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr'
 
-import Alert from '@mui/material/Alert'
-import Snackbar from '@mui/material/Snackbar'
-
 import { NotificacionesContext } from './notificacionesContext'
 import { api } from './api'
 import { useAuth } from './authContext'
@@ -15,8 +12,6 @@ const SIN_DATOS = { deLaSesion: null, items: [], noLeidas: 0 }
 // Tiene que coincidir letra por letra con el nombre que usa NotificadorSignalR en el backend.
 // Si no coincide, SignalR no avisa nada: simplemente no llega el mensaje.
 const EVENTO_DEL_HUB = 'NuevaNotificacion'
-
-const SEGUNDOS_DEL_AVISO = 5000
 
 // Las notificaciones del usuario: la lista, el contador del globito y las acciones de marcado.
 //
@@ -197,6 +192,8 @@ export default function NotificacionesProvider({ children }) {
     }
   }, [marcarTodasLasNotificacionesLeidas, recargar])
 
+  const cerrarAviso = useCallback(() => setAviso(null), [])
+
   return (
     <NotificacionesContext.Provider
       value={{
@@ -207,28 +204,15 @@ export default function NotificacionesProvider({ children }) {
         avisosRecibidos,
         recargar,
         marcarLeida,
-        marcarTodasLeidas
+        marcarTodasLeidas,
+        // El cartel flotante lo dibuja AvisoDeNotificacion, no este provider: el provider está
+        // por encima del ThemeProvider (ver main.jsx), y un cartel dibujado acá salía con el
+        // tema por defecto de MUI en vez del de la app.
+        aviso,
+        cerrarAviso
       }}
     >
       {children}
-
-      {/* El cartel lo dibuja el provider y no el panel, porque el aviso puede llegar en
-          cualquier pantalla y con la campana cerrada. Arriba y al centro: en un teléfono es
-          donde no tapa ni el encabezado ni los botones de abajo. */}
-      <Snackbar
-        open={aviso !== null}
-        autoHideDuration={SEGUNDOS_DEL_AVISO}
-        onClose={() => setAviso(null)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert
-          severity={aviso?.severidad ?? 'info'}
-          variant="filled"
-          onClose={() => setAviso(null)}
-        >
-          {aviso?.mensaje ?? ''}
-        </Alert>
-      </Snackbar>
     </NotificacionesContext.Provider>
   )
 }
