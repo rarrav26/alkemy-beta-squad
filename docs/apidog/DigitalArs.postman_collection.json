@@ -1146,10 +1146,67 @@
                   "const alta = pm.response.json();",
                   "pm.test(\"Queda pendiente de contraseña\", function () {",
                   "    pm.expect(alta.requiresPasswordSetup).to.eql(true);",
-                  "    pm.expect(alta.invitationToken).to.be.a(\"string\").and.not.be.empty;",
                   "});",
-                  "pm.environment.set(\"usuarioIdC\", alta.usuarioId);",
-                  "pm.environment.set(\"invitationToken\", alta.invitationToken);"
+                  "// El token de la invitación viaja solo por correo: el administrador nunca lo recibe.",
+                  "pm.test(\"El alta no devuelve el token y avisa que envió el correo\", function () {",
+                  "    pm.expect(alta).to.not.have.property(\"invitationToken\");",
+                  "    pm.expect(alta.invitationSent).to.eql(true);",
+                  "});",
+                  "pm.environment.set(\"usuarioIdC\", alta.usuarioId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Leer el correo de invitación de C (smtp4dev)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{smtpUrl}}/api/messages",
+              "host": [
+                "{{smtpUrl}}"
+              ],
+              "path": [
+                "api",
+                "messages"
+              ]
+            },
+            "description": "Hace de bandeja de entrada de C: busca en smtp4dev el correo que mandó la API y saca el token del enlace. Requiere smtp4dev corriendo (ver docs/apidog/README.md)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const respuesta = pm.response.json();",
+                  "const mensajes = Array.isArray(respuesta) ? respuesta : respuesta.results;",
+                  "const emailC = pm.environment.get(\"emailC\").toLowerCase();",
+                  "const deC = mensajes",
+                  "    .filter(m => JSON.stringify(m.to).toLowerCase().includes(emailC))",
+                  "    .sort((a, b) => new Date(a.receivedDate) - new Date(b.receivedDate));",
+                  "pm.test(\"Llegó el correo de invitación de C\", function () {",
+                  "    pm.expect(deC.length).to.be.above(0);",
+                  "    pm.expect(deC[deC.length - 1].subject).to.eql(\"Creá tu contraseña de DigitalArs\");",
+                  "});",
+                  "const ultimo = deC[deC.length - 1];",
+                  "pm.sendRequest(pm.environment.get(\"smtpUrl\") + \"/api/messages/\" + ultimo.id + \"/html\", function (err, res) {",
+                  "    const href = res.text().match(/href=\"([^\"]+)\"/)[1].replace(/&amp;/g, \"&\");",
+                  "    const token = decodeURIComponent(href.split(\"token=\")[1].split(\"&\")[0]);",
+                  "    pm.test(\"El enlace lleva a /primera-password con el token\", function () {",
+                  "        pm.expect(href).to.include(\"/primera-password?\");",
+                  "        pm.expect(token).to.not.be.empty;",
+                  "    });",
+                  "    pm.environment.set(\"invitationToken\", token);",
+                  "});"
                 ]
               }
             }

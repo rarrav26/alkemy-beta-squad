@@ -12,7 +12,8 @@ Cada request trae sus aserciones (status, `code` de error y campos clave).
 Están en formato Postman v2.1 porque Apidog los importa tal cual, con los scripts de
 extracción del token y las aserciones.
 
-Resultado esperado de una corrida completa: **37 requests y 70 aserciones en verde**.
+Resultado esperado de una corrida completa: **38 requests y 74 aserciones en verde** (Newman
+cuenta 39 requests: la lectura del correo de C hace una segunda llamada a smtp4dev).
 
 ## Antes de correrla
 
@@ -23,6 +24,9 @@ Resultado esperado de una corrida completa: **37 requests y 70 aserciones en ver
 3. Certificado de desarrollo: confiar en él con `dotnet dev-certs https --trust`, o desactivar
    la verificación de certificados SSL en la configuración de Apidog.
 4. Usar **Apidog de escritorio**. La versión web no llega a `localhost` sin su agente local.
+5. **smtp4dev** corriendo en `http://localhost:5050` (ver el README de la raíz). El alta de C
+   ya no devuelve el token de invitación: lo manda por correo, y el request *Leer el correo de
+   invitación de C* lo saca de la bandeja de smtp4dev (variable `{{smtpUrl}}`).
 
 ## Paso 1 — Importar la colección
 
@@ -99,7 +103,7 @@ sin token no tiene que aparecer ningún header `Authorization`.
 
 ## Paso 4 — Correr
 
-**Run** en el escenario. Tiene que terminar con 37 requests y 70 aserciones en verde. Para
+**Run** en el escenario. Tiene que terminar con 38 requests y 74 aserciones en verde. Para
 repetirla, esperar un minuto (ver *Límite de solicitudes*).
 
 ## Problemas frecuentes

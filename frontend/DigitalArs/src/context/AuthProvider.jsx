@@ -272,6 +272,10 @@ export default function AuthProvider({ children }) {
   function createUser(data) {
     return authenticatedRequest('/api/usuarios', { method: 'POST', body: data })
   }
+  // Genera una invitación nueva (la anterior deja de servir) y la manda por correo.
+  function reenviarInvitacion(usuarioId) {
+    return authenticatedRequest(`/api/usuarios/${usuarioId}/invitation`, { method: 'POST' })
+  }
   function retry() {
     setReady(false)
     setConnectionError('')
@@ -313,6 +317,7 @@ export default function AuthProvider({ children }) {
         register,
         initialPassword,
         createUser,
+        reenviarInvitacion,
         logout,
         retry,
         obtenerMiCuenta,

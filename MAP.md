@@ -391,9 +391,9 @@ El caso PASSWORD_SETUP_REQUIRED cubre al usuario que creó el administrador y
 todavía no eligió contraseña. Es la única desviación deliberada del error
 genérico: sin ella, esa persona recibiría el mismo 401 que un intento fallido y
 nunca sabría que debe definir su contraseña. Lo que se revela es acotado, porque
-la pantalla de primera contraseña sigue exigiendo el código de invitación que
-solo tiene el administrador. LoginPage lee el campo code y deriva a
-/primera-password con el correo ya cargado.
+para definir la contraseña hace falta el token de invitación, que solo llega al
+correo de la persona. LoginPage lee el campo code y deriva a /primera-password,
+que le indica revisar su correo.
 
 Ejemplo de respuesta; el vencimiento real se calcula al emitir:
 
@@ -472,12 +472,14 @@ Los roles del JWT reflejan el momento de emisión. Si se agrega una función par
 
 ### Usuario creado por un administrador
 
-POST /api/usuarios recibe PerfilUsuarioDto, sin contraseña. AccountService crea Identity y perfil, y devuelve una invitación:
+POST /api/usuarios recibe PerfilUsuarioDto, sin contraseña. AccountService crea Identity y perfil, genera la invitación y la manda por correo con IEnviadorDeInvitaciones (SmtpEnviadorDeInvitaciones). El enlace, armado por Helpers/Domain/CorreoDeInvitacion, abre /primera-password?email=...&token=... en el frontend. La respuesta trae:
 
 - usuarioId y email;
 - requiresPasswordSetup: true;
-- invitationToken;
+- invitationSent: si el correo salió (false no deshace el alta: se reenvía con POST /api/usuarios/{id}/invitation);
 - expiresInSeconds: 86400.
+
+El token no viaja en la respuesta: el administrador nunca lo conoce.
 
 La invitación usa proveedores de Identity y Data Protection con el propósito DigitalArs.InitialPassword.v1. **No sirve como JWT para acceder a endpoints.**
 

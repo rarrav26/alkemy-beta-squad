@@ -125,6 +125,12 @@ builder.Services.AddMemoryCache();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<INotificadorEnTiempoReal, NotificadorSignalR>();
 
+// La invitación de primera contraseña llega por correo: el token nunca pasa por el
+// administrador. La sección "Email" dice a qué SMTP conectarse; sin ella se usan los
+// valores de smtp4dev (localhost:2525), el SMTP de desarrollo del README.
+builder.Services.AddOptions<EmailOptions>().BindConfiguration("Email").ValidateDataAnnotations().ValidateOnStart();
+builder.Services.AddScoped<IEnviadorDeInvitaciones, SmtpEnviadorDeInvitaciones>();
+
 // -----------------------------------------------------------------------------
 // 5. Manejo global de errores
 // -----------------------------------------------------------------------------

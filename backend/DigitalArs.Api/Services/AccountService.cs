@@ -17,7 +17,8 @@ public class AccountService(
     DigitalArsDbContext db,
     UserManager<IdentityUser> users,
     IUsuarioRepository usuarios,
-    ICuentaRepository cuentas) : IAccountService
+    ICuentaRepository cuentas,
+    IEnviadorDeInvitaciones invitaciones) : IAccountService
 {
     private const int IntentosParaGenerarAlias = 10;
 
@@ -41,12 +42,15 @@ public class AccountService(
         var alta = await CrearEnTransaccionAsync(dto, password: null);
         if (!alta.Exitoso) return Resultado<UsuarioCreadoResponse>.Fallo(MotivoDeRechazo.DatosInvalidos, alta.Errores);
 
+        // El correo sale después de confirmar la transacción: si el SMTP falla, el usuario ya
+        // existe y lo que queda pendiente es solo reenviarle la invitación.
         var usuarioIdentity = alta.UsuarioIdentity!;
+        var enviada = await EnviarInvitacionAsync(usuarioIdentity, alta.Perfil!.nombre);
         return Resultado<UsuarioCreadoResponse>.Exito(new UsuarioCreadoResponse(
-            UsuarioId: alta.Perfil!.id,
+            UsuarioId: alta.Perfil.id,
             Email: usuarioIdentity.Email,
             RequiresPasswordSetup: true,
-            InvitationToken: await GenerarInvitacionAsync(usuarioIdentity),
+            InvitationSent: enviada,
             ExpiresInSeconds: Invitacion.ExpiraEnSegundos));
     }
 
@@ -70,7 +74,7 @@ public class AccountService(
         return Resultado<InvitacionResponse>.Exito(new InvitacionResponse(
             Email: usuarioIdentity.Email,
             RequiresPasswordSetup: true,
-            InvitationToken: await GenerarInvitacionAsync(usuarioIdentity),
+            InvitationSent: await EnviarInvitacionAsync(usuarioIdentity, perfil.nombre),
             ExpiresInSeconds: Invitacion.ExpiraEnSegundos));
     }
 
@@ -408,8 +412,13 @@ public class AccountService(
         return rotado.Succeeded;
     }
 
-    private Task<string> GenerarInvitacionAsync(IdentityUser usuarioIdentity) =>
-        users.GenerateUserTokenAsync(usuarioIdentity, TokenOptions.DefaultProvider, Invitacion.Proposito);
+    // El token se genera y se entrega en el mismo paso: no sale de acá más que por el correo.
+    private async Task<bool> EnviarInvitacionAsync(IdentityUser usuarioIdentity, string nombre)
+    {
+        var token = await users.GenerateUserTokenAsync(
+            usuarioIdentity, TokenOptions.DefaultProvider, Invitacion.Proposito);
+        return await invitaciones.EnviarAsync(usuarioIdentity.Email!, nombre, token);
+    }
 
     private async Task<ResultadoDeAlta> CrearEnTransaccionAsync(PerfilUsuarioDto dto, string? password)
     {

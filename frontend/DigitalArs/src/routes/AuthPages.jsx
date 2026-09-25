@@ -1,5 +1,5 @@
-import { Button, Stack, TextField } from '@mui/material'
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Alert, Button, Stack, TextField } from '@mui/material'
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/authContext'
 import AuthForm, { PasswordFields, ProfileFields } from '../components/Auth/AuthForm'
 
@@ -26,7 +26,7 @@ export function LoginPage() {
     onSubmit={ingresar}
     footer={<Stack spacing={1}>
       <Button component={Link} to="/register">Crear una cuenta</Button>
-      <Button component={Link} to="/primera-password">Tengo una invitación</Button>
+      <Button component={Link} to="/primera-password">Primer ingreso</Button>
     </Stack>}>
     <TextField name="email" label="Correo electrónico" type="email" autoComplete="username" required fullWidth />
     <TextField name="password" label="Contraseña" type="password" autoComplete="current-password" required fullWidth />
@@ -56,16 +56,30 @@ export function InitialPasswordPage() {
   const { initialPassword, session } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  // Si llegó derivado desde el login ya sabemos su correo: se lo dejamos cargado.
-  const emailSugerido = location.state?.email ?? ''
+  const [params] = useSearchParams()
+  // Lo normal es llegar desde el enlace del correo, que trae el email y el token: la persona
+  // solo elige la contraseña. Si llegó derivada desde el login, al menos sabemos su correo.
+  const tokenDelEnlace = params.get('token') ?? ''
+  const emailSugerido = params.get('email') ?? location.state?.email ?? ''
   if (session) return <Navigate to="/dashboard" replace />
-  return <AuthForm title="Elegí tu contraseña" description="Usá la invitación que te entregó el administrador."
-    submitLabel="Establecer contraseña" success={location.state?.message}
+
+  if (!tokenDelEnlace)
+    return <AuthForm title="Primer ingreso" description="Si un administrador te creó la cuenta, te enviamos un correo con un enlace para elegir tu contraseña."
+      success={location.state?.message}
+      footer={<Button component={Link} to="/login">Volver al inicio de sesión</Button>}>
+      <Alert severity="info">
+        Abrí el enlace del correo "Creá tu contraseña de DigitalArs". Vence en 24 horas y sirve una sola vez.
+        Si no lo encontrás o ya venció, pedile al administrador que te reenvíe la invitación.
+      </Alert>
+    </AuthForm>
+
+  return <AuthForm title="Elegí tu contraseña" description="Es la contraseña con la que vas a ingresar a DigitalArs."
+    submitLabel="Establecer contraseña"
     onSubmit={async data => { await initialPassword(data); navigate('/dashboard', { replace: true }) }}
     footer={<Button component={Link} to="/login">Volver al inicio de sesión</Button>}>
     <TextField name="email" label="Correo electrónico" type="email" autoComplete="username" required fullWidth
-      defaultValue={emailSugerido} />
-    <TextField name="invitationToken" label="Código de invitación" autoComplete="off" required fullWidth multiline minRows={2} />
+      defaultValue={emailSugerido} slotProps={{ htmlInput: { readOnly: true } }} />
+    <input type="hidden" name="invitationToken" value={tokenDelEnlace} />
     <PasswordFields />
   </AuthForm>
 }

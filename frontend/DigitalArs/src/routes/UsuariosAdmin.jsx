@@ -36,6 +36,7 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined';
 import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/authContext';
 import { obtenerUsuariosAdmin, cambiarEstadoUsuarioAdmin } from '../context/api';
 import EditarUsuarioModal from '../components/Admin/EditarUsuarioModal';
@@ -289,7 +290,8 @@ export default function UsuariosAdmin() {
           variant="contained"
           color="primary"
           startIcon={<AddIcon />}
-          onClick={() => console.log('Crear usuario - próxima HU')}
+          component={Link}
+          to="/usuarios/nuevo"
           sx={{ textTransform: 'none', fontWeight: 600, px: 2.5, width: { xs: '100%', sm: 'auto' } }}
         >
           Crear nuevo usuario

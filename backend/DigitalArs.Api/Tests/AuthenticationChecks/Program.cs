@@ -60,6 +60,17 @@ var expiredProvider = new DataProtectorTokenProvider<IdentityUser>(
 var fresh = await CrearInvitacion(other);
 Check(!await expiredProvider.ValidateAsync(Invitacion.Proposito, fresh, users, other), "Invitación vencida rechazada");
 
+// La invitación llega por correo como enlace al frontend. El token de Identity trae +, / e =:
+// si el enlace no los escapa, el que lee la pantalla ya no es el mismo token.
+var enlace = CorreoDeInvitacion.Enlace("http://localhost:5173/", "ana+demo@example.com", fresh);
+var consulta = System.Web.HttpUtility.ParseQueryString(new Uri(enlace).Query);
+Check(enlace.StartsWith("http://localhost:5173/primera-password?"), "Enlace de invitación apunta a la pantalla de primera contraseña");
+Check(consulta["token"] == fresh, "Enlace de invitación conserva el token intacto");
+Check(consulta["email"] == "ana+demo@example.com", "Enlace de invitación conserva el email intacto");
+Check(await users.VerifyUserTokenAsync(other, TokenOptions.DefaultProvider, Invitacion.Proposito, consulta["token"]!),
+    "El token leído del enlace sigue siendo válido");
+Check(!CorreoDeInvitacion.Cuerpo("<script>x</script>", enlace, 24).Contains("<script>"), "El correo escapa el nombre cargado por el admin");
+
 var response = await service.CrearToken(user, 42);
 var parameters = new TokenValidationParameters
 {
