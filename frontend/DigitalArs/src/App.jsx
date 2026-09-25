@@ -14,6 +14,7 @@ import { ElementosGlobales } from './context/ElementosGlobales'
 import ScrollTopButton from './components/Home/ScrollTopButton'
 import EncabezadoMobile from './components/Navegacion/EncabezadoMobile'
 import BarraInferior from './components/Navegacion/BarraInferior'
+import AvisoDeNotificacion from './components/Notificaciones/AvisoDeNotificacion'
 import useNavegacionMobile from './hooks/useNavegacionMobile'
 
 // Deja lugar abajo para que la barra inferior fija (y el botón de QR que sobresale) no tape el
@@ -68,6 +69,7 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <EstructuraDeLaPagina />
+      <AvisoDeNotificacion />
     </ThemeProvider>
   )
 }

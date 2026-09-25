@@ -92,7 +92,14 @@ export default function CampanaDeNotificaciones() {
               sx: {
                 maxHeight: '70vh',
                 borderTopLeftRadius: 16,
-                borderTopRightRadius: 16
+                borderTopRightRadius: 16,
+                // Sin barra de scroll, como el resto de la vista mobile: la lista se desliza con
+                // el dedo. Va sobre la hoja y todo lo que tiene adentro porque quien hace el
+                // scroll es la lista (ListaDeNotificaciones), no la hoja. En escritorio el panel
+                // es un Popover y la barra se mantiene.
+                scrollbarWidth: 'none',
+                '& *': { scrollbarWidth: 'none' },
+                '&::-webkit-scrollbar, & *::-webkit-scrollbar': { display: 'none' }
               }
             }
           }}
