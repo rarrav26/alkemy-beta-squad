@@ -1,12 +1,14 @@
 import { useContext, useEffect, useState } from "react";
-import ArrowDownwardRoundedIcon from "@mui/icons-material/ArrowDownwardRounded";
-import ArrowUpwardRoundedIcon from "@mui/icons-material/ArrowUpwardRounded";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import {
   Alert,
   Box,
   Button,
   Collapse,
+  Card,
+  CardContent,
+  List,
+  LinearProgress,
   MenuItem,
   Paper,
   Stack,
@@ -16,121 +18,22 @@ import {
   useTheme,
 } from "@mui/material";
 import { Link } from "react-router-dom";
+import FilaDeMovimientoCompacta from "../components/Movimientos/FilaDeMovimientoCompacta";
 import HistorialMobile from "../components/Movimientos/HistorialMobile";
 import { useAuth } from "../context/authContext";
 import { ElementosGlobales } from "../context/ElementosGlobales";
-import useNavegacionMobile from "../hooks/useNavegacionMobile";
+import useShell from "../hooks/useShell";
+import { SHELL_MOBILE } from "./shellUtils";
 import {
   construirConsulta,
   contarFiltrosAplicados,
-  descripcionConTarjeta,
-  detalleDeLaContraparte,
   filtrosIniciales,
-  formatearFecha,
   normalizarRespuestaMovimientos,
   opcionesTipo,
   paginaVacia,
-  prefijoDelImporte,
 } from "./movimientosUtils";
 
-const formatoPesos = new Intl.NumberFormat("es-AR", {
-  style: "currency",
-  currency: "ARS",
-});
-
 const MILISEGUNDOS_ENTRE_REFRESCOS = 15000;
-
-// El signo sale de prefijoDelImporte (compartido con la lista corta del Inicio y Cuentas);
-// acá solo se elige el color. Un movimiento de signo DESCONOCIDO va en color de texto normal.
-function presentacionDelImporte(movimiento) {
-  const prefijo = prefijoDelImporte(movimiento);
-
-  if (movimiento.esCredito) return { prefijo, color: "success.main" };
-  if (movimiento.esDebito) return { prefijo, color: "error.main" };
-
-  return { prefijo, color: "text.primary" };
-}
-
-// Una fila del historial. La usan el preview del dashboard y la pantalla
-// completa, asi que el formato de los montos y las fechas es siempre el mismo.
-function FilaDeMovimiento({ movimiento }) {
-  const presentacion = presentacionDelImporte(movimiento);
-  const detalle = detalleDeLaContraparte(movimiento);
-  const IconoMovimiento = movimiento.esCredito
-    ? ArrowDownwardRoundedIcon
-    : ArrowUpwardRoundedIcon;
-
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 1.5,
-        px: 1.5,
-        py: 1.25,
-        border: "1px solid",
-        borderColor: "divider",
-        borderRadius: 2,
-        backgroundColor: "background.paper",
-      }}
-    >
-      <Stack direction="row" spacing={1.5} sx={{ minWidth: 0, flex: 1, alignItems: "center" }}>
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 34,
-            height: 34,
-            borderRadius: "50%",
-            backgroundColor: movimiento.esCredito ? "success.light" : "error.light",
-            color: movimiento.esCredito ? "success.dark" : "error.dark",
-            flexShrink: 0,
-          }}
-        >
-          <IconoMovimiento fontSize="small" />
-        </Box>
-
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography fontWeight={700} sx={{ lineHeight: 1.3 }}>
-            {descripcionConTarjeta(movimiento)}
-          </Typography>
-          {detalle && (
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              {detalle}
-            </Typography>
-          )}
-          <Typography variant="body2" color="text.secondary">
-            {formatearFecha(movimiento.fecha)}
-          </Typography>
-        </Box>
-      </Stack>
-
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-end",
-          textAlign: "right",
-          flexShrink: 0,
-        }}
-      >
-        <Typography
-          fontWeight={700}
-          sx={{
-            color: presentacion.color,
-            whiteSpace: "nowrap",
-            lineHeight: 1.3,
-          }}
-        >
-          {presentacion.prefijo}
-          {formatoPesos.format(Math.abs(movimiento.importe))}
-        </Typography>
-      </Box>
-    </Box>
-  );
-}
 
 // Decide que se ve dentro del recuadro de la lista. Se resuelve con returns
 // tempranos para no anidar condiciones dentro del JSX. Lo usan la pantalla
@@ -143,7 +46,7 @@ function ContenidoDeLaLista({
 }) {
   if (cargando) {
     return (
-      <Typography color="text.secondary" role="status">
+      <Typography color="text.secondary" role="status" sx={{ py: 2 }}>
         Cargando movimientos…
       </Typography>
     );
@@ -152,18 +55,26 @@ function ContenidoDeLaLista({
   // El error va antes que el vacio: si la lista quedo vacia porque la carga fallo,
   // no sabemos si el usuario tiene movimientos, asi que no lo afirmamos.
   if (error) {
-    return <Alert severity="error">{error}</Alert>;
+    return <Alert severity="error" sx={{ my: 1.5 }}>{error}</Alert>;
   }
 
   if (movimientos.length === 0) {
     return (
-      <Typography color="text.secondary">{mensajeSinResultados}</Typography>
+      <Typography color="text.secondary" sx={{ py: 2 }}>{mensajeSinResultados}</Typography>
     );
   }
 
-  return movimientos.map((movimiento) => (
-    <FilaDeMovimiento key={movimiento.id} movimiento={movimiento} />
-  ));
+  return (
+    <List disablePadding>
+      {movimientos.map((movimiento, indice) => (
+        <FilaDeMovimientoCompacta
+          key={movimiento.id}
+          movimiento={movimiento}
+          conDivisor={indice < movimientos.length - 1}
+        />
+      ))}
+    </List>
+  );
 }
 
 export function MovimientosPreview() {
@@ -263,6 +174,7 @@ function HistorialDeEscritorio() {
   const [pagina, setPagina] = useState(1);
   const [pageSize, setPageSize] = useState(5);
   const [datos, setDatos] = useState(paginaVacia);
+  const [versionDePagina, setVersionDePagina] = useState(0);
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(true);
   const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
@@ -292,6 +204,7 @@ function HistorialDeEscritorio() {
         if (ignorar) return;
 
         setDatos(normalizarRespuestaMovimientos(respuesta));
+        if (mostrarCargando) setVersionDePagina((version) => version + 1);
         setError("");
       } catch (err) {
         if (ignorar) return;
@@ -624,63 +537,102 @@ function HistorialDeEscritorio() {
           </Stack>
         </Paper>
 
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <Stack spacing={1.5} aria-busy={cargando}>
-            <ContenidoDeLaLista
-              cargando={cargando}
-              error={error}
-              movimientos={datos.items}
-              mensajeSinResultados={mensajeSinResultados}
-            />
-          </Stack>
-        </Paper>
-
-        {/* Sin resultados no hay nada que paginar, y un "Siguiente" habilitado sobre
-            una lista vacia solo confunde. */}
-        {datos.items.length > 0 ? (
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={2}
-            sx={{ justifyContent: "space-between", alignItems: "center" }}
-          >
-            <Stack direction="row" spacing={1}>
-              <Button
-                variant="outlined"
-                disabled={pagina === 1 || cargando}
-                onClick={() => setPagina((valor) => valor - 1)}
+        <Card variant="outlined">
+          <CardContent sx={{ py: 0.5, '&:last-child': { pb: 1.5 } }}>
+            <Box
+              aria-busy={cargando}
+              sx={{ position: "relative", minHeight: (pageSize * 6) + "rem" }}
+            >
+              {cargando && (
+                <LinearProgress
+                  aria-label="Cargando movimientos"
+                  sx={{ position: "absolute", inset: "0 0 auto", zIndex: 1 }}
+                />
+              )}
+              <Box
+                key={versionDePagina}
+                aria-hidden={cargando && datos.items.length > 0 ? true : undefined}
+                sx={{
+                  opacity: cargando ? 0.4 : 1,
+                  transition: "opacity 180ms ease",
+                  animation: versionDePagina > 0 ? "entradaDeMovimientos 260ms ease-out" : "none",
+                  "@keyframes entradaDeMovimientos": {
+                    from: { opacity: 0, transform: "translateY(6px)" },
+                    to: { opacity: 1, transform: "translateY(0)" },
+                  },
+                  // Reserva también las filas vacías de la última página.
+                  "& > .MuiList-root": {
+                    display: "grid",
+                    gridTemplateRows: "repeat(" + pageSize + ", minmax(6rem, auto))",
+                  },
+                  "@media (prefers-reduced-motion: reduce)": {
+                    animation: "none",
+                    transition: "none",
+                  },
+                }}
               >
-                Anterior
-              </Button>
-              <Button
-                variant="outlined"
-                disabled={pagina >= datos.totalPages || cargando}
-                onClick={() => setPagina((valor) => valor + 1)}
-              >
-                Siguiente
-              </Button>
-            </Stack>
+                <ContenidoDeLaLista
+                  cargando={cargando && datos.items.length === 0}
+                  error={error}
+                  movimientos={datos.items}
+                  mensajeSinResultados={mensajeSinResultados}
+                />
+              </Box>
+            </Box>
 
-            <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-              <TextField
-                select
-                size="small"
-                label="Por página"
-                value={pageSize}
-                onChange={(event) => cambiarTamanioDePagina(event.target.value)}
-                sx={{ minWidth: 120 }}
+            {/* Sin resultados no hay nada que paginar, y un "Siguiente" habilitado sobre
+                una lista vacia solo confunde. */}
+            {datos.items.length > 0 ? (
+              <Stack
+                component="nav"
+                aria-label="Paginación de movimientos"
+                direction={{ xs: "column", md: "row" }}
+                spacing={2}
+                sx={{ justifyContent: "space-between", alignItems: "center", borderTop: 1, borderColor: "divider", mt: 0.5, pt: 2 }}
               >
-                <MenuItem value={5}>5</MenuItem>
-                <MenuItem value={10}>10</MenuItem>
-                <MenuItem value={20}>20</MenuItem>
-              </TextField>
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    variant="text"
+                    size="small"
+                    disabled={pagina === 1 || cargando}
+                    onClick={() => setPagina((valor) => valor - 1)}
+                  >
+                    Anterior
+                  </Button>
+                  <Button
+                    variant="text"
+                    size="small"
+                    disabled={pagina >= datos.totalPages || cargando}
+                    onClick={() => setPagina((valor) => valor + 1)}
+                  >
+                    Siguiente
+                  </Button>
+                </Stack>
 
-              <Typography color="text.secondary">
-                Página {pagina} de {datos.totalPages} · {datos.totalItems}{" "}
-                movimientos
-              </Typography>
-            </Stack>
-          </Stack>
-        ) : null}
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ alignItems: "center" }}>
+                  <TextField
+                    select
+                    size="small"
+                    label="Por página"
+                    value={pageSize}
+                    onChange={(event) => cambiarTamanioDePagina(event.target.value)}
+                    sx={{ minWidth: 120 }}
+                  >
+                    <MenuItem value={5}>5</MenuItem>
+                    <MenuItem value={10}>10</MenuItem>
+                    <MenuItem value={20}>20</MenuItem>
+                  </TextField>
+
+                  <Typography variant="body2" color="text.secondary">
+                    Página {pagina} de {datos.totalPages} · {datos.totalItems}{" "}
+                    movimientos
+                  </Typography>
+                </Stack>
+              </Stack>
+            ) : null}
+
+          </CardContent>
+        </Card>
 
         <Box
           sx={{
@@ -715,10 +667,13 @@ function HistorialDeEscritorio() {
 
 // Una vista por componente, y no un if en el medio de una sola: cada una tiene sus propios
 // hooks (la de escritorio consulta cada 15 s), y así la que no se ve no corre nada.
+//
+// La de escritorio sirve a las dos cáscaras de pantalla ancha: la de la barra lateral y la
+// clásica del administrador.
 export function MovimientosPage() {
-  const usaNavegacionMobile = useNavegacionMobile();
+  const esVistaMobile = useShell() === SHELL_MOBILE;
 
-  if (usaNavegacionMobile) return <HistorialMobile />;
+  if (esVistaMobile) return <HistorialMobile />;
 
   return <HistorialDeEscritorio />;
 }

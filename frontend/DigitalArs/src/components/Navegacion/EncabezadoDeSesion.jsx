@@ -9,18 +9,29 @@ import HelpOutlineRounded from '@mui/icons-material/HelpOutlineRounded'
 
 import { useAuth } from '../../context/authContext'
 import { getSessionUser } from '../../routes/dashboardUtils'
+import { esAdministrador } from '../../routes/rolesUtils'
 import ChangeTheme from '../Header/ChangeTheme'
 import CampanaDeNotificaciones from '../Notificaciones/CampanaDeNotificaciones'
 import AvisoProximamente from '../Proximamente/AvisoProximamente'
 
-// Encabezado de la vista mobile del usuario regular: reemplaza al AppBar azul de escritorio.
+// Encabezado del usuario con sesión activa: el saludo, la campana, el tema y Ayuda. Lo comparten
+// las DOS cáscaras nuevas — en mobile va arriba de la pantalla y la navegación queda en la barra
+// inferior; en escritorio va arriba de la columna de contenido, a la derecha de la barra
+// lateral. Es el mismo componente a propósito: duplicarlo era la forma segura de que la campana
+// terminara arreglada en una vista y no en la otra.
+//
 // Va sobre el fondo de la pantalla (color="transparent") para que el protagonista sea la
-// tarjeta de saldo, no la barra. La navegación vive en la barra inferior.
-export default function EncabezadoMobile() {
+// tarjeta de saldo, no la barra.
+export default function EncabezadoDeSesion() {
   const { session } = useAuth()
   const [avisoAbierto, setAvisoAbierto] = useState(false)
 
   const nombre = getSessionUser(session)?.nombre ?? 'usuario'
+
+  // El administrador no tiene billetera y la API le responde 403 en notificaciones, así que la
+  // campana le mostraría un globito que nunca puede cargar. Es el mismo control que ya hacía el
+  // AppBar clásico; acá hay que repetirlo porque la barra lateral también lo atiende a él.
+  const tieneCampana = !esAdministrador(session)
 
   return (
     <AppBar position="static" color="transparent" elevation={0}>
@@ -36,7 +47,7 @@ export default function EncabezadoMobile() {
           </Typography>
         </Box>
 
-        <CampanaDeNotificaciones />
+        {tieneCampana && <CampanaDeNotificaciones />}
         <ChangeTheme />
 
         <Button

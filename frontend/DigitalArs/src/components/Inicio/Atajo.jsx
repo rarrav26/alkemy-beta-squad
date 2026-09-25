@@ -26,7 +26,16 @@ export default function Atajo({ etiqueta, Icono, insignia, onClick, disabled = f
         // Pequeño "hundimiento" al tocar: en una pantalla táctil no hay hover, y sin esto el
         // usuario no tiene confirmación de que el toque se registró.
         '&:active': { transform: 'scale(0.95)' },
-        '&.Mui-focusVisible': { outline: '2px solid', outlineColor: 'primary.main' }
+        // Y con mouse, al revés: se levanta apenas al pasar por encima. Va detrás de
+        // `hover: hover` porque en una pantalla táctil el navegador deja el estado :hover pegado
+        // después de tocar, y el atajo quedaría levantado hasta que toques otra cosa.
+        // Después del :active a propósito: si el orden fuera el inverso, el hover ganaría por
+        // especificidad igual y el hundimiento no se vería al tocar con un mouse conectado.
+        '@media (hover: hover)': {
+          '&:hover': { transform: 'translateY(-2px)' }
+        },
+        '&.Mui-focusVisible': { outline: '2px solid', outlineColor: 'primary.main' },
+        '@media (prefers-reduced-motion: reduce)': { transition: 'none' }
       }}
     >
       <Badge badgeContent={insignia} color="success" overlap="circular">

@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   Paper,
   Stack,
   Typography,
@@ -11,151 +10,60 @@ import {
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/authContext";
 import useMiCuenta from "../hooks/useMiCuenta";
-import useNavegacionMobile from "../hooks/useNavegacionMobile";
 import useOperacionesDeDinero from "../hooks/useOperacionesDeDinero";
+import useShell from "../hooks/useShell";
 import AuthForm, { ProfileFields } from "../components/Auth/AuthForm";
-import EstadoDeCargaDeCuenta from "../components/Cuentas/EstadoDeCargaDeCuenta";
+import InicioDelAdmin from "../components/Admin/InicioDelAdmin";
+import InicioEscritorio from "../components/Inicio/InicioEscritorio";
 import InicioMobile from "../components/Inicio/InicioMobile";
 import ModalesDeDinero from "../components/Cuentas/ModalesDeDinero";
-import SaldoAnimado from "../components/Cuentas/SaldoAnimado";
-import TarjetaVirtual from "../components/Cuentas/TarjetaVirtual";
-import { MovimientosPreview } from "./Movimientos";
-import { getSessionUser } from "./dashboardUtils";
 import { esAdministrador } from "./rolesUtils";
+import { SHELL_MOBILE } from "./shellUtils";
 
 export default function Dashboard() {
   const { session } = useAuth();
-  const usuario = getSessionUser(session);
   const esAdmin = esAdministrador(session);
   // El administrador usa el panel de gestión: no tiene cuenta que cargar.
   const { cuenta, cargando, error, reintentar, aplicarDeposito, aplicarTransferencia } =
     useMiCuenta({ habilitado: !esAdmin });
   const operaciones = useOperacionesDeDinero({ aplicarDeposito, aplicarTransferencia });
-  const usaNavegacionMobile = useNavegacionMobile();
+  const shell = useShell();
 
-  // Los modales son los mismos para la vista de escritorio y la mobile: solo cambia el botón
+  // El rol decide antes que el ancho: el administrador ve la misma portada del panel en las dos
+  // cáscaras, porque lo que cambia entre mobile y escritorio es la navegación que la rodea (barra
+  // inferior o barra lateral), no lo que hay adentro. Sus tres acciones caben cómodas en las dos.
+  if (esAdmin) return <InicioDelAdmin />;
+
+  // Los modales son los mismos para las dos vistas del usuario regular: solo cambia el botón
   // que los abre.
-  const modalesDeDinero = !esAdmin && cuenta && (
+  const modalesDeDinero = cuenta && (
     <ModalesDeDinero operaciones={operaciones} saldoDisponible={cuenta.saldo} />
   );
 
-  // useNavegacionMobile ya deja afuera al administrador: esta rama es solo del usuario regular.
-  if (usaNavegacionMobile) {
-    return (
-      <>
-        <InicioMobile
-          cuenta={cuenta}
-          cargando={cargando}
-          error={error}
-          onReintentar={reintentar}
-          mensajeExito={operaciones.mensajeExito}
-          onCerrarMensajeExito={operaciones.cerrarMensajeExito}
-          onAgregar={operaciones.abrirDeposito}
-          onTransferir={operaciones.abrirTransferencia}
-        />
-        {modalesDeDinero}
-      </>
-    );
-  }
+  // Las dos vistas reciben exactamente los mismos datos: la cuenta se carga UNA vez acá y cada
+  // una decide solo cómo mostrarla. Si cada vista pidiera lo suyo, un arreglo en la carga habría
+  // que hacerlo dos veces.
+  const datosDeInicio = {
+    cuenta,
+    cargando,
+    error,
+    onReintentar: reintentar,
+    mensajeExito: operaciones.mensajeExito,
+    onCerrarMensajeExito: operaciones.cerrarMensajeExito,
+    onAgregar: operaciones.abrirDeposito,
+    onTransferir: operaciones.abrirTransferencia,
+  };
+
+  // Protected no deja llegar acá sin una sesión verificada, así que lo que no es mobile es
+  // escritorio: la cáscara clásica del usuario regular solo existe mientras se verifica, y en
+  // ese rato esta pantalla todavía no se dibuja.
+  const Inicio = shell === SHELL_MOBILE ? InicioMobile : InicioEscritorio;
 
   return (
-    <Box sx={{ maxWidth: 900, mx: "auto", p: { xs: 3, md: 6 } }}>
-      <Typography variant="overline" color="primary">
-        Tu espacio
-      </Typography>
-
-      <Typography component="h1" variant="h3" fontWeight={700}>
-        Hola, {usuario?.nombre ?? "usuario"}
-      </Typography>
-
-      <Typography color="text.secondary" sx={{ mt: 1, mb: 4 }}>
-        Bienvenido a tu cuenta de DigitalArs.
-      </Typography>
-
-      <Paper variant="outlined" sx={{ p: 3 }}>
-        <Stack spacing={2} alignItems="flex-start">
-          <Chip label={usuario?.role ?? "Usuario"} />
-          <Typography>{usuario?.email ?? "Sin correo disponible"}</Typography>
-
-          {esAdmin ? (
-            <>
-              <Typography>
-                Registrá usuarios: les enviamos un correo para que elijan su
-                contraseña.
-              </Typography>
-
-              <Button component={Link} to="/usuarios/nuevo" variant="contained">
-                Registrar usuario
-              </Button>
-            </>
-          ) : (
-            <Box sx={{ width: "100%" }} aria-busy={cargando}>
-              <EstadoDeCargaDeCuenta
-                cargando={cargando}
-                error={error}
-                onReintentar={reintentar}
-              />
-
-              {!cargando && !error && cuenta && (
-                <Stack spacing={2}>
-                  <Box>
-                    <Typography color="text.secondary">
-                      Saldo disponible en pesos
-                    </Typography>
-
-                    <SaldoAnimado valor={cuenta.saldo} />
-                  </Box>
-
-                  {operaciones.mensajeExito && (
-                    <Alert
-                      severity="success"
-                      onClose={operaciones.cerrarMensajeExito}
-                    >
-                      {operaciones.mensajeExito}
-                    </Alert>
-                  )}
-
-                  <Stack direction='row' spacing={2}>
-                    <Button variant='contained' onClick={operaciones.abrirDeposito}>
-                      Ingresar dinero
-                    </Button>
-
-                    <Button variant='outlined' onClick={operaciones.abrirTransferencia}>
-                      Transferir dinero
-                    </Button>
-                  </Stack>
-
-                  <Box>
-                    <Typography color="text.secondary">Alias</Typography>
-                    <Typography sx={{ overflowWrap: "anywhere" }}>
-                      {cuenta.alias}
-                    </Typography>
-                  </Box>
-
-                  <Box>
-                    <Typography color="text.secondary">CVU</Typography>
-                    <Typography sx={{ overflowWrap: "anywhere" }}>
-                      {cuenta.cvu}
-                    </Typography>
-                  </Box>
-                </Stack>
-              )}
-            </Box>
-          )}
-        </Stack>
-      </Paper>
-      {/* La tarjeta va antes del historial: es un dato de la cuenta, no una operación.
-          Solo para quien tiene billetera, así que el admin no la ve.
-          Recibe el saldo porque un pago lo descuenta, y avisa acá para actualizarlo. */}
-      {!esAdmin && cuenta && (
-        <TarjetaVirtual
-          saldoDisponible={cuenta.saldo}
-          onPagoRealizado={operaciones.pagoRealizado}
-        />
-      )}
-      {!esAdmin && cuenta && <MovimientosPreview />}
+    <>
+      <Inicio {...datosDeInicio} />
       {modalesDeDinero}
-    </Box>
+    </>
   );
 }
 

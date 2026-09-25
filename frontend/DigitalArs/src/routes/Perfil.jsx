@@ -7,6 +7,7 @@ import {
   CardContent,
   CircularProgress,
   Divider,
+  Paper,
   Stack,
   TextField,
   Typography
@@ -31,15 +32,29 @@ const formatoPesos = new Intl.NumberFormat('es-AR', {
 })
 
 // Ya no recibe darkMode: los colores salen del tema, que es quien sabe en qué modo está.
+// Una fila de dato: la etiqueta a la izquierda y el valor a la derecha.
+//
+// Se ve como los campos del login: mismo redondeo y solo el borde, sin relleno propio.
+//
+// Antes llevaba `borderRadius: 2` y quedaba tipo píldora, y el motivo es una trampa del tema: un
+// `borderRadius` numérico en `sx` NO son píxeles, MUI lo multiplica por `theme.shape.borderRadius`
+// (createUnaryUnit con 'shape.borderRadius'). Este proyecto lo subió de los 4 que trae MUI a 12,
+// así que ese 2 eran 24px — la mitad del alto de la fila, o sea redondeo completo. Sin el número,
+// el Card usa el radio del tema y coincide con los campos del formulario.
+//
+// Y sin relleno: un `action.hover` encima del panel de vidrio era vidrio sobre vidrio, con dos
+// desenfoques apilados. Transparente deja pasar los rayos del fondo una sola vez y es más barato.
 function InfoCard({ label, value, alignRight = false }) {
   return (
     <Card
       variant="outlined"
       sx={{
         height: '100%',
-        borderRadius: 2,
         borderColor: 'divider',
-        backgroundColor: 'action.hover',
+        backgroundColor: 'transparent',
+        // El tema le pone vidrio a todo Paper `outlined`; acá no hace falta, porque el panel que la
+        // contiene ya lo tiene. Apilarlos no se ve mejor y cuesta el doble.
+        backdropFilter: 'none',
         boxShadow: 'none'
       }}
     >
@@ -303,18 +318,23 @@ export default function PerfilPage() {
   const tieneCuenta = Boolean(perfil?.cuenta)
 
   return (
-    <Box
-      sx={{
-        maxWidth: 1200,
-        mx: 'auto',
-        p: { xs: 2.5, md: 4 },
-        backgroundColor: 'background.default',
-        borderRadius: 2,
-        border: '1px solid',
-        borderColor: 'divider',
-        color: 'text.primary'
-      }}
-    >
+    // La página aporta su propio espacio alrededor, como hacen Cuentas y Tarjetas. Antes el panel
+    // arrancaba pegado al encabezado y contra los bordes de la pantalla, porque no había ninguna
+    // caja que separara: el contenedor traía su relleno interno pero nada por fuera.
+    <Box sx={{ px: { xs: 2, md: 3 }, pt: { xs: 2, md: 3 }, pb: 4 }}>
+      <Paper
+        // Paper `outlined` y no un Box con colores a mano. El borde y el radio ya los da la
+        // variante, y sobre todo: el vidrio traslúcido del tema se aplica justo a esa variante, así
+        // que esta pantalla deja de ser una excepción y los rayos del fondo también la cruzan.
+        // Antes tenía `backgroundColor: 'background.default'` escrito a mano, que es opaco.
+        variant="outlined"
+        sx={{
+          maxWidth: 1200,
+          mx: 'auto',
+          p: { xs: 2.5, md: 4 },
+          color: 'text.primary'
+        }}
+      >
       <Typography
         variant="h4"
         fontWeight={700}
@@ -475,6 +495,7 @@ export default function PerfilPage() {
           )}
         </Box>
       </Stack>
+      </Paper>
     </Box>
   )
 }

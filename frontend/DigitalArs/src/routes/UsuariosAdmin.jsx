@@ -41,6 +41,7 @@ import { useAuth } from '../context/authContext';
 import { obtenerUsuariosAdmin, cambiarEstadoUsuarioAdmin } from '../context/api';
 import EditarUsuarioModal from '../components/Admin/EditarUsuarioModal';
 import DetalleUsuarioModal from '../components/Admin/DetalleUsuarioModal';
+import BotonConfirmarManteniendo from '../components/Comunes/BotonConfirmarManteniendo';
 
 // Las tres acciones. En la tabla van como iconos: ocupan siempre lo mismo, así la fila no se
 // reacomoda cuando el rótulo cambia entre "Activar" y "Desactivar", y el texto vive en el
@@ -215,7 +216,7 @@ export default function UsuariosAdmin() {
   }
 
   async function confirmarCambioDeEstado() {
-    if (!contenidoDialogo?.usuario) return;
+    if (!contenidoDialogo?.usuario || cambiandoEstado) return;
 
     const { usuario, activar } = contenidoDialogo;
     const id = usuario.usuarioId || usuario.id;
@@ -257,13 +258,16 @@ export default function UsuariosAdmin() {
   const hasta = Math.min(pagina * 10, totalItems);
 
   return (
+    // Contenedor de PURO layout: ancho máximo, centrado y aire. No pinta fondo a propósito.
+    // Antes llevaba 'background.default', que es opaco, así que tapaba los rayos en toda la
+    // pantalla del admin; y si en cambio le pusiéramos vidrio, quedaría un vidrio encima del
+    // vidrio de la tabla -- dos desenfoques apilados y el doble de opacidad efectiva. La única
+    // superficie de esta pantalla es la tabla (o las tarjetas).
     <Box
       sx={{
         maxWidth: 1200,
         mx: 'auto',
         p: { xs: 2, md: 4 },
-        backgroundColor: 'background.default',
-        borderRadius: 2,
         color: 'text.primary'
       }}
     >
@@ -365,11 +369,10 @@ export default function UsuariosAdmin() {
           )}
           {usuarios.length === 0 ? (
             <Paper
+              variant="outlined"
               sx={{
                 p: 3,
-                textAlign: 'center',
-                backgroundColor: 'background.paper',
-                borderRadius: 2
+                textAlign: 'center'
               }}
             >
               <Typography variant="body2" sx={{ color: colorTextoSecundario }}>
@@ -404,17 +407,19 @@ export default function UsuariosAdmin() {
                 return (
                 <Paper
                   key={u.usuarioId || u.id}
+                  variant="outlined"
                   sx={{
                     p: 2,
-                    // Mismo par de tonos que las filas de la tabla, así la lista se lee igual
-                    // en las dos vistas. El color se lee del objeto del tema en vez de pasar
-                    // la ruta como texto: 'superficies.filaAlterna' es una clave propia y sx
-                    // no la resuelve como sí hace con las de la paleta estándar, así que el
-                    // fondo quedaba sin aplicar y todas las tarjetas se veían iguales.
-                    backgroundColor: usaTonoAlterno
-                      ? theme.palette.superficies.filaAlterna
-                      : theme.palette.background.paper,
-                    borderRadius: 2,
+                    // Mismo tinte intercalado que las filas de la tabla, así la lista se lee
+                    // igual en las dos vistas. Es un tinte traslúcido que se apoya sobre el
+                    // vidrio de la tarjeta, no un fondo que lo reemplaza: con un tono opaco,
+                    // la mitad de las tarjetas tapaba los rayos. Y se lee del objeto del tema
+                    // en vez de pasar la ruta como texto, porque 'superficies.tinteAlterno' es
+                    // una clave propia y sx no la resuelve como sí hace con las de la paleta
+                    // estándar -- pasándola como texto el fondo quedaba sin aplicar.
+                    backgroundImage: usaTonoAlterno
+                      ? `linear-gradient(${theme.palette.superficies.tinteAlterno}, ${theme.palette.superficies.tinteAlterno})`
+                      : 'none',
                     boxShadow: 1,
                     // Franja de color al costado: da el estado de un vistazo al recorrer la
                     // lista, antes de leer el chip.
@@ -496,16 +501,16 @@ export default function UsuariosAdmin() {
               })}
             </Box>
           ) : (
-            /* Vista de tabla para escritorio. El contenedor conserva su scroll horizontal
-               como red de seguridad en anchos intermedios. */
+            /* Vista de tabla para escritorio. `variant="outlined"` no es solo el borde: es lo
+               que el tema usa para decidir qué superficie va de vidrio, así que es la línea que
+               hace que los rayos se vean cruzar por detrás de la tabla. Sin ella, `component=
+               {Paper}` cae en la variante `elevation`, que trae fondo opaco y encima el degradé
+               `--Paper-overlay` que MUI agrega en modo oscuro. El contenedor conserva su scroll
+               horizontal como red de seguridad en anchos intermedios. */
             <TableContainer
               component={Paper}
-              sx={{
-                backgroundColor: 'background.paper',
-                boxShadow: 1,
-                borderRadius: 2,
-                overflowX: 'auto'
-              }}
+              variant="outlined"
+              sx={{ overflowX: 'auto' }}
             >
               <Table>
                 <TableHead sx={{ backgroundColor: theme.palette.superficies.encabezadoTabla }}>
@@ -525,9 +530,11 @@ export default function UsuariosAdmin() {
                       hover
                       sx={{
                         // Filas alternadas: en una tabla de seis columnas ayudan a no perder
-                        // el renglón al leer de izquierda a derecha.
+                        // el renglón al leer de izquierda a derecha. El tono es un tinte
+                        // traslúcido, así que la fila se distingue de su vecina sin tapar los
+                        // rayos que pasan por detrás del vidrio del contenedor.
                         '&:nth-of-type(odd)': {
-                          backgroundColor: theme.palette.superficies.filaAlterna
+                          backgroundColor: theme.palette.superficies.tinteAlterno
                         },
                         '&:last-child td': { borderBottom: 0 }
                       }}
@@ -671,25 +678,35 @@ export default function UsuariosAdmin() {
                   </>
                 )}
               </DialogContentText>
+              {!contenidoDialogo?.activar && (
+                <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
+                  Mantené presionado 2 segundos para desactivar. Si soltás antes, se cancela.
+                </Typography>
+              )}
             </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 2 }}>
+            <DialogActions sx={{ px: 3, pb: 2, gap: 1, flexWrap: 'wrap', rowGap: 2 }}>
               {/* El foco arranca en Cancelar: es una acción destructiva y quien apreta Enter
                   por reflejo no debería desactivar a nadie sin haberlo leído. */}
               <Button onClick={cerrarDialogo} disabled={cambiandoEstado} autoFocus>
                 Cancelar
               </Button>
-              <Button
+              {contenidoDialogo?.activar ? <Button
                 variant="contained"
-                color={contenidoDialogo?.activar ? 'success' : 'error'}
+                color="success"
                 onClick={confirmarCambioDeEstado}
                 disabled={cambiandoEstado}
               >
-                {cambiandoEstado
-                  ? 'Guardando…'
-                  : contenidoDialogo?.activar
-                    ? 'Activar'
-                    : 'Desactivar'}
-              </Button>
+                {cambiandoEstado ? 'Guardando…' : 'Activar'}
+              </Button> : dialogoAbierto && (
+                <BotonConfirmarManteniendo
+                  key={contenidoDialogo?.usuario?.usuarioId || contenidoDialogo?.usuario?.id}
+                  onConfirmar={confirmarCambioDeEstado}
+                  disabled={cambiandoEstado}
+                  icon={<BlockOutlinedIcon fontSize="small" />}
+                >
+                  Mantener para desactivar
+                </BotonConfirmarManteniendo>
+              )}
             </DialogActions>
           </>
         )}

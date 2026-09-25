@@ -8,6 +8,7 @@ import Typography from '@mui/material/Typography'
 
 import { rangoDeFechasValido } from '../../routes/movimientosUtils'
 import TiradorDeHoja from '../Navegacion/TiradorDeHoja'
+import { papelDeHojaInferior } from '../Comunes/hojaInferior'
 
 // color-scheme hace que el navegador dibuje el ícono y el almanaque del input date en el
 // modo del tema: sin esto, en modo noche el ícono sale negro sobre fondo negro.
@@ -50,7 +51,7 @@ export default function HojaDeFiltrosDeFecha({ open, onClose, desde, hasta, onAp
       slotProps={{
         transition: { onEnter: reiniciarCampos },
         paper: {
-          sx: { borderTopLeftRadius: 16, borderTopRightRadius: 16, pb: 'env(safe-area-inset-bottom)' }
+          sx: papelDeHojaInferior
         }
       }}
     >

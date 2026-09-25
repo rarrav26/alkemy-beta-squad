@@ -1,0 +1,67 @@
+.hero-portada { max-width: 1200px; margin: 0 auto; padding: 0 32px; }
+.hero-principal { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 24px; min-height: 650px; padding: 40px 0 30px; }
+.hero-copy { position: relative; z-index: 2; padding-bottom: 30px; }
+.hero-etiqueta { display: flex; align-items: center; gap: 10px; font-size: 10px; font-weight: 700; letter-spacing: 2.6px; color: var(--hero-acento); margin-bottom: 28px; }
+.hero-etiqueta > span, .hero-punto { width: 6px; height: 6px; background: var(--hero-verde); border-radius: 50%; box-shadow: 0 0 16px var(--hero-verde); flex-shrink: 0; }
+.hero-portada .hero-titulo { font-family: inherit; font-size: clamp(44px, 5.1vw, 68px); font-weight: 750; line-height: 1.08; letter-spacing: -3.5px; margin: 0; }
+.hero-titulo > span { color: var(--hero-acento); }
+.hero-descripcion { color: var(--hero-secundario); max-width: 400px; font-size: 17px; line-height: 1.8; margin: 28px 0; }
+.hero-acciones { display: flex; flex-wrap: wrap; gap: 10px; }
+.hero-nota { display: flex; align-items: center; gap: 12px; margin-top: 38px; color: var(--hero-secundario); font-size: 12px; }
+.hero-nota-linea { width: 28px; height: 1px; background: var(--hero-acento); }
+.hero-escena { position: relative; height: 560px; min-width: 0; isolation: isolate; }
+.hero-escena::before { content: ''; position: absolute; inset: 35px -15px; background: radial-gradient(ellipse, var(--hero-resplandor), transparent 66%); z-index: -1; }
+.hero-orbita { position: absolute; width: 450px; height: 450px; border: 1px solid var(--hero-linea); border-radius: 50%; top: 45px; right: -5px; pointer-events: none; opacity: .45; }
+.hero-orbita--dos { width: 340px; height: 340px; top: 100px; right: 50px; border-style: dashed; }
+.hero-actividad { position: absolute; top: 10px; right: 0; width: 90%; border: 1px solid var(--hero-linea); border-radius: 20px; padding: 18px 14px 0; background: var(--hero-panel); backdrop-filter: blur(16px); box-shadow: 0 22px 70px rgba(0,0,0,.12); transform: rotate(3deg); }
+.hero-actividad-cabecera { display: flex; align-items: center; gap: 8px; padding: 4px 5px 16px; font-size: 9px; font-weight: 650; letter-spacing: 1.4px; color: var(--hero-secundario); }
+.hero-demo { margin-left: auto; font-size: 8px; letter-spacing: 1px; border: 1px solid var(--hero-linea); padding: 3px 5px; border-radius: 4px; }
+.hero-cinta { height: 326px; overflow: hidden; mask-image: linear-gradient(transparent, #000 8%, #000 80%, transparent); }
+.hero-cinta-interior { animation: hero-transacciones 24s linear infinite; }
+.hero-tarjeta { position: absolute; width: 350px; max-width: 80%; top: 243px; left: 0; z-index: 2; transform: rotate(-9deg); filter: drop-shadow(0 22px 24px rgba(0,0,0,.25)); }
+.hero-tarjeta-nota { display: block; text-align: center; font-size: 10px; letter-spacing: .3px; color: var(--hero-secundario); margin-top: 13px; }
+.hero-confirmacion { position: absolute; right: -6px; top: 428px; z-index: 3; display: flex; align-items: center; gap: 10px; background: var(--hero-panel); backdrop-filter: blur(20px); border: 1px solid var(--hero-linea); border-radius: 14px; padding: 14px 18px; box-shadow: 0 12px 30px rgba(0,0,0,.15); animation: hero-flotar 6s ease-in-out infinite; }
+.hero-confirmacion > span { color: var(--hero-verde); font-size: 25px; }
+.hero-confirmacion strong { display: block; font-size: 12px; }
+.hero-confirmacion small { display: block; color: var(--hero-secundario); font-size: 10px; margin-top: 3px; }
+.hero-controles { position: absolute; bottom: 0; right: 0; display: flex; align-items: center; gap: 12px; font-size: 9px; color: var(--hero-secundario); }
+.hero-controles button { display: grid; place-items: center; border: 1px solid var(--hero-linea); border-radius: 50%; width: 32px; height: 32px; color: inherit; background: var(--hero-panel); cursor: pointer; }
+.hero-controles svg { font-size: 17px; }
+.hero-controles button:focus-visible { outline: 2px solid var(--hero-acento); outline-offset: 3px; }
+.hero-escena--pausada .hero-cinta-interior, .hero-escena--pausada .hero-confirmacion, .hero-actividad:hover .hero-cinta-interior { animation-play-state: paused; }
+.hero-beneficios { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; border-top: 1px solid var(--hero-linea); padding: 30px 0; }
+.hero-beneficios > div { display: flex; align-items: center; gap: 14px; }
+.hero-beneficios svg { color: var(--hero-acento); font-size: 24px; }
+.hero-beneficios strong { display: block; font-size: 12px; font-weight: 650; }
+.hero-beneficios small { display: block; color: var(--hero-secundario); font-size: 11px; margin-top: 6px; }
+@keyframes hero-transacciones { to { transform: translateY(-50%); } }
+@keyframes hero-flotar { 50% { transform: translateY(-8px); } }
+@media (max-width: 900px) {
+  .hero-portada { padding: 0 24px; }
+  .hero-principal { grid-template-columns: 1fr; padding-top: 50px; gap: 10px; }
+  .hero-copy { text-align: center; padding-bottom: 0; }
+  .hero-etiqueta, .hero-acciones, .hero-nota { justify-content: center; }
+  .hero-portada .hero-titulo { font-size: clamp(42px, 8vw, 64px); letter-spacing: -2.5px; }
+  .hero-descripcion { margin: 24px auto; }
+  .hero-nota { margin-top: 24px; }
+  .hero-escena { width: 100%; max-width: 520px; margin: 30px auto 0; }
+  .hero-beneficios { gap: 16px; }
+}
+@media (max-width: 600px) {
+  .hero-portada { padding: 0 20px; overflow: hidden; }
+  .hero-principal { padding-top: 32px; }
+  .hero-etiqueta { font-size: 9px; letter-spacing: 1.8px; margin-bottom: 22px; }
+  .hero-descripcion { font-size: 15px; line-height: 1.7; }
+  .hero-acciones { flex-direction: column; align-items: stretch; padding: 0 16px; }
+  .hero-escena { height: 490px; }
+  .hero-actividad { width: 96%; top: 8px; right: 0; padding: 14px 8px 0; transform: rotate(2deg); }
+  .hero-cinta { height: 300px; }
+  .hero-tarjeta { top: 235px; max-width: 85%; left: 3px; transform: rotate(-7deg); }
+  .hero-confirmacion { top: 388px; right: 0; padding: 10px 12px; }
+  .hero-controles { font-size: 8px; }
+  .hero-beneficios { grid-template-columns: 1fr; gap: 26px; padding: 30px 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-cinta-interior, .hero-confirmacion { animation: none; }
+  .hero-controles button { display: none; }
+}

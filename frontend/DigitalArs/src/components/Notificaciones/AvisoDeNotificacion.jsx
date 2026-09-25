@@ -2,7 +2,8 @@ import Alert from '@mui/material/Alert'
 import Snackbar from '@mui/material/Snackbar'
 
 import { useNotificaciones } from '../../context/notificacionesContext'
-import useNavegacionMobile from '../../hooks/useNavegacionMobile'
+import useShell from '../../hooks/useShell'
+import { SHELL_MOBILE } from '../../routes/shellUtils'
 
 const MILISEGUNDOS_DEL_AVISO = 5000
 
@@ -13,12 +14,13 @@ const MILISEGUNDOS_DEL_AVISO = 5000
 // Dónde aparece:
 // - En mobile, abajo y por encima de la barra inferior. Arriba tapaba el encabezado entero,
 //   campana incluida, justo cuando el usuario quiere ver el globito sumar.
-// - En escritorio, arriba y al centro, debajo de nada importante.
+// - En escritorio, arriba y al centro, debajo de nada importante. Vale para las dos cáscaras de
+//   pantalla ancha: la de la barra lateral y la clásica del administrador.
 export default function AvisoDeNotificacion() {
   const { aviso, cerrarAviso } = useNotificaciones()
-  const usaNavegacionMobile = useNavegacionMobile()
+  const esVistaMobile = useShell() === SHELL_MOBILE
 
-  const posicion = usaNavegacionMobile
+  const posicion = esVistaMobile
     ? { vertical: 'bottom', horizontal: 'center' }
     : { vertical: 'top', horizontal: 'center' }
 
@@ -30,7 +32,7 @@ export default function AvisoDeNotificacion() {
       anchorOrigin={posicion}
       // Los 96px son el alto de la barra inferior más el botón de QR que sobresale: la misma
       // separación que usa AvisoProximamente, así los avisos de abajo quedan todos alineados.
-      sx={usaNavegacionMobile ? { bottom: { xs: 96 } } : undefined}
+      sx={esVistaMobile ? { bottom: { xs: 96 } } : undefined}
     >
       <Alert severity={aviso?.severidad ?? 'info'} variant="filled" onClose={cerrarAviso}>
         {aviso?.mensaje ?? ''}
