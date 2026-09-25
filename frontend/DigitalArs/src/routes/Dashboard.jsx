@@ -140,7 +140,7 @@ export default function Dashboard() {
           {esAdmin ? (
             <>
               <Typography>
-                Registrá usuarios y entregales una invitación para que elijan su
+                Registrá usuarios: les enviamos un correo para que elijan su
                 contraseña.
               </Typography>
 
