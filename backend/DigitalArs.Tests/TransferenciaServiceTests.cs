@@ -16,12 +16,16 @@ public class TransferenciaServiceTests
     private readonly Mock<ICuentaRepository> _mockCuentas;
     private readonly Mock<IUsuarioRepository> _mockUsuarios;
     private readonly Mock<ITipoMovimientoRepository> _mockTiposMovimiento;
+    private readonly Mock<INotificacionRepository> _mockNotificaciones;
+    private readonly Mock<INotificadorEnTiempoReal> _mockNotificadorEnTiempoReal;
 
     public TransferenciaServiceTests()
     {
         _mockCuentas = new Mock<ICuentaRepository>();
         _mockUsuarios = new Mock<IUsuarioRepository>();
         _mockTiposMovimiento = new Mock<ITipoMovimientoRepository>();
+        _mockNotificaciones = new Mock<INotificacionRepository>();
+        _mockNotificadorEnTiempoReal = new Mock<INotificadorEnTiempoReal>();
     }
 
     private DigitalArsDbContext CrearContextoEnMemoria()
@@ -39,7 +43,14 @@ public class TransferenciaServiceTests
     {
         // Arrange
         await using var context = CrearContextoEnMemoria();
-        var service = new TransferenciaService(_mockCuentas.Object, _mockUsuarios.Object, _mockTiposMovimiento.Object, context);
+        var service = new TransferenciaService(
+            _mockCuentas.Object,
+            _mockUsuarios.Object,
+            _mockTiposMovimiento.Object,
+            _mockNotificaciones.Object,
+            _mockNotificadorEnTiempoReal.Object,
+            context
+        );
         var dto = new TransferenciaDto { Destino = "alias.destino", Importe = -50m };
 
         // Act
@@ -67,7 +78,14 @@ public class TransferenciaServiceTests
         _mockCuentas.Setup(c => c.GetByAliasOCvuAsync("destino.alias", It.IsAny<CancellationToken>()))
                     .ReturnsAsync(cuentaDestino);
 
-        var service = new TransferenciaService(_mockCuentas.Object, _mockUsuarios.Object, _mockTiposMovimiento.Object, context);
+        var service = new TransferenciaService(
+            _mockCuentas.Object,
+            _mockUsuarios.Object,
+            _mockTiposMovimiento.Object,
+            _mockNotificaciones.Object,
+            _mockNotificadorEnTiempoReal.Object,
+            context
+        );
         var dto = new TransferenciaDto { Destino = "destino.alias", Importe = 500m };
 
         // Act
@@ -93,7 +111,14 @@ public class TransferenciaServiceTests
         _mockCuentas.Setup(c => c.GetByAliasOCvuAsync("inexistente.alias", It.IsAny<CancellationToken>()))
                     .ReturnsAsync((Cuenta?)null);
 
-        var service = new TransferenciaService(_mockCuentas.Object, _mockUsuarios.Object, _mockTiposMovimiento.Object, context);
+        var service = new TransferenciaService(
+            _mockCuentas.Object,
+            _mockUsuarios.Object,
+            _mockTiposMovimiento.Object,
+            _mockNotificaciones.Object,
+            _mockNotificadorEnTiempoReal.Object,
+            context
+        );
         var dto = new TransferenciaDto { Destino = "inexistente.alias", Importe = 100m };
 
         // Act
@@ -121,7 +146,14 @@ public class TransferenciaServiceTests
         _mockCuentas.Setup(c => c.GetByAliasOCvuAsync("destino.inactivo", It.IsAny<CancellationToken>()))
                     .ReturnsAsync(cuentaDestino);
 
-        var service = new TransferenciaService(_mockCuentas.Object, _mockUsuarios.Object, _mockTiposMovimiento.Object, context);
+        var service = new TransferenciaService(
+            _mockCuentas.Object,
+            _mockUsuarios.Object,
+            _mockTiposMovimiento.Object,
+            _mockNotificaciones.Object,
+            _mockNotificadorEnTiempoReal.Object,
+            context
+        );
         var dto = new TransferenciaDto { Destino = "destino.inactivo", Importe = 100m };
 
         // Act
@@ -147,7 +179,14 @@ public class TransferenciaServiceTests
         _mockCuentas.Setup(c => c.GetByAliasOCvuAsync("mi.propio.alias", It.IsAny<CancellationToken>()))
                     .ReturnsAsync(cuentaOrigen);
 
-        var service = new TransferenciaService(_mockCuentas.Object, _mockUsuarios.Object, _mockTiposMovimiento.Object, context);
+        var service = new TransferenciaService(
+            _mockCuentas.Object,
+            _mockUsuarios.Object,
+            _mockTiposMovimiento.Object,
+            _mockNotificaciones.Object,
+            _mockNotificadorEnTiempoReal.Object,
+            context
+        );
         var dto = new TransferenciaDto { Destino = "mi.propio.alias", Importe = 100m };
 
         // Act
@@ -181,7 +220,14 @@ public class TransferenciaServiceTests
         _mockCuentas.Setup(c => c.IncrementarSaldoAsync(2, 200m, It.IsAny<CancellationToken>()))
                     .ReturnsAsync(false);
 
-        var service = new TransferenciaService(_mockCuentas.Object, _mockUsuarios.Object, _mockTiposMovimiento.Object, context);
+        var service = new TransferenciaService(
+            _mockCuentas.Object,
+            _mockUsuarios.Object,
+            _mockTiposMovimiento.Object,
+            _mockNotificaciones.Object,
+            _mockNotificadorEnTiempoReal.Object,
+            context
+        );
         var dto = new TransferenciaDto { Destino = "destino.alias", Importe = 200m };
 
         // Act
